@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-border: 0 0% 90%;
+    --color-input: 0 0% 90%;
+    --color-ring: 0 0% 20%;
+    --color-background: 0 0% 98%;
+    --color-foreground: 0 0% 12%;
+    --color-primary: 0 0% 12%;
+    --color-primary-foreground: 0 0% 98%;
+    --color-secondary: 0 0% 25%;
+    --color-secondary-foreground: 0 0% 98%;
+    --color-tertiary: 40 15% 85%;
+    --color-tertiary-foreground: 0 0% 12%;
+    --color-neutral: 0 0% 98%;
+    --color-neutral-foreground: 0 0% 12%;
+    --color-destructive: 0 0% 30%;
+    --color-destructive-foreground: 0 0% 98%;
+    --color-muted: 0 0% 95%;
+    --color-muted-foreground: 0 0% 40%;
+    --color-accent: 40 15% 85%;
+    --color-accent-foreground: 0 0% 12%;
+    --color-popover: 0 0% 100%;
+    --color-popover-foreground: 0 0% 12%;
+    --color-card: 0 0% 100%;
+    --color-card-foreground: 0 0% 12%;
+    --color-success: 0 0% 30%;
+    --color-warning: 0 0% 40%;
+    
+    --font-sans: "Lato", sans-serif;
+    --font-heading: "Figtree", sans-serif;
+    
+    --radius-lg: 2px;
+    --radius-md: 2px;
+    --radius-sm: 2px;
+  }
+  
+  * {
+    @apply border-border;
+  }
+  
+  html,
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading text-foreground;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  /* Remove all animations */
+  * {
+    animation-duration: 0s !important;
+    transition-duration: 0.15s !important;
+  }
+
+  /* Calm hover states only */
+  button, a {
+    transition: opacity 0.15s ease;
+  }
+
+  button:hover, a:hover {
+    opacity: 0.8;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
