@@ -99,7 +99,7 @@ export default function DirectoryGrid({
             size="icon"
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className="border-border text-foreground hover:bg-muted disabled:opacity-50"
+            className="border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white disabled:opacity-50 disabled:border-gray-300 disabled:text-gray-300"
           >
             <ChevronLeft className="w-5 h-5" />
           </Button>
@@ -112,8 +112,8 @@ export default function DirectoryGrid({
                 onClick={() => onPageChange(page)}
                 className={
                   currentPage === page
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    : 'border-border text-foreground hover:bg-muted'
+                    ? 'bg-[#A89F91] text-white hover:bg-[#B45309]'
+                    : 'border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white'
                 }
               >
                 {page}
@@ -126,7 +126,7 @@ export default function DirectoryGrid({
             size="icon"
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="border-border text-foreground hover:bg-muted disabled:opacity-50"
+            className="border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white disabled:opacity-50 disabled:border-gray-300 disabled:text-gray-300"
           >
             <ChevronRight className="w-5 h-5" />
           </Button>

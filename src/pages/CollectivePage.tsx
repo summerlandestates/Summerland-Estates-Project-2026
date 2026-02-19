@@ -439,7 +439,7 @@ export default function CollectivePage() {
   }, {} as { [key: string]: ForumTopic[] });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="collective" />
       
       <main className="pt-32 pb-16">

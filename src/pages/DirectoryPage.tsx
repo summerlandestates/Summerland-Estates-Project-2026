@@ -8,6 +8,7 @@ import DirectoryGrid from '../components/DirectoryGrid';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { GitCompare, X, Shield, Users, Lock } from 'lucide-react';
 import { listings } from '../data/listings';
 import type { Listing, FilterState, PricingTier } from '../types';
@@ -122,34 +123,50 @@ export default function DirectoryPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="home" />
       
       <main>
         {/* Hero Section */}
-        <section className="pt-48 pb-32 border-b border-border/30">
-          <div className="container mx-auto px-12 max-w-5xl text-center">
-            <h1 className="text-7xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
-              A private network connecting trusted estate professionals with discreet households worldwide.
+        <section className="pt-32 pb-24 border-b border-border/30 bg-gradient-to-b from-tertiary/20 to-background relative overflow-hidden">
+          {/* Wheel background image - bottom right corner */}
+          <div 
+            className="absolute -bottom-32 -right-32 w-96 h-96 opacity-10 pointer-events-none"
+            style={{
+              backgroundImage: 'url(/favicon.png)',
+              backgroundSize: 'contain',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center'
+            }}
+          />
+          <div className="container mx-auto px-12 max-w-6xl text-center relative z-10">
+            <div className="inline-block mb-6">
+              <Badge className="bg-[#A89F91]/10 text-[#A89F91] border-[#A89F91]/20 px-4 py-2 text-sm font-semibold">
+                Premium Estate Services
+              </Badge>
+            </div>
+            <h1 className="text-6xl md:text-7xl font-heading font-bold text-foreground mb-6 tracking-tight leading-tight">
+              Premium Estate Services<br />
+              <span className="text-[#A89F91]">Made Simple</span>
             </h1>
-            <p className="text-xl text-muted-foreground mb-16 max-w-2xl mx-auto leading-relaxed">
-              Membership is reviewed to preserve the integrity of the network.
+            <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed">
+              Connect with verified, background-checked professionals who understand the unique needs of luxury estates. From housekeepers to private chefs, find exceptional service providers in your area.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button
                 onClick={() => navigate('/add-listing')}
                 size="lg"
-                className="bg-primary text-primary-foreground px-12 py-6 text-base"
+                className="bg-[#A89F91] text-white hover:bg-[#8A8279] px-10 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
               >
-                Apply for Membership
+                Become a Provider
               </Button>
               <Button
-                onClick={() => navigate('/add-listing')}
+                onClick={() => navigate('/pricing')}
                 variant="outline"
                 size="lg"
-                className="border-border text-foreground px-12 py-6 text-base"
+                className="border-2 border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white px-10 transition-all duration-300 hover:-translate-y-1"
               >
-                Request Access as a Principal
+                Find Professionals
               </Button>
             </div>
           </div>
@@ -158,42 +175,42 @@ export default function DirectoryPage() {
         {/* Value Section */}
         <section className="py-32 border-b border-border/30">
           <div className="container mx-auto px-12 max-w-7xl">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-6 flex items-center justify-center">
-                  <Lock className="w-12 h-12 text-primary" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <Card className="text-center p-8 border-gray-200 hover:border-[#A89F91] transition-all duration-300 hover:shadow-lg h-full flex flex-col">
+                <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-[#A89F91]/10 rounded-2xl">
+                  <Lock className="w-10 h-10 text-[#A89F91]" />
                 </div>
-                <h3 className="text-2xl font-heading font-medium text-foreground mb-4 tracking-tight">
+                <h3 className="text-2xl font-heading font-semibold text-foreground mb-4 tracking-tight">
                   Discretion by Design
                 </h3>
-                <p className="text-muted-foreground leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed flex-grow">
                   All communication remains private and on-platform.
                 </p>
-              </div>
+              </Card>
 
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-6 flex items-center justify-center">
-                  <Shield className="w-12 h-12 text-primary" />
+              <Card className="text-center p-8 border-gray-200 hover:border-[#A89F91] transition-all duration-300 hover:shadow-lg h-full flex flex-col">
+                <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-[#A89F91]/10 rounded-2xl">
+                  <Shield className="w-10 h-10 text-[#A89F91]" />
                 </div>
-                <h3 className="text-2xl font-heading font-medium text-foreground mb-4 tracking-tight">
+                <h3 className="text-2xl font-heading font-semibold text-foreground mb-4 tracking-tight">
                   Curated Membership
                 </h3>
-                <p className="text-muted-foreground leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed flex-grow">
                   Every profile is reviewed. Standards come before scale.
                 </p>
-              </div>
+              </Card>
 
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-6 flex items-center justify-center">
-                  <Users className="w-12 h-12 text-primary" />
+              <Card className="text-center p-8 border-gray-200 hover:border-[#A89F91] transition-all duration-300 hover:shadow-lg h-full flex flex-col">
+                <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-[#A89F91]/10 rounded-2xl">
+                  <Users className="w-10 h-10 text-[#A89F91]" />
                 </div>
-                <h3 className="text-2xl font-heading font-medium text-foreground mb-4 tracking-tight">
+                <h3 className="text-2xl font-heading font-semibold text-foreground mb-4 tracking-tight">
                   Professional Integrity
                 </h3>
-                <p className="text-muted-foreground leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed flex-grow">
                   This is not an open marketplace. It is a trusted network.
                 </p>
-              </div>
+              </Card>
             </div>
           </div>
         </section>

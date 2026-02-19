@@ -14,7 +14,7 @@ export default function ContactPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="contact" />
       
       <main className="pt-32 pb-16">

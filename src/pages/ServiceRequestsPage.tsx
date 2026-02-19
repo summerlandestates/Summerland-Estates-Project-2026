@@ -103,7 +103,7 @@ export default function ServiceRequestsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="jobs" />
       
       <main className="pt-32 pb-16">

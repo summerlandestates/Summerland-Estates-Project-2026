@@ -77,7 +77,7 @@ export default function FAQsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="faqs" />
       
       <main className="pt-32 pb-16">
@@ -96,12 +96,12 @@ export default function FAQsPage() {
               <AccordionItem
                 key={index}
                 value={`item-${index}`}
-                className="bg-card border border-border rounded-lg px-6"
+                className="bg-white border border-gray-200 rounded-xl px-6 shadow-sm hover:shadow-md transition-shadow duration-300"
               >
-                <AccordionTrigger className="text-left text-foreground hover:text-primary">
+                <AccordionTrigger className="text-left text-gray-900 hover:no-underline">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground">
+                <AccordionContent className="text-gray-600">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>

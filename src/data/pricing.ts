@@ -1,43 +1,20 @@
 import type { PricingPlan, UserType } from '../types';
 
 export const pricingPlans: PricingPlan[] = [
-  // Professional Plans
+  // Professional Plans - Completely FREE with unlimited access
   {
     id: 'professional-free',
     name: 'Free',
     price: '$0',
     features: [
-      'Public profile (1 photo)',
-      'View 1 placement',
-      '1 message to up to 2 profiles'
-    ],
-    userType: 'professional'
-  },
-  {
-    id: 'professional-premium',
-    name: 'Premium',
-    price: '$1.99',
-    period: '/month',
-    features: [
+      'Unlimited photos',
       'Unlimited placements',
       'Unlimited messaging',
-      'Full profile',
+      'Full profile access',
       'Interview request tool',
       'Community access',
-      'Notifications'
-    ],
-    userType: 'professional'
-  },
-  {
-    id: 'professional-community',
-    name: 'Just Join the Community',
-    price: '$1',
-    period: '/month',
-    features: [
-      'Community access only',
-      'No placements',
-      'No interviews',
-      'No booking tools'
+      'Notifications',
+      'All features included'
     ],
     userType: 'professional'
   },

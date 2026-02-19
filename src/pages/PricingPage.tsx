@@ -4,7 +4,7 @@ import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import { Check, User, Building2, Briefcase, Home } from 'lucide-react';
 import { pricingPlans, getPlansByUserType } from '../data/pricing';
 import type { UserType, PricingTier } from '../types';
 
@@ -54,7 +54,7 @@ export default function PricingPage() {
 
   if (!selectedUserType) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background page-transition">
         <NavBar currentPage="pricing" />
         
         <main className="pt-48 pb-32">
@@ -74,8 +74,8 @@ export default function PricingPage() {
                 onClick={() => setSelectedUserType('professional')}
               >
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                    <span className="text-3xl">👤</span>
+                  <div className="w-16 h-16 bg-[#A89F91]/10 rounded-xl flex items-center justify-center mx-auto mb-6">
+                    <User className="w-8 h-8 text-[#A89F91]" />
                   </div>
                   <h2 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
                     Private Estate Professionals
@@ -83,7 +83,7 @@ export default function PricingPage() {
                   <p className="text-muted-foreground mb-8 leading-relaxed">
                     Seeking placements in private estates
                   </p>
-                  <Button className="w-full bg-primary text-primary-foreground px-8 py-4">
+                  <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4">
                     View Plans
                   </Button>
                 </div>
@@ -94,8 +94,8 @@ export default function PricingPage() {
                 onClick={() => setSelectedUserType('business')}
               >
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-secondary/10 flex items-center justify-center mx-auto mb-6">
-                    <span className="text-3xl">🏢</span>
+                  <div className="w-16 h-16 bg-[#A89F91]/10 rounded-xl flex items-center justify-center mx-auto mb-6">
+                    <Building2 className="w-8 h-8 text-[#A89F91]" />
                   </div>
                   <h2 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
                     Estate Services Businesses
@@ -103,7 +103,7 @@ export default function PricingPage() {
                   <p className="text-muted-foreground mb-8 leading-relaxed">
                     Providing services to private estates
                   </p>
-                  <Button className="w-full bg-secondary text-secondary-foreground px-8 py-4">
+                  <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4">
                     View Plans
                   </Button>
                 </div>
@@ -114,8 +114,8 @@ export default function PricingPage() {
                 onClick={() => setSelectedUserType('agency')}
               >
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-accent/10 flex items-center justify-center mx-auto mb-6">
-                    <span className="text-3xl">🎯</span>
+                  <div className="w-16 h-16 bg-[#A89F91]/10 rounded-xl flex items-center justify-center mx-auto mb-6">
+                    <Briefcase className="w-8 h-8 text-[#A89F91]" />
                   </div>
                   <h2 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
                     Agencies
@@ -123,7 +123,7 @@ export default function PricingPage() {
                   <p className="text-muted-foreground mb-8 leading-relaxed">
                     Placing professionals in estates
                   </p>
-                  <Button className="w-full bg-accent text-accent-foreground px-8 py-4">
+                  <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4">
                     View Plans
                   </Button>
                 </div>
@@ -134,8 +134,8 @@ export default function PricingPage() {
                 onClick={() => setSelectedUserType('estates')}
               >
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-tertiary/10 flex items-center justify-center mx-auto mb-6">
-                    <span className="text-3xl">🏰</span>
+                  <div className="w-16 h-16 bg-[#A89F91]/10 rounded-xl flex items-center justify-center mx-auto mb-6">
+                    <Home className="w-8 h-8 text-[#A89F91]" />
                   </div>
                   <h2 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
                     Estate Principals
@@ -143,7 +143,7 @@ export default function PricingPage() {
                   <p className="text-muted-foreground mb-8 leading-relaxed">
                     Hiring for private estates
                   </p>
-                  <Button className="w-full bg-tertiary text-tertiary-foreground px-8 py-4">
+                  <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4">
                     View Plans
                   </Button>
                 </div>
@@ -168,11 +168,11 @@ export default function PricingPage() {
                     </p>
                     <ul className="space-y-2 text-sm text-foreground text-left">
                       <li className="flex items-start">
-                        <Check className="w-4 h-4 mr-2 mt-0.5 text-primary flex-shrink-0" />
+                        <Check className="w-4 h-4 mr-2 mt-0.5 text-[#A89F91] flex-shrink-0" />
                         <span>Community access only</span>
                       </li>
                       <li className="flex items-start">
-                        <Check className="w-4 h-4 mr-2 mt-0.5 text-primary flex-shrink-0" />
+                        <Check className="w-4 h-4 mr-2 mt-0.5 text-[#A89F91] flex-shrink-0" />
                         <span>No placements or interviews</span>
                       </li>
                     </ul>
@@ -185,11 +185,11 @@ export default function PricingPage() {
                     </p>
                     <ul className="space-y-2 text-sm text-foreground text-left">
                       <li className="flex items-start">
-                        <Check className="w-4 h-4 mr-2 mt-0.5 text-primary flex-shrink-0" />
+                        <Check className="w-4 h-4 mr-2 mt-0.5 text-[#A89F91] flex-shrink-0" />
                         <span>Community access only</span>
                       </li>
                       <li className="flex items-start">
-                        <Check className="w-4 h-4 mr-2 mt-0.5 text-primary flex-shrink-0" />
+                        <Check className="w-4 h-4 mr-2 mt-0.5 text-[#A89F91] flex-shrink-0" />
                         <span>No hiring or messaging tools</span>
                       </li>
                     </ul>
@@ -199,7 +199,7 @@ export default function PricingPage() {
                 <Button
                   onClick={handleJoinCommunity}
                   size="lg"
-                  className="bg-primary text-primary-foreground px-12 py-4"
+                  className="bg-[#A89F91] hover:bg-[#8A8279] text-white px-12 py-4"
                 >
                   Join Community
                 </Button>
@@ -263,7 +263,7 @@ export default function PricingPage() {
                 <ul className="space-y-4 mb-8 min-h-[240px]">
                   {plan.features.map((feature, index) => (
                     <li key={index} className="flex items-start text-foreground">
-                      <Check className="w-5 h-5 mr-3 mt-0.5 text-primary flex-shrink-0" />
+                      <Check className="w-5 h-5 mr-3 mt-0.5 text-[#A89F91] flex-shrink-0" />
                       <span className="text-sm leading-relaxed">{feature}</span>
                     </li>
                   ))}
@@ -271,7 +271,7 @@ export default function PricingPage() {
 
                 <Button
                   onClick={() => handleSelectTier(plan.id)}
-                  className="w-full bg-primary text-primary-foreground px-8 py-4"
+                  className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4"
                 >
                   Continue
                 </Button>

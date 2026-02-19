@@ -36,12 +36,12 @@ export default function ListingCard({
   };
 
   const displayName = formatNameForDisplay(listing, canViewFullName);
-  const displayPhoto = canViewPhoto ? listing.profilePhoto : 'https://via.placeholder.com/400x400/e5e5e5/666666?text=Profile';
+  const displayPhoto = canViewPhoto ? listing.profilePhoto : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(displayName) + '&size=400&background=D97706&color=fff&bold=true';
 
   if (viewMode === 'list') {
     return (
       <Card
-        className={`listing-card p-6 bg-card text-card-foreground cursor-pointer transition-all duration-300 ease-in-out hover:scale-[1.02] border relative ${
+        className={`listing-card p-6 bg-card text-card-foreground cursor-pointer transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1 border relative ${
           isSelected ? 'border-primary border-2 shadow-lg' : 'border-border'
         }`}
         onClick={onClick}
@@ -65,8 +65,8 @@ export default function ListingCard({
               loading="lazy"
             />
             {listing.isOnlineNow && (
-              <div className="absolute top-2 right-2 flex items-center gap-1 bg-success text-white px-2 py-1 rounded-full text-xs font-semibold">
-                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+              <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                 Online
               </div>
             )}
@@ -82,7 +82,7 @@ export default function ListingCard({
               <div className="flex items-center gap-2 flex-shrink-0">
                 <Badge
                   variant="secondary"
-                  className="bg-secondary text-secondary-foreground"
+                  className="bg-gray-800 text-white hover:bg-gray-900"
                 >
                   {listing.category}
                 </Badge>
@@ -106,7 +106,7 @@ export default function ListingCard({
                   {listing.experienceYears} years exp.
                 </div>
                 {listing.availability && (
-                  <Badge className="bg-success text-white">Available</Badge>
+                  <Badge className="bg-[#D97706] text-white hover:bg-[#B45309]">Available</Badge>
                 )}
               </div>
             )}
@@ -118,8 +118,8 @@ export default function ListingCard({
 
   return (
     <Card
-      className={`listing-card bg-card text-card-foreground cursor-pointer overflow-hidden border relative ${
-        isSelected ? 'border-primary' : 'border-border/50'
+      className={`listing-card bg-card text-card-foreground cursor-pointer overflow-hidden border relative transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${
+        isSelected ? 'border-primary border-2 shadow-lg' : 'border-border/50'
       }`}
       onClick={onClick}
     >
@@ -141,8 +141,8 @@ export default function ListingCard({
           loading="lazy"
         />
         {listing.isOnlineNow && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 bg-success text-white px-2 py-1 rounded-full text-xs font-semibold">
-            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+          <div className="absolute top-3 right-3 flex items-center gap-1 bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+            <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
             Online
           </div>
         )}
@@ -163,12 +163,12 @@ export default function ListingCard({
         <div className="flex items-center gap-2">
           <Badge
             variant="secondary"
-            className="bg-secondary text-secondary-foreground"
+            className="bg-gray-800 text-white hover:bg-gray-900"
           >
             {listing.category}
           </Badge>
           {listing.availability && (
-            <Badge className="bg-success text-white">Available</Badge>
+            <Badge className="bg-[#D97706] text-white hover:bg-[#B45309]">Available</Badge>
           )}
         </div>
 

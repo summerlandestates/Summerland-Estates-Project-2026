@@ -10,7 +10,7 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="about" />
       
       <main className="pt-32 pb-16">

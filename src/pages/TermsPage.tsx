@@ -9,7 +9,7 @@ export default function TermsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="terms" />
       
       <main className="pt-32 pb-16">

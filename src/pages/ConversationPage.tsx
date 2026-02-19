@@ -233,7 +233,7 @@ export default function ConversationPage() {
   const showConfirmButton = canShowConfirmHired(conversation, listings);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="" />
       
       <main className="pt-32 pb-16">

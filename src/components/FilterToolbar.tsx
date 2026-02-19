@@ -163,7 +163,7 @@ export default function FilterToolbar({
       <Button
         variant="ghost"
         onClick={handleReset}
-        className="text-muted-foreground hover:text-foreground hover:bg-muted"
+        className="text-gray-600 hover:text-[#A89F91] hover:bg-[#A89F91]/10"
       >
         Reset Filters
       </Button>
@@ -188,14 +188,14 @@ export default function FilterToolbar({
               <ToggleGroupItem
                 value="grid"
                 aria-label="Grid view"
-                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                className="data-[state=on]:bg-[#A89F91] data-[state=on]:text-white border-[#A89F91]/30 hover:bg-[#A89F91]/10"
               >
                 <Grid3x3 className="w-5 h-5" />
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="list"
                 aria-label="List view"
-                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                className="data-[state=on]:bg-[#A89F91] data-[state=on]:text-white border-[#A89F91]/30 hover:bg-[#A89F91]/10"
               >
                 <List className="w-5 h-5" />
               </ToggleGroupItem>

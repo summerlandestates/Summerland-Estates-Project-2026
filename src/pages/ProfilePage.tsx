@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Star, CheckCircle, Mail, Phone, Share2, Send, Heart, UserPlus } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,8 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const listing = listings.find((l) => l.id === id);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showReferModal, setShowReferModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
   const [copied, setCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -195,32 +196,33 @@ export default function ProfilePage() {
   const displayPhoto = visibilityRules.canViewPhoto ? listing.profilePhoto : 'https://via.placeholder.com/400x400/e5e5e5/666666?text=Profile';
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="" />
       
       <main className="pt-32 pb-16">
-        <div className="container mx-auto px-8 max-w-5xl">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
           <Button
             onClick={() => navigate('/')}
             variant="ghost"
-            className="mb-8 text-foreground hover:bg-muted"
+            className="mb-6 text-foreground hover:bg-muted"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Directory
           </Button>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="lg:col-span-1 lg:sticky lg:top-32 lg:self-start">
-              <Card className="p-8 bg-card text-card-foreground">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Sidebar - Profile Card */}
+            <div className="lg:col-span-1">
+              <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl overflow-hidden">
                 <div className="relative mb-6">
                   <img
                     src={displayPhoto}
                     alt={displayName}
-                    className="w-full aspect-square object-cover rounded-lg"
+                    className="w-full aspect-square object-cover rounded-xl"
                     loading="lazy"
                   />
                   {listing.isOnlineNow && (
-                    <div className="absolute top-3 right-3 flex items-center gap-2 bg-success text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    <div className="absolute top-3 right-3 flex items-center gap-2 bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-md">
                       <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                       Online Now
                     </div>
@@ -247,15 +249,6 @@ export default function ProfilePage() {
                     >
                       {listing.category}
                     </Badge>
-                    {listing.verified && (
-                      <Badge
-                        variant="outline"
-                        className="border-success text-success"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        Verified
-                      </Badge>
-                    )}
                     {listing.profileStatus && (
                       <Badge className={getProfileStatusColor(listing.profileStatus)}>
                         {getProfileStatusLabel(listing.profileStatus)}
@@ -302,7 +295,8 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="mt-8 space-y-3">
-                  {visibilityRules.canSendMessage ? (
+                  {/* Professionals can message for free, others need to upgrade */}
+                  {(userTier === 'professional-free' || visibilityRules.canSendMessage) ? (
                     <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
                       <Mail className="w-5 h-5 mr-2" />
                       Send Message
@@ -344,17 +338,17 @@ export default function ProfilePage() {
                     <Button
                       variant="outline"
                       className="border-border text-foreground hover:bg-muted"
-                      onClick={handleRefer}
+                      onClick={() => setShowReviewModal(true)}
                     >
-                      <Send className="w-4 h-4 mr-2" />
-                      Refer
+                      <Star className="w-4 h-4 mr-2" />
+                      Review
                     </Button>
                     <Button
                       variant={isSaved ? "default" : "outline"}
                       className={isSaved ? "bg-primary text-primary-foreground" : "border-border text-foreground hover:bg-muted"}
                       onClick={handleToggleSave}
                     >
-                      <Heart className={`w-4 h-4 mr-2 ${isSaved ? 'fill-current' : ''}`} />
+                      <Bookmark className={`w-4 h-4 mr-2 ${isSaved ? 'fill-current' : ''}`} />
                       {isSaved ? 'Saved' : 'Save'}
                     </Button>
                     <Button
@@ -370,7 +364,8 @@ export default function ProfilePage() {
               </Card>
             </div>
 
-            <div className="lg:col-span-3">
+            {/* Right Content - Profile Details */}
+            <div className="lg:col-span-2">
               {!visibilityRules.canViewDetailedInfo ? (
                 <UpgradePrompt
                   feature="Full Profile Details"
@@ -379,8 +374,8 @@ export default function ProfilePage() {
                 />
               ) : (
                 <div className="space-y-6">
-                  <Card className="p-6 bg-card text-card-foreground">
-                    <h2 className="text-xl font-heading font-bold text-foreground mb-3">
+                  <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl">
+                    <h2 className="text-xl font-heading font-bold text-foreground mb-4 pb-3 border-b border-gray-100">
                       About
                     </h2>
                     <p className="text-foreground leading-relaxed text-sm">{listing.bio}</p>
@@ -394,8 +389,8 @@ export default function ProfilePage() {
                   </Card>
 
                   {listing.languages && listing.languages.length > 0 && (
-                    <Card className="p-6 bg-card text-card-foreground">
-                      <h2 className="text-xl font-heading font-bold text-foreground mb-3">
+                    <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl">
+                      <h2 className="text-xl font-heading font-bold text-foreground mb-4 pb-3 border-b border-gray-100">
                         Languages
                       </h2>
                       <div className="flex flex-wrap gap-2">
@@ -403,7 +398,7 @@ export default function ProfilePage() {
                           <Badge
                             key={index}
                             variant="secondary"
-                            className="bg-secondary text-secondary-foreground"
+                            className="bg-[#A89F91]/10 text-[#A89F91] border border-[#A89F91]/20"
                           >
                             {language}
                           </Badge>
@@ -413,13 +408,13 @@ export default function ProfilePage() {
                   )}
 
                   {listing.workHistory && listing.workHistory.length > 0 && (
-                    <Card className="p-6 bg-card text-card-foreground">
-                      <h2 className="text-xl font-heading font-bold text-foreground mb-4">
+                    <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl">
+                      <h2 className="text-xl font-heading font-bold text-foreground mb-4 pb-3 border-b border-gray-100">
                         Work History
                       </h2>
-                      <div className="space-y-4">
+                      <div className="space-y-6">
                         {listing.workHistory.map((job, index) => (
-                          <div key={index} className="border-l-2 border-primary pl-4">
+                          <div key={index} className="border-l-3 border-[#A89F91] pl-4">
                             <h3 className="text-base font-heading font-semibold text-foreground">
                               {job.jobTitle}
                             </h3>
@@ -428,8 +423,8 @@ export default function ProfilePage() {
                             </p>
                             <ul className="space-y-1">
                               {job.duties.map((duty, dutyIndex) => (
-                                <li key={dutyIndex} className="text-foreground text-xs flex items-start">
-                                  <span className="mr-2">•</span>
+                                <li key={dutyIndex} className="text-foreground text-sm flex items-start">
+                                  <span className="mr-2 text-[#A89F91]">•</span>
                                   <span>{duty}</span>
                                 </li>
                               ))}
@@ -441,8 +436,8 @@ export default function ProfilePage() {
                   )}
 
                   {listing.technicalSkills && listing.technicalSkills.length > 0 && (
-                    <Card className="p-6 bg-card text-card-foreground">
-                      <h2 className="text-xl font-heading font-bold text-foreground mb-3">
+                    <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl">
+                      <h2 className="text-xl font-heading font-bold text-foreground mb-4 pb-3 border-b border-gray-100">
                         Technical Skills
                       </h2>
                       <div className="flex flex-wrap gap-2">
@@ -450,7 +445,7 @@ export default function ProfilePage() {
                           <Badge
                             key={index}
                             variant="secondary"
-                            className="bg-muted text-muted-foreground text-xs"
+                            className="bg-gray-100 text-gray-700 text-xs"
                           >
                             {skill}
                           </Badge>
@@ -460,14 +455,14 @@ export default function ProfilePage() {
                   )}
 
                   {listing.certifications && listing.certifications.length > 0 && (
-                    <Card className="p-6 bg-card text-card-foreground">
-                      <h2 className="text-xl font-heading font-bold text-foreground mb-3">
+                    <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl">
+                      <h2 className="text-xl font-heading font-bold text-foreground mb-4 pb-3 border-b border-gray-100">
                         Certifications
                       </h2>
-                      <ul className="space-y-2 text-sm">
+                      <ul className="space-y-3 text-sm">
                         {listing.certifications.map((cert, index) => (
                           <li key={index} className="flex items-start text-foreground">
-                            <CheckCircle className="w-4 h-4 mr-2 mt-0.5 text-success flex-shrink-0" />
+                            <CheckCircle className="w-5 h-5 mr-3 mt-0.5 text-green-500 flex-shrink-0" />
                             <span>{cert}</span>
                           </li>
                         ))}
@@ -476,7 +471,7 @@ export default function ProfilePage() {
                   )}
 
                   {listing.reviews && listing.reviews.length > 0 && (
-                    <Card className="p-6 bg-card text-card-foreground border-2 border-accent">
+                    <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl">
                       <div className="flex items-center justify-between mb-3">
                         <h2 className="text-xl font-heading font-bold text-foreground">
                           Reviews
@@ -525,6 +520,60 @@ export default function ProfilePage() {
       </main>
 
       <Footer />
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 p-6 bg-card">
+            <h3 className="text-xl font-heading font-bold text-foreground mb-4">
+              Rate this Profile
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              How would you rate {listing?.name}?
+            </p>
+            <div className="flex justify-center gap-2 mb-6">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setReviewRating(star)}
+                  className="p-1 transition-transform hover:scale-110"
+                >
+                  <Star
+                    className={`w-10 h-10 ${
+                      star <= reviewRating
+                        ? 'fill-[#A89F91] text-[#A89F91]'
+                        : 'text-gray-300'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowReviewModal(false);
+                  setReviewRating(0);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                onClick={() => {
+                  // TODO: Save review to database
+                  setShowReviewModal(false);
+                  setReviewRating(0);
+                }}
+                disabled={reviewRating === 0}
+              >
+                Submit Review
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

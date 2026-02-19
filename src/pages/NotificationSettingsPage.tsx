@@ -144,7 +144,7 @@ export default function NotificationSettingsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="" />
       
       <main className="pt-32 pb-16">

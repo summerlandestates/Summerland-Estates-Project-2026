@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ type ExitStep = 'outcome' | 'select-profile' | 'community-offer' | 'confirm-dele
 
 export default function AccountManagementPage() {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
   const [userType, setUserType] = useState<UserType>('professional');
   const [showExitFlow, setShowExitFlow] = useState(false);
@@ -30,10 +32,11 @@ export default function AccountManagementPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    if (!loggedIn) {
-      navigate('/');
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/login');
       return;
     }
 
@@ -41,7 +44,19 @@ export default function AccountManagementPage() {
     const type = localStorage.getItem('userType') as UserType;
     setUserTier(tier);
     setUserType(type || 'professional');
-  }, [navigate]);
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A89F91]"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const handleStartExitFlow = () => {
     setShowExitFlow(true);
@@ -116,7 +131,7 @@ export default function AccountManagementPage() {
   const communityPrice = isProfessional ? '$1' : '$3.99';
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="" />
       
       <main className="pt-32 pb-16">
