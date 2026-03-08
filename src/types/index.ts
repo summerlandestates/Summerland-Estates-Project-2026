@@ -157,12 +157,16 @@ export type EstatesRole = 'estate-manager' | 'chief-of-staff' | 'personal-assist
 export type UserType = 'professional' | 'business' | 'agency' | 'estates';
 
 export type PricingTier = 
+  | 'professional-basic' 
+  | 'professional-pro'
   | 'professional-free' 
   | 'professional-premium'
   | 'professional-community'
   | 'business-free'
+  | 'business-basic'
   | 'business-pro'
   | 'business-multi'
+  | 'business-enterprise'
   | 'agency-free'
   | 'agency-basic'
   | 'agency-hiring'
@@ -297,6 +301,20 @@ export interface FilterState {
   availableNow: boolean;
   verifiedOnly: boolean;
   profileStatus: string;
+  // Advanced filters from requirements
+  title?: string;
+  serviceType?: string;
+  gender?: string;
+  language?: string;
+  workAvailability?: string;
+  hasBackgroundCheck?: boolean;
+  willingDrugTest?: boolean;
+  certifications?: string[];
+  comfortWith?: string[];
+  hasCar?: boolean;
+  yearsExperience?: string;
+  personalityType?: string;
+  cookingLevel?: string;
 }
 
 export interface NotificationPreferences {
@@ -348,6 +366,7 @@ export interface OnboardingStep {
   content: string;
   subContent?: string;
   note?: string;
+  buttonText?: string;
 }
 
 export interface ApplicationFormData {

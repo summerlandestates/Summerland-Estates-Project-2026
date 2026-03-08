@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { 
   FileText, 
   DollarSign, 
@@ -18,8 +29,10 @@ import {
   Shield, 
   TrendingUp,
   Download,
-  Search
+  Search,
+  X
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Tool {
   id: string;
@@ -28,6 +41,8 @@ interface Tool {
   icon: any;
   category: string;
   downloadUrl?: string;
+  price: string;
+  includedInPlan?: string[];
 }
 
 const tools: Tool[] = [
@@ -37,7 +52,9 @@ const tools: Tool[] = [
     description: 'Comprehensive budgeting spreadsheet for tracking household expenses, staff salaries, maintenance costs, and annual projections.',
     icon: DollarSign,
     category: 'Financial',
-    downloadUrl: '/templates/estate-budget-template.xlsx'
+    downloadUrl: '/templates/estate-budget-template.xlsx',
+    price: '$4.99',
+    includedInPlan: ['estates-pro', 'agency-pro']
   },
   {
     id: 'vendor-comparison',
@@ -45,7 +62,9 @@ const tools: Tool[] = [
     description: 'Compare quotes, services, and ratings from multiple vendors. Includes negotiation tips and contract review checklist.',
     icon: TrendingUp,
     category: 'Financial',
-    downloadUrl: '/templates/vendor-comparison.xlsx'
+    downloadUrl: '/templates/vendor-comparison.xlsx',
+    price: '$3.99',
+    includedInPlan: ['estates-hiring', 'estates-pro', 'agency-hiring', 'agency-pro']
   },
   {
     id: 'price-negotiation',
@@ -53,7 +72,9 @@ const tools: Tool[] = [
     description: 'Step-by-step guide for negotiating with vendors, including scripts, tactics, and best practices for securing favorable terms.',
     icon: FileText,
     category: 'Financial',
-    downloadUrl: '/templates/negotiation-guide.pdf'
+    downloadUrl: '/templates/negotiation-guide.pdf',
+    price: '$2.99',
+    includedInPlan: ['estates-basic', 'estates-hiring', 'estates-pro']
   },
   {
     id: 'estate-manager-manual',
@@ -61,7 +82,9 @@ const tools: Tool[] = [
     description: 'Complete training guide covering responsibilities, protocols, staff management, and best practices for estate management.',
     icon: BookOpen,
     category: 'Training',
-    downloadUrl: '/templates/estate-manager-manual.pdf'
+    downloadUrl: '/templates/estate-manager-manual.pdf',
+    price: '$9.99',
+    includedInPlan: ['estates-pro']
   },
   {
     id: 'housekeeper-manual',
@@ -69,7 +92,9 @@ const tools: Tool[] = [
     description: 'Detailed cleaning protocols, product usage, room-by-room checklists, and quality standards for housekeeping staff.',
     icon: BookOpen,
     category: 'Training',
-    downloadUrl: '/templates/housekeeper-manual.pdf'
+    downloadUrl: '/templates/housekeeper-manual.pdf',
+    price: '$7.99',
+    includedInPlan: ['estates-hiring', 'estates-pro']
   },
   {
     id: 'chef-manual',
@@ -77,7 +102,9 @@ const tools: Tool[] = [
     description: 'Kitchen management, meal planning, dietary accommodations, food safety, and service standards for private chefs.',
     icon: BookOpen,
     category: 'Training',
-    downloadUrl: '/templates/chef-manual.pdf'
+    downloadUrl: '/templates/chef-manual.pdf',
+    price: '$7.99',
+    includedInPlan: ['estates-hiring', 'estates-pro']
   },
   {
     id: 'security-manual',
@@ -85,7 +112,9 @@ const tools: Tool[] = [
     description: 'Security protocols, emergency procedures, access control, surveillance systems, and incident reporting guidelines.',
     icon: Shield,
     category: 'Training',
-    downloadUrl: '/templates/security-manual.pdf'
+    downloadUrl: '/templates/security-manual.pdf',
+    price: '$7.99',
+    includedInPlan: ['estates-pro']
   },
   {
     id: 'house-protocols',
@@ -93,7 +122,9 @@ const tools: Tool[] = [
     description: 'Standard operating procedures for daily operations, guest services, event management, and household routines.',
     icon: ClipboardList,
     category: 'Operations',
-    downloadUrl: '/templates/house-protocols.pdf'
+    downloadUrl: '/templates/house-protocols.pdf',
+    price: '$5.99',
+    includedInPlan: ['estates-basic', 'estates-hiring', 'estates-pro']
   },
   {
     id: 'inventory-list',
@@ -101,7 +132,9 @@ const tools: Tool[] = [
     description: 'Track furniture, artwork, electronics, linens, and all household items. Includes valuation and insurance documentation.',
     icon: ClipboardList,
     category: 'Operations',
-    downloadUrl: '/templates/inventory-template.xlsx'
+    downloadUrl: '/templates/inventory-template.xlsx',
+    price: '$3.99',
+    includedInPlan: ['estates-basic', 'estates-hiring', 'estates-pro']
   },
   {
     id: 'emergency-procedures',
@@ -109,7 +142,9 @@ const tools: Tool[] = [
     description: 'Comprehensive emergency response plans for fire, medical emergencies, natural disasters, security breaches, and evacuations.',
     icon: AlertTriangle,
     category: 'Safety',
-    downloadUrl: '/templates/emergency-procedures.pdf'
+    downloadUrl: '/templates/emergency-procedures.pdf',
+    price: '$4.99',
+    includedInPlan: ['estates-basic', 'estates-hiring', 'estates-pro']
   },
   {
     id: 'emergency-contacts',
@@ -117,7 +152,9 @@ const tools: Tool[] = [
     description: 'Essential phone numbers including police, fire, medical, utilities, contractors, and key personnel. Print and post throughout property.',
     icon: Phone,
     category: 'Safety',
-    downloadUrl: '/templates/emergency-contacts.pdf'
+    downloadUrl: '/templates/emergency-contacts.pdf',
+    price: 'Free',
+    includedInPlan: ['estates-free', 'estates-basic', 'estates-hiring', 'estates-pro']
   },
   {
     id: 'utility-shutoff',
@@ -125,7 +162,9 @@ const tools: Tool[] = [
     description: 'Step-by-step instructions with photos for shutting off gas, water, and electricity in emergencies. Includes valve locations.',
     icon: Droplet,
     category: 'Safety',
-    downloadUrl: '/templates/utility-shutoff-guide.pdf'
+    downloadUrl: '/templates/utility-shutoff-guide.pdf',
+    price: '$1.99',
+    includedInPlan: ['estates-basic', 'estates-hiring', 'estates-pro']
   },
   {
     id: 'gas-shutoff',
@@ -133,7 +172,9 @@ const tools: Tool[] = [
     description: 'Detailed guide for safely shutting off gas lines, identifying gas leaks, and when to call professionals.',
     icon: Flame,
     category: 'Safety',
-    downloadUrl: '/templates/gas-shutoff.pdf'
+    downloadUrl: '/templates/gas-shutoff.pdf',
+    price: '$1.99',
+    includedInPlan: ['estates-basic', 'estates-hiring', 'estates-pro']
   },
   {
     id: 'home-systems',
@@ -141,7 +182,9 @@ const tools: Tool[] = [
     description: 'Operating instructions for HVAC, security, automation, pool systems, and all smart home technology.',
     icon: Home,
     category: 'Operations',
-    downloadUrl: '/templates/home-systems-manual.pdf'
+    downloadUrl: '/templates/home-systems-manual.pdf',
+    price: '$6.99',
+    includedInPlan: ['estates-hiring', 'estates-pro']
   },
   {
     id: 'warranty-registration',
@@ -149,7 +192,9 @@ const tools: Tool[] = [
     description: 'Instructions for registering appliances, tracking warranties, scheduling maintenance, and filing claims.',
     icon: FileText,
     category: 'Operations',
-    downloadUrl: '/templates/warranty-guide.pdf'
+    downloadUrl: '/templates/warranty-guide.pdf',
+    price: '$2.99',
+    includedInPlan: ['estates-basic', 'estates-hiring', 'estates-pro']
   },
   {
     id: 'staff-handbook',
@@ -157,7 +202,9 @@ const tools: Tool[] = [
     description: 'Customizable employee handbook covering policies, expectations, benefits, and workplace guidelines.',
     icon: Users,
     category: 'HR',
-    downloadUrl: '/templates/staff-handbook.pdf'
+    downloadUrl: '/templates/staff-handbook.pdf',
+    price: '$8.99',
+    includedInPlan: ['estates-hiring', 'estates-pro']
   }
 ];
 
@@ -189,10 +236,32 @@ export default function ToolsPage() {
     setFilteredTools(filtered);
   }, [searchQuery, selectedCategory]);
 
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
+  const navigate = useNavigate();
+
   const handleDownload = (tool: Tool) => {
-    // In a real app, this would trigger an actual download
-    console.log('Downloading:', tool.title);
-    alert(`Downloading ${tool.title}...`);
+    if (tool.price === 'Free') {
+      // Free download
+      console.log('Downloading:', tool.title);
+      toast.success('Download Started!', {
+        description: `${tool.title} is being downloaded.`,
+      });
+    } else {
+      // Show pricing modal for paid templates
+      setSelectedTool(tool);
+      setShowPricingModal(true);
+    }
+  };
+
+  const handlePurchase = () => {
+    if (selectedTool) {
+      toast.success('Redirecting to checkout...', {
+        description: `Purchasing ${selectedTool.title} for ${selectedTool.price}`,
+      });
+      setShowPricingModal(false);
+      // In real app, would redirect to Stripe checkout
+    }
   };
 
   return (
@@ -261,25 +330,36 @@ export default function ToolsPage() {
                         <Icon className="w-6 h-6 text-primary" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-lg font-heading font-semibold text-foreground mb-1">
-                          {tool.title}
-                        </h3>
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="text-lg font-heading font-semibold text-foreground">
+                            {tool.title}
+                          </h3>
+                          <span className={`text-sm font-semibold ${tool.price === 'Free' ? 'text-green-600' : 'text-primary'}`}>
+                            {tool.price}
+                          </span>
+                        </div>
                         <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                           {tool.category}
                         </span>
                       </div>
                     </div>
 
-                    <p className="text-sm text-foreground mb-6 leading-relaxed">
+                    <p className="text-sm text-foreground mb-4 leading-relaxed">
                       {tool.description}
                     </p>
+
+                    {tool.includedInPlan && tool.includedInPlan.length > 0 && (
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Included in: {tool.includedInPlan.map(p => p.replace('estates-', '').replace('agency-', '')).join(', ')} plans
+                      </p>
+                    )}
 
                     <Button
                       onClick={() => handleDownload(tool)}
                       className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      Download Template
+                      {tool.price === 'Free' ? 'Download Free' : `Purchase ${tool.price}`}
                     </Button>
                   </Card>
                 );
@@ -296,19 +376,156 @@ export default function ToolsPage() {
               <p className="text-lg mb-6 text-primary-foreground/90">
                 We can create customized templates and training materials specific to your estate's needs. Contact us to discuss your requirements.
               </p>
-              <Button
-                variant="secondary"
-                size="lg"
-                className="bg-tertiary text-tertiary-foreground hover:bg-tertiary/90"
-              >
-                Request Custom Templates
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    className="bg-tertiary text-tertiary-foreground hover:bg-tertiary/90"
+                  >
+                    Request Custom Templates
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px]">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-heading">Request Custom Template</DialogTitle>
+                    <DialogDescription>
+                      Fill out the form below and we'll create a customized template for your estate's needs.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      toast.success('Request Submitted!', {
+                        description: 'We will review your request and get back to you within 2-3 business days.',
+                      });
+                    }}
+                    className="space-y-4 mt-4"
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor="request_name">Your Name</Label>
+                      <Input
+                        id="request_name"
+                        placeholder="Full name"
+                        required
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="request_email">Email Address</Label>
+                      <Input
+                        id="request_email"
+                        type="email"
+                        placeholder="email@example.com"
+                        required
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="template_name">Template Name</Label>
+                      <Input
+                        id="template_name"
+                        placeholder="e.g. Wine Cellar Inventory Tracker"
+                        required
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="template_description">Description</Label>
+                      <Textarea
+                        id="template_description"
+                        placeholder="Describe what you need the template to do, what fields it should include, and any specific requirements..."
+                        rows={4}
+                        required
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-4">
+                      <Button type="submit" className="flex-1 bg-[#A89F91] hover:bg-[#8A8279]">
+                        Submit Request
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
           </Card>
         </div>
       </main>
 
       <Footer />
+
+      {/* Pricing Modal for Paid Templates */}
+      {showPricingModal && selectedTool && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md p-6 bg-card">
+            <h3 className="text-xl font-heading font-semibold text-foreground mb-2 text-center">
+              Download Template
+            </h3>
+            <p className="text-muted-foreground mb-6 text-center text-sm">
+              {selectedTool.title}
+            </p>
+            
+            <div className="space-y-4">
+              {/* Purchase Option */}
+              <div 
+                className="border-2 border-[#A89F91] rounded-lg p-4 cursor-pointer hover:bg-[#A89F91]/5 transition-colors"
+                onClick={handlePurchase}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-foreground">One-Time Purchase</span>
+                  <span className="text-xl font-bold text-[#A89F91]">{selectedTool.price}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Download this template immediately
+                </p>
+              </div>
+
+              {/* Join Now Option */}
+              <div 
+                className="border-2 border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => {
+                  setShowPricingModal(false);
+                  navigate('/add-listing');
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-foreground">Join Now</span>
+                  <span className="text-sm font-medium text-green-600">Included in Pro Plans</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Get unlimited access to all templates with a membership
+                </p>
+              </div>
+            </div>
+
+            {selectedTool.includedInPlan && selectedTool.includedInPlan.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-4 text-center">
+                This template is included in: {selectedTool.includedInPlan.map(p => p.replace('estates-', 'Estates ').replace('agency-', 'Agency ')).join(', ')} plans
+              </p>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowPricingModal(false);
+                  setSelectedTool(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                onClick={handlePurchase}
+              >
+                Purchase {selectedTool.price}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

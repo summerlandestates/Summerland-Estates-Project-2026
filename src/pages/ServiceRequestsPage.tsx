@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -15,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MapPin, Calendar, DollarSign, Send, X } from 'lucide-react';
+import { MapPin, Calendar, DollarSign, Send, Plus, Loader2 } from 'lucide-react';
 import type { ServiceRequest } from '../types';
 
 // Mock data - in a real app, this would come from an API
@@ -55,13 +58,35 @@ const mockServiceRequests: ServiceRequest[] = [
   }
 ];
 
+interface ServiceFormData {
+  serviceNeeded: string;
+  location: string;
+  dateNeeded: string;
+  details: string;
+  specialRequests: string;
+  budgetMin: string;
+  budgetMax: string;
+}
+
 export default function ServiceRequestsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(mockServiceRequests);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [showBidModal, setShowBidModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState('');
   const [bidMessage, setBidMessage] = useState('');
+  const [serviceForm, setServiceForm] = useState<ServiceFormData>({
+    serviceNeeded: '',
+    location: '',
+    dateNeeded: '',
+    details: '',
+    specialRequests: '',
+    budgetMin: '',
+    budgetMax: '',
+  });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -102,6 +127,67 @@ export default function ServiceRequestsPage() {
     setBidMessage('');
   };
 
+  const handleCreateServiceRequest = () => {
+    if (!user) {
+      toast.error('Please sign in to create a service request');
+      navigate('/login');
+      return;
+    }
+    setShowCreateModal(true);
+  };
+
+  const handleSubmitServiceRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) {
+      toast.error('Please sign in to create a service request');
+      navigate('/login');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const { error } = await supabase.from('service_requests').insert({
+        user_id: user.id,
+        service_needed: serviceForm.serviceNeeded,
+        location: serviceForm.location,
+        date_needed: serviceForm.dateNeeded,
+        details: serviceForm.details,
+        special_requests: serviceForm.specialRequests || null,
+        budget_min: serviceForm.budgetMin ? parseFloat(serviceForm.budgetMin) : null,
+        budget_max: serviceForm.budgetMax ? parseFloat(serviceForm.budgetMax) : null,
+        status: 'open',
+      });
+
+      if (error) throw error;
+
+      toast.success('Service Request Posted!', {
+        description: 'Service providers can now submit bids for your request.',
+      });
+      
+      setShowCreateModal(false);
+      setServiceForm({
+        serviceNeeded: '',
+        location: '',
+        dateNeeded: '',
+        details: '',
+        specialRequests: '',
+        budgetMin: '',
+        budgetMax: '',
+      });
+      
+      // Refresh the page to show new request
+      window.location.reload();
+    } catch (error: any) {
+      toast.error('Failed to post service request', {
+        description: error.message || 'Please try again',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background page-transition">
       <NavBar currentPage="jobs" />
@@ -119,10 +205,11 @@ export default function ServiceRequestsPage() {
                 </p>
               </div>
               <Button
-                onClick={() => navigate('/post-job')}
+                onClick={handleCreateServiceRequest}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                Post Service Request
+                <Plus className="w-4 h-4 mr-2" />
+                Create Service Request
               </Button>
             </div>
           </div>
@@ -133,10 +220,11 @@ export default function ServiceRequestsPage() {
                 No active service requests at this time
               </p>
               <Button
-                onClick={() => navigate('/post-job')}
+                onClick={handleCreateServiceRequest}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                Post a Service Request
+                <Plus className="w-4 h-4 mr-2" />
+                Create Service Request
               </Button>
             </Card>
           ) : (
@@ -274,6 +362,142 @@ export default function ServiceRequestsPage() {
               >
                 <Send className="w-4 h-4 mr-2" />
                 Send Bid
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Service Request Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="bg-card text-card-foreground max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-heading font-bold text-foreground">
+              Create Service Request
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Request short-term or one-time services for your estate. Service providers will be able to submit private bids.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmitServiceRequest} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="serviceNeeded" className="text-foreground">Service Needed *</Label>
+              <Input
+                id="serviceNeeded"
+                placeholder="e.g. Window Washing, Plumber, Event Staff"
+                required
+                value={serviceForm.serviceNeeded}
+                onChange={(e) => setServiceForm(prev => ({ ...prev, serviceNeeded: e.target.value }))}
+                className="bg-background text-foreground border-border"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="serviceLocation" className="text-foreground">Location *</Label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="serviceLocation"
+                  placeholder="City, neighborhood, or estate location"
+                  required
+                  value={serviceForm.location}
+                  onChange={(e) => setServiceForm(prev => ({ ...prev, location: e.target.value }))}
+                  className="pl-10 bg-background text-foreground border-border"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dateNeeded" className="text-foreground">Date Needed *</Label>
+              <Input
+                id="dateNeeded"
+                type="date"
+                required
+                value={serviceForm.dateNeeded}
+                onChange={(e) => setServiceForm(prev => ({ ...prev, dateNeeded: e.target.value }))}
+                className="bg-background text-foreground border-border"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="details" className="text-foreground">Details *</Label>
+              <Textarea
+                id="details"
+                placeholder="Describe the scope of work, size of property, timing, access details, etc."
+                rows={5}
+                required
+                value={serviceForm.details}
+                onChange={(e) => setServiceForm(prev => ({ ...prev, details: e.target.value }))}
+                className="bg-background text-foreground border-border"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="specialRequests" className="text-foreground">Special Requests (Optional)</Label>
+              <Textarea
+                id="specialRequests"
+                placeholder="Certifications, discretion, uniforms, experience, or other requirements"
+                rows={3}
+                value={serviceForm.specialRequests}
+                onChange={(e) => setServiceForm(prev => ({ ...prev, specialRequests: e.target.value }))}
+                className="bg-background text-foreground border-border"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="budgetMin" className="text-foreground">Budget Min (Optional)</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="budgetMin"
+                    type="number"
+                    placeholder="Min"
+                    value={serviceForm.budgetMin}
+                    onChange={(e) => setServiceForm(prev => ({ ...prev, budgetMin: e.target.value }))}
+                    className="pl-10 bg-background text-foreground border-border"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="budgetMax" className="text-foreground">Budget Max (Optional)</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="budgetMax"
+                    type="number"
+                    placeholder="Max"
+                    value={serviceForm.budgetMax}
+                    onChange={(e) => setServiceForm(prev => ({ ...prev, budgetMax: e.target.value }))}
+                    className="pl-10 bg-background text-foreground border-border"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 border-border text-foreground hover:bg-muted"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Posting...
+                  </>
+                ) : (
+                  'Post Service Request'
+                )}
               </Button>
             </div>
           </form>

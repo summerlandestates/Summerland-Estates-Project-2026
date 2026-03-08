@@ -11,7 +11,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Mail, Calendar, Shield, Loader2, Save, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { User, Mail, Calendar, Shield, Loader2, Save, CheckCircle2, XCircle, AlertCircle, Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Profile {
   id: string;
@@ -35,6 +44,14 @@ export default function MyProfilePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
+  
+  // Delete profile states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<'confirm' | 'hired' | 'hired-details' | 'deleting'>('confirm');
+  const [gotHired, setGotHired] = useState<boolean | null>(null);
+  const [hiredByName, setHiredByName] = useState('');
+  const [hiredByProfileLink, setHiredByProfileLink] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     // Wait for auth to finish loading before checking user
@@ -191,6 +208,79 @@ export default function MyProfilePage() {
     return email.substring(0, 2).toUpperCase();
   };
 
+  const handleDeleteClick = () => {
+    setShowDeleteModal(true);
+    setDeleteStep('confirm');
+    setGotHired(null);
+    setHiredByName('');
+    setHiredByProfileLink('');
+  };
+
+  const handleDeleteConfirm = () => {
+    setDeleteStep('hired');
+  };
+
+  const handleHiredResponse = (hired: boolean) => {
+    setGotHired(hired);
+    if (hired) {
+      setDeleteStep('hired-details');
+    } else {
+      // Not hired, proceed to delete
+      handleFinalDelete();
+    }
+  };
+
+  const handleFinalDelete = async () => {
+    if (!user) return;
+    
+    setDeleting(true);
+    setDeleteStep('deleting');
+    
+    try {
+      // If user got hired, log the hiring info
+      if (gotHired && (hiredByName || hiredByProfileLink)) {
+        await supabase.from('hiring_feedback').insert({
+          user_id: user.id,
+          hired_by_name: hiredByName || null,
+          hired_by_profile_link: hiredByProfileLink || null,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      // Delete user profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      // Sign out the user
+      await supabase.auth.signOut();
+      
+      toast.success('Account Deleted', {
+        description: 'Your account has been successfully deleted.',
+      });
+      
+      navigate('/');
+    } catch (error: any) {
+      toast.error('Delete Failed', {
+        description: error.message || 'Failed to delete account. Please try again.',
+      });
+      setDeleteStep('confirm');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeleteStep('confirm');
+    setGotHired(null);
+    setHiredByName('');
+    setHiredByProfileLink('');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -337,11 +427,132 @@ export default function MyProfilePage() {
                     )}
                   </Button>
                 </div>
+
+                {/* Delete Account Section */}
+                <div className="pt-6 mt-6 border-t border-red-200">
+                  <h3 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Once you delete your account, there is no going back. Please be certain.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={handleDeleteClick}
+                    className="w-full border-red-500 text-red-500 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Account
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </main>
+
+      {/* Delete Account Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={closeDeleteModal}>
+        <DialogContent className="sm:max-w-md">
+          {deleteStep === 'confirm' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-red-600">Delete Account</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete your account? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex gap-2 sm:gap-0">
+                <Button variant="outline" onClick={closeDeleteModal}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={handleDeleteConfirm}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Yes, Delete My Account
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {deleteStep === 'hired' && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Did you get hired?</DialogTitle>
+                <DialogDescription>
+                  Before you go, we'd love to know if you found success on our platform.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-4 py-4">
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => handleHiredResponse(true)}
+                >
+                  Yes, I got hired!
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => handleHiredResponse(false)}
+                >
+                  No
+                </Button>
+              </div>
+            </>
+          )}
+
+          {deleteStep === 'hired-details' && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Congratulations! 🎉</DialogTitle>
+                <DialogDescription>
+                  We're thrilled you found success! Please share who hired you so we can celebrate.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hired-by-name">Name of person/company who hired you</Label>
+                  <Input
+                    id="hired-by-name"
+                    value={hiredByName}
+                    onChange={(e) => setHiredByName(e.target.value)}
+                    placeholder="Enter name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hired-by-link">Or link to their profile (optional)</Label>
+                  <Input
+                    id="hired-by-link"
+                    value={hiredByProfileLink}
+                    onChange={(e) => setHiredByProfileLink(e.target.value)}
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteStep('hired')}>
+                  Back
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={handleFinalDelete}
+                  disabled={!hiredByName && !hiredByProfileLink}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Submit & Delete Account
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {deleteStep === 'deleting' && (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-red-600 mb-4" />
+              <p className="text-gray-600">Deleting your account...</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Footer />
     </div>

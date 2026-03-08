@@ -17,6 +17,10 @@ export default function ProfilePage() {
   const listing = listings.find((l) => l.id === id);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
   const [reviewRating, setReviewRating] = useState(0);
   const [copied, setCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -312,19 +316,40 @@ export default function ProfilePage() {
                     </Button>
                   )}
                   
+                  {/* Book Interview button for Professionals */}
+                  {(listing.category === 'Staff' || listing.category === 'staff') && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-accent text-accent hover:bg-accent/10"
+                      onClick={() => {
+                        if (!visibilityRules.canViewFullProfile) {
+                          navigate('/pricing');
+                        } else {
+                          setShowBookingModal(true);
+                        }
+                      }}
+                    >
+                      <Calendar className="w-5 h-5 mr-2" />
+                      Book Interview
+                    </Button>
+                  )}
+
+                  {/* Book Service button for Business/Service Providers */}
                   {listing.category === 'Business' && (
-                    <>
-                      {listing.bookingEnabled && (
-                        <Button
-                          variant="outline"
-                          className="w-full border-border text-foreground hover:bg-muted"
-                          onClick={() => !visibilityRules.canViewFullProfile && navigate('/pricing')}
-                        >
-                          <Calendar className="w-5 h-5 mr-2" />
-                          Book Service
-                        </Button>
-                      )}
-                    </>
+                    <Button
+                      variant="outline"
+                      className="w-full border-accent text-accent hover:bg-accent/10"
+                      onClick={() => {
+                        if (!visibilityRules.canViewFullProfile) {
+                          navigate('/pricing');
+                        } else {
+                          setShowServiceModal(true);
+                        }
+                      }}
+                    >
+                      <Calendar className="w-5 h-5 mr-2" />
+                      Book Service
+                    </Button>
                   )}
                   <div className="grid grid-cols-2 gap-2">
                     <Button
@@ -523,10 +548,10 @@ export default function ProfilePage() {
 
       {/* Review Modal */}
       {showReviewModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4 p-6 bg-card">
-            <h3 className="text-xl font-heading font-bold text-foreground mb-4">
-              Rate this Profile
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md p-6 bg-card">
+            <h3 className="text-xl font-heading font-semibold text-foreground mb-4 text-center">
+              Leave a Review
             </h3>
             <p className="text-muted-foreground mb-6">
               How would you rate {listing?.name}?
@@ -569,6 +594,215 @@ export default function ProfilePage() {
                 disabled={reviewRating === 0}
               >
                 Submit Review
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Book Interview Modal */}
+      {showBookingModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg p-6 bg-card">
+            <h3 className="text-xl font-heading font-semibold text-foreground mb-2 text-center">
+              Book Interview
+            </h3>
+            <p className="text-muted-foreground mb-6 text-center text-sm">
+              Schedule an interview with {listing?.name}
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Select Date</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Select Time</label>
+                <select
+                  value={selectedTime}
+                  onChange={(e) => setSelectedTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                >
+                  <option value="">Choose a time slot</option>
+                  <option value="09:00">9:00 AM</option>
+                  <option value="09:30">9:30 AM</option>
+                  <option value="10:00">10:00 AM</option>
+                  <option value="10:30">10:30 AM</option>
+                  <option value="11:00">11:00 AM</option>
+                  <option value="11:30">11:30 AM</option>
+                  <option value="12:00">12:00 PM</option>
+                  <option value="12:30">12:30 PM</option>
+                  <option value="13:00">1:00 PM</option>
+                  <option value="13:30">1:30 PM</option>
+                  <option value="14:00">2:00 PM</option>
+                  <option value="14:30">2:30 PM</option>
+                  <option value="15:00">3:00 PM</option>
+                  <option value="15:30">3:30 PM</option>
+                  <option value="16:00">4:00 PM</option>
+                  <option value="16:30">4:30 PM</option>
+                  <option value="17:00">5:00 PM</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Interview Type</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="interviewType" value="video" defaultChecked className="text-[#A89F91]" />
+                    <span className="text-sm text-foreground">Video Call</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="interviewType" value="phone" className="text-[#A89F91]" />
+                    <span className="text-sm text-foreground">Phone Call</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="interviewType" value="inperson" className="text-[#A89F91]" />
+                    <span className="text-sm text-foreground">In Person</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Message (Optional)</label>
+                <textarea
+                  placeholder="Add a note about the interview..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91] resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowBookingModal(false);
+                  setSelectedDate('');
+                  setSelectedTime('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                onClick={() => {
+                  // TODO: Save booking request to database
+                  alert(`Interview request sent to ${listing?.name} for ${selectedDate} at ${selectedTime}`);
+                  setShowBookingModal(false);
+                  setSelectedDate('');
+                  setSelectedTime('');
+                }}
+                disabled={!selectedDate || !selectedTime}
+              >
+                Send Request
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Book Service Modal */}
+      {showServiceModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg p-6 bg-card">
+            <h3 className="text-xl font-heading font-semibold text-foreground mb-2 text-center">
+              Book Service
+            </h3>
+            <p className="text-muted-foreground mb-6 text-center text-sm">
+              Schedule a service with {listing?.name}
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Service Type</label>
+                <select
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                >
+                  <option value="">Select a service</option>
+                  <option value="consultation">Consultation</option>
+                  <option value="estimate">Free Estimate</option>
+                  <option value="one-time">One-Time Service</option>
+                  <option value="recurring">Recurring Service</option>
+                  <option value="emergency">Emergency Service</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Preferred Date</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Preferred Time</label>
+                <select
+                  value={selectedTime}
+                  onChange={(e) => setSelectedTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                >
+                  <option value="">Choose a time slot</option>
+                  <option value="morning">Morning (8AM - 12PM)</option>
+                  <option value="afternoon">Afternoon (12PM - 5PM)</option>
+                  <option value="evening">Evening (5PM - 8PM)</option>
+                  <option value="flexible">Flexible</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Service Location</label>
+                <input
+                  type="text"
+                  placeholder="Enter your address"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Description of Service Needed</label>
+                <textarea
+                  placeholder="Describe what you need help with..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91] resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowServiceModal(false);
+                  setSelectedDate('');
+                  setSelectedTime('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                onClick={() => {
+                  alert(`Service request sent to ${listing?.name} for ${selectedDate}`);
+                  setShowServiceModal(false);
+                  setSelectedDate('');
+                  setSelectedTime('');
+                }}
+                disabled={!selectedDate || !selectedTime}
+              >
+                Request Service
               </Button>
             </div>
           </Card>

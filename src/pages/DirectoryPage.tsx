@@ -161,7 +161,12 @@ export default function DirectoryPage() {
                 Become a Provider
               </Button>
               <Button
-                onClick={() => navigate('/pricing')}
+                onClick={() => {
+                  const directorySection = document.getElementById('directory-section');
+                  if (directorySection) {
+                    directorySection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
                 variant="outline"
                 size="lg"
                 className="border-2 border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white px-10 transition-all duration-300 hover:-translate-y-1"
@@ -232,8 +237,64 @@ export default function DirectoryPage() {
           </div>
         </section>
 
+        {/* Featured Professionals Section */}
+        <section className="py-24 border-b border-border/30 bg-tertiary/10">
+          <div className="container mx-auto px-12 max-w-7xl">
+            <div className="mb-12 text-center">
+              <Badge className="bg-[#A89F91]/10 text-[#A89F91] border-[#A89F91]/20 px-4 py-2 text-sm font-semibold mb-4">
+                Featured
+              </Badge>
+              <h2 className="text-4xl font-heading font-medium text-foreground mb-4 tracking-tight">
+                Featured Professionals & Service Providers
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                Premium members who have chosen to be highlighted in our network.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {listings.filter(l => l.verified).slice(0, 4).map((listing) => (
+                <Card 
+                  key={listing.id}
+                  className="p-6 cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-[#A89F91]/30 bg-card"
+                  onClick={() => navigate(`/profile/${listing.id}`)}
+                >
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-20 h-20 rounded-full bg-[#A89F91]/20 flex items-center justify-center mb-4 overflow-hidden">
+                      {listing.profilePhoto ? (
+                        <img src={listing.profilePhoto} alt={listing.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Users className="w-10 h-10 text-[#A89F91]" />
+                      )}
+                    </div>
+                    <h3 className="font-heading font-semibold text-foreground mb-1">{listing.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-2">{listing.role}</p>
+                    <p className="text-xs text-muted-foreground">{listing.location}</p>
+                    {listing.verified && (
+                      <Badge className="mt-3 bg-green-100 text-green-700 border-green-200">
+                        <Shield className="w-3 h-3 mr-1" />
+                        Verified
+                      </Badge>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            <div className="text-center mt-8">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/pricing')}
+                className="border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white"
+              >
+                Get Featured on Homepage
+              </Button>
+            </div>
+          </div>
+        </section>
+
         {/* Directory Section */}
-        <section className="py-32">
+        <section id="directory-section" className="py-32">
           <div className="container mx-auto px-12 max-w-7xl">
             <div className="mb-16 text-center">
               <h2 className="text-5xl font-heading font-medium text-foreground mb-6 tracking-tight">

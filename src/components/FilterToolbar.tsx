@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Search, Grid3x3, List, ChevronDown } from 'lucide-react';
+import { Search, Grid3x3, List, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { professionalTitles, genderOptions, languages, workAvailability, cookingExperience } from '../data/profileOptions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -158,7 +159,190 @@ export default function FilterToolbar({
             Verified Only
           </Label>
         </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="hasBackgroundCheck"
+            checked={filters.hasBackgroundCheck || false}
+            onCheckedChange={(checked) =>
+              handleFilterUpdate('hasBackgroundCheck', checked)
+            }
+          />
+          <Label
+            htmlFor="hasBackgroundCheck"
+            className="text-foreground cursor-pointer"
+          >
+            Has Background Check
+          </Label>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="hasCar"
+            checked={filters.hasCar || false}
+            onCheckedChange={(checked) =>
+              handleFilterUpdate('hasCar', checked)
+            }
+          />
+          <Label
+            htmlFor="hasCar"
+            className="text-foreground cursor-pointer"
+          >
+            Has Car
+          </Label>
+        </div>
       </div>
+
+      {/* Advanced Filters */}
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="advanced" className="border-border">
+          <AccordionTrigger className="text-foreground hover:no-underline py-2">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4" />
+              <span className="text-sm font-medium">Advanced Filters</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-foreground">Title</Label>
+                <Select
+                  value={filters.title || ''}
+                  onValueChange={(value) => handleFilterUpdate('title', value)}
+                >
+                  <SelectTrigger className="bg-background text-foreground border-border">
+                    <SelectValue placeholder="All Titles" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground max-h-[200px]">
+                    <SelectItem value="" className="text-foreground cursor-pointer">All Titles</SelectItem>
+                    {professionalTitles.map((title) => (
+                      <SelectItem key={title} value={title.toLowerCase()} className="text-foreground cursor-pointer">
+                        {title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="gender" className="text-foreground">Gender</Label>
+                <Select
+                  value={filters.gender || ''}
+                  onValueChange={(value) => handleFilterUpdate('gender', value)}
+                >
+                  <SelectTrigger className="bg-background text-foreground border-border">
+                    <SelectValue placeholder="Any Gender" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground">
+                    <SelectItem value="" className="text-foreground cursor-pointer">Any Gender</SelectItem>
+                    {genderOptions.map((gender) => (
+                      <SelectItem key={gender} value={gender.toLowerCase()} className="text-foreground cursor-pointer">
+                        {gender}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="language" className="text-foreground">Language</Label>
+                <Select
+                  value={filters.language || ''}
+                  onValueChange={(value) => handleFilterUpdate('language', value)}
+                >
+                  <SelectTrigger className="bg-background text-foreground border-border">
+                    <SelectValue placeholder="Any Language" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground max-h-[200px]">
+                    <SelectItem value="" className="text-foreground cursor-pointer">Any Language</SelectItem>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang} value={lang.toLowerCase()} className="text-foreground cursor-pointer">
+                        {lang}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="workAvailability" className="text-foreground">Work Availability</Label>
+                <Select
+                  value={filters.workAvailability || ''}
+                  onValueChange={(value) => handleFilterUpdate('workAvailability', value)}
+                >
+                  <SelectTrigger className="bg-background text-foreground border-border">
+                    <SelectValue placeholder="Any Availability" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground">
+                    <SelectItem value="" className="text-foreground cursor-pointer">Any Availability</SelectItem>
+                    {workAvailability.map((avail) => (
+                      <SelectItem key={avail} value={avail.toLowerCase()} className="text-foreground cursor-pointer">
+                        {avail}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="yearsExperience" className="text-foreground">Years Experience</Label>
+                <Select
+                  value={filters.yearsExperience || ''}
+                  onValueChange={(value) => handleFilterUpdate('yearsExperience', value)}
+                >
+                  <SelectTrigger className="bg-background text-foreground border-border">
+                    <SelectValue placeholder="Any Experience" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground">
+                    <SelectItem value="" className="text-foreground cursor-pointer">Any Experience</SelectItem>
+                    <SelectItem value="0-2" className="text-foreground cursor-pointer">0-2 years</SelectItem>
+                    <SelectItem value="3-5" className="text-foreground cursor-pointer">3-5 years</SelectItem>
+                    <SelectItem value="6-10" className="text-foreground cursor-pointer">6-10 years</SelectItem>
+                    <SelectItem value="10+" className="text-foreground cursor-pointer">10+ years</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cookingLevel" className="text-foreground">Cooking Experience</Label>
+                <Select
+                  value={filters.cookingLevel || ''}
+                  onValueChange={(value) => handleFilterUpdate('cookingLevel', value)}
+                >
+                  <SelectTrigger className="bg-background text-foreground border-border">
+                    <SelectValue placeholder="Any Level" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground">
+                    <SelectItem value="" className="text-foreground cursor-pointer">Any Level</SelectItem>
+                    {cookingExperience.map((level) => (
+                      <SelectItem key={level} value={level.toLowerCase()} className="text-foreground cursor-pointer">
+                        {level}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="personalityType" className="text-foreground">Personality Type</Label>
+                <Select
+                  value={filters.personalityType || ''}
+                  onValueChange={(value) => handleFilterUpdate('personalityType', value)}
+                >
+                  <SelectTrigger className="bg-background text-foreground border-border">
+                    <SelectValue placeholder="Any Type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground">
+                    <SelectItem value="" className="text-foreground cursor-pointer">Any Type</SelectItem>
+                    <SelectItem value="introvert" className="text-foreground cursor-pointer">Introvert</SelectItem>
+                    <SelectItem value="extrovert" className="text-foreground cursor-pointer">Extrovert</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <Button
         variant="ghost"

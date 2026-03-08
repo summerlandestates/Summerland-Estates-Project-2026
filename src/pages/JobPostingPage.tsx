@@ -12,13 +12,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Briefcase, MapPin, DollarSign, Clock, Users, Loader2 } from 'lucide-react';
-
-type PostType = 'job' | 'service-request' | null;
+import { MapPin, DollarSign, Clock, Loader2 } from 'lucide-react';
 
 interface JobFormData {
   jobTitle: string;
-  jobCategory: string;
   jobDescription: string;
   location: string;
   salaryRange: string;
@@ -33,8 +30,10 @@ interface JobFormData {
   eveningWorkRequired: boolean;
   overnightStaysRequired: boolean;
   onCallRequired: boolean;
+  holidaysRequired: boolean;
   experienceRequired: string;
   qualifications: string;
+  personalityFit: string;
   driversLicenseRequired: boolean;
   backgroundCheckRequired: boolean;
   referencesRequired: boolean;
@@ -50,26 +49,14 @@ interface JobFormData {
   relocationAssistance: boolean;
 }
 
-interface ServiceRequestFormData {
-  serviceNeeded: string;
-  location: string;
-  dateNeeded: string;
-  details: string;
-  specialRequests: string;
-  budgetMin: string;
-  budgetMax: string;
-}
-
 export default function JobPostingPage() {
   const { user } = useAuth();
-  const [postType, setPostType] = useState<PostType>(null);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   
   // Job form state
   const [jobForm, setJobForm] = useState<JobFormData>({
     jobTitle: '',
-    jobCategory: '',
     jobDescription: '',
     location: '',
     salaryRange: '',
@@ -84,8 +71,10 @@ export default function JobPostingPage() {
     eveningWorkRequired: false,
     overnightStaysRequired: false,
     onCallRequired: false,
+    holidaysRequired: false,
     experienceRequired: '',
     qualifications: '',
+    personalityFit: '',
     driversLicenseRequired: false,
     backgroundCheckRequired: false,
     referencesRequired: false,
@@ -99,17 +88,6 @@ export default function JobPostingPage() {
     preferredStartDate: '',
     travelRequired: false,
     relocationAssistance: false,
-  });
-
-  // Service request form state
-  const [serviceForm, setServiceForm] = useState<ServiceRequestFormData>({
-    serviceNeeded: '',
-    location: '',
-    dateNeeded: '',
-    details: '',
-    specialRequests: '',
-    budgetMin: '',
-    budgetMax: '',
   });
 
   useEffect(() => {
@@ -131,7 +109,6 @@ export default function JobPostingPage() {
       const { error } = await supabase.from('job_postings').insert({
         user_id: user.id,
         job_title: jobForm.jobTitle,
-        job_category: jobForm.jobCategory,
         job_description: jobForm.jobDescription,
         location: jobForm.location,
         salary_range: jobForm.salaryRange,
@@ -146,8 +123,10 @@ export default function JobPostingPage() {
         evening_work_required: jobForm.eveningWorkRequired,
         overnight_stays_required: jobForm.overnightStaysRequired,
         on_call_required: jobForm.onCallRequired,
+        holidays_required: jobForm.holidaysRequired,
         experience_required: jobForm.experienceRequired || null,
         qualifications: jobForm.qualifications || null,
+        personality_fit: jobForm.personalityFit || null,
         drivers_license_required: jobForm.driversLicenseRequired,
         background_check_required: jobForm.backgroundCheckRequired,
         references_required: jobForm.referencesRequired,
@@ -172,45 +151,6 @@ export default function JobPostingPage() {
       navigate('/open-roles');
     } catch (error: any) {
       toast.error('Failed to post job', {
-        description: error.message || 'Please try again',
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handlePostServiceRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!user) {
-      toast.error('Please sign in to create a service request');
-      navigate('/login');
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const { error } = await supabase.from('service_requests').insert({
-        user_id: user.id,
-        service_needed: serviceForm.serviceNeeded,
-        location: serviceForm.location,
-        date_needed: serviceForm.dateNeeded,
-        details: serviceForm.details,
-        special_requests: serviceForm.specialRequests || null,
-        budget_min: serviceForm.budgetMin ? parseFloat(serviceForm.budgetMin) : null,
-        budget_max: serviceForm.budgetMax ? parseFloat(serviceForm.budgetMax) : null,
-        status: 'open',
-      });
-
-      if (error) throw error;
-
-      toast.success('Service Request Created!', {
-        description: 'Service providers can now submit bids for your request.',
-      });
-      navigate('/open-roles');
-    } catch (error: any) {
-      toast.error('Failed to create service request', {
         description: error.message || 'Please try again',
       });
     } finally {
@@ -245,209 +185,15 @@ export default function JobPostingPage() {
     }));
   };
 
-  if (postType === null) {
-    return (
-      <div className="min-h-screen bg-background page-transition">
-        <NavBar currentPage="jobs" />
-        
-        <main className="pt-32 pb-16">
-          <div className="container mx-auto px-8 max-w-4xl">
-            <div className="mb-12 text-center">
-              <h1 className="text-5xl font-heading font-bold text-foreground mb-4">
-                Post a Job or Service Request
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Choose the type of post you'd like to create
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card 
-                className="p-8 bg-card text-card-foreground cursor-pointer hover:shadow-xl transition-all hover:scale-105 border-2 border-border hover:border-primary"
-                onClick={() => setPostType('job')}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Briefcase className="w-8 h-8 text-primary" />
-                  </div>
-                  <h2 className="text-2xl font-heading font-bold text-foreground mb-3">
-                    Job Posting
-                  </h2>
-                  <p className="text-muted-foreground mb-6">
-                    Post a full-time, part-time, or contract position for estate staff
-                  </p>
-                  <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                    Create Job Posting
-                  </Button>
-                </div>
-              </Card>
-
-              <Card 
-                className="p-8 bg-card text-card-foreground cursor-pointer hover:shadow-xl transition-all hover:scale-105 border-2 border-border hover:border-primary"
-                onClick={() => setPostType('service-request')}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Users className="w-8 h-8 text-secondary" />
-                  </div>
-                  <h2 className="text-2xl font-heading font-bold text-foreground mb-3">
-                    Service Request
-                  </h2>
-                  <p className="text-muted-foreground mb-6">
-                    Request short-term or one-time services for your estate
-                  </p>
-                  <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90">
-                    Create Service Request
-                  </Button>
-                </div>
-              </Card>
-            </div>
-          </div>
-        </main>
-
-        <Footer />
-      </div>
-    );
-  }
-
-  if (postType === 'service-request') {
-    return (
-      <div className="min-h-screen bg-background page-transition">
-        <NavBar currentPage="jobs" />
-        
-        <main className="pt-32 pb-16">
-          <div className="container mx-auto px-8 max-w-4xl">
-            <Button
-              variant="ghost"
-              onClick={() => setPostType(null)}
-              className="mb-8 text-foreground hover:bg-muted"
-            >
-              ← Back to Post Type Selection
-            </Button>
-
-            <div className="mb-12 text-center">
-              <h1 className="text-5xl font-heading font-bold text-foreground mb-4">
-                Create Service Request
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Request short-term or one-time services for your estate
-              </p>
-            </div>
-
-            <Card className="p-8 bg-card text-card-foreground">
-              <form onSubmit={handlePostServiceRequest} className="space-y-8">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="serviceNeeded" className="text-foreground">Service Needed *</Label>
-                    <Input
-                      id="serviceNeeded"
-                      placeholder="e.g. Window Washing, Plumber, Event Staff"
-                      required
-                      value={serviceForm.serviceNeeded}
-                      onChange={(e) => setServiceForm(prev => ({ ...prev, serviceNeeded: e.target.value }))}
-                      className="bg-background text-foreground border-border"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="serviceLocation" className="text-foreground">Location *</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="serviceLocation"
-                        placeholder="City, neighborhood, or estate location"
-                        required
-                        value={serviceForm.location}
-                        onChange={(e) => setServiceForm(prev => ({ ...prev, location: e.target.value }))}
-                        className="pl-10 bg-background text-foreground border-border"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="dateNeeded" className="text-foreground">Date Needed *</Label>
-                    <Input
-                      id="dateNeeded"
-                      type="date"
-                      required
-                      value={serviceForm.dateNeeded}
-                      onChange={(e) => setServiceForm(prev => ({ ...prev, dateNeeded: e.target.value }))}
-                      className="bg-background text-foreground border-border"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="details" className="text-foreground">Details *</Label>
-                    <Textarea
-                      id="details"
-                      placeholder="Describe the scope of work, size of property, timing, access details, etc."
-                      rows={6}
-                      required
-                      value={serviceForm.details}
-                      onChange={(e) => setServiceForm(prev => ({ ...prev, details: e.target.value }))}
-                      className="bg-background text-foreground border-border"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="specialRequests" className="text-foreground">Special Requests (Optional)</Label>
-                    <Textarea
-                      id="specialRequests"
-                      placeholder="Certifications, discretion, uniforms, experience, or other requirements"
-                      rows={4}
-                      value={serviceForm.specialRequests}
-                      onChange={(e) => setServiceForm(prev => ({ ...prev, specialRequests: e.target.value }))}
-                      className="bg-background text-foreground border-border"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-border">
-                  <Button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Posting...
-                      </>
-                    ) : (
-                      'Post Service Request'
-                    )}
-                  </Button>
-                  <p className="text-sm text-muted-foreground text-center mt-4">
-                    Service providers will be able to submit private bids for your request
-                  </p>
-                </div>
-              </form>
-            </Card>
-          </div>
-        </main>
-
-        <Footer />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <NavBar currentPage="jobs" />
       
       <main className="pt-32 pb-16">
         <div className="container mx-auto px-8 max-w-4xl">
-          <Button
-            variant="ghost"
-            onClick={() => setPostType(null)}
-            className="mb-8 text-foreground hover:bg-muted"
-          >
-            ← Back to Post Type Selection
-          </Button>
-
           <div className="mb-12 text-center">
             <h1 className="text-5xl font-heading font-bold text-foreground mb-4">
-              Post a Job
+              Post a Placement
             </h1>
             <p className="text-lg text-muted-foreground">
               Find the perfect candidate for your estate staffing needs
@@ -472,26 +218,6 @@ export default function JobPostingPage() {
                     onChange={(e) => setJobForm(prev => ({ ...prev, jobTitle: e.target.value }))}
                     className="bg-background text-foreground border-border"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="jobCategory" className="text-foreground">Job Category *</Label>
-                  <Select value={jobForm.jobCategory} onValueChange={(value) => setJobForm(prev => ({ ...prev, jobCategory: value }))}>
-                    <SelectTrigger className="bg-background text-foreground border-border">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover text-popover-foreground">
-                      <SelectItem value="estate-management" className="text-foreground cursor-pointer">Estate Management</SelectItem>
-                      <SelectItem value="culinary" className="text-foreground cursor-pointer">Culinary</SelectItem>
-                      <SelectItem value="housekeeping" className="text-foreground cursor-pointer">Housekeeping</SelectItem>
-                      <SelectItem value="childcare" className="text-foreground cursor-pointer">Childcare</SelectItem>
-                      <SelectItem value="security" className="text-foreground cursor-pointer">Security</SelectItem>
-                      <SelectItem value="maintenance" className="text-foreground cursor-pointer">Maintenance</SelectItem>
-                      <SelectItem value="personal-assistant" className="text-foreground cursor-pointer">Personal Assistant</SelectItem>
-                      <SelectItem value="chauffeur" className="text-foreground cursor-pointer">Chauffeur</SelectItem>
-                      <SelectItem value="other" className="text-foreground cursor-pointer">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -641,6 +367,42 @@ export default function JobPostingPage() {
                     />
                     <Label htmlFor="temporary" className="text-foreground cursor-pointer">
                       Temporary
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="remote"
+                      checked={jobForm.employmentTypes.includes('remote')}
+                      onCheckedChange={(checked) => {
+                        setJobForm(prev => ({
+                          ...prev,
+                          employmentTypes: checked 
+                            ? [...prev.employmentTypes, 'remote']
+                            : prev.employmentTypes.filter(t => t !== 'remote')
+                        }));
+                      }}
+                    />
+                    <Label htmlFor="remote" className="text-foreground cursor-pointer">
+                      Remote
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="holidays"
+                      checked={jobForm.employmentTypes.includes('holidays')}
+                      onCheckedChange={(checked) => {
+                        setJobForm(prev => ({
+                          ...prev,
+                          employmentTypes: checked 
+                            ? [...prev.employmentTypes, 'holidays']
+                            : prev.employmentTypes.filter(t => t !== 'holidays')
+                        }));
+                      }}
+                    />
+                    <Label htmlFor="holidays" className="text-foreground cursor-pointer">
+                      Holidays
                     </Label>
                   </div>
                 </div>
@@ -795,6 +557,17 @@ export default function JobPostingPage() {
                         On-Call Availability Required
                       </Label>
                     </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="holidays"
+                        checked={jobForm.holidaysRequired}
+                        onCheckedChange={(checked) => setJobForm(prev => ({ ...prev, holidaysRequired: !!checked }))}
+                      />
+                      <Label htmlFor="holidays" className="text-foreground cursor-pointer">
+                        Holidays Required
+                      </Label>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -831,6 +604,18 @@ export default function JobPostingPage() {
                     rows={5}
                     value={jobForm.qualifications}
                     onChange={(e) => setJobForm(prev => ({ ...prev, qualifications: e.target.value }))}
+                    className="bg-background text-foreground border-border"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="personalityFit" className="text-foreground">Personality Fit</Label>
+                  <Textarea
+                    id="personalityFit"
+                    placeholder="Describe the ideal personality traits, work style, and cultural fit for this role..."
+                    rows={4}
+                    value={jobForm.personalityFit}
+                    onChange={(e) => setJobForm(prev => ({ ...prev, personalityFit: e.target.value }))}
                     className="bg-background text-foreground border-border"
                   />
                 </div>
@@ -879,6 +664,20 @@ export default function JobPostingPage() {
                       Drug Test Required
                     </Label>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="personalityFit" className="text-foreground">
+                    Personality Fit
+                  </Label>
+                  <Textarea
+                    id="personalityFit"
+                    placeholder="Describe the ideal personality traits for this role (e.g., detail-oriented, outgoing, calm under pressure, etc.)"
+                    rows={3}
+                    value={jobForm.personalityFit}
+                    onChange={(e) => setJobForm(prev => ({ ...prev, personalityFit: e.target.value }))}
+                    className="bg-background text-foreground border-border"
+                  />
                 </div>
               </div>
 

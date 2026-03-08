@@ -39,6 +39,8 @@ import OpenRolesPage from './pages/OpenRolesPage';
 import AdminJobsPage from './pages/AdminJobsPage';
 import JobDetailPage from './pages/JobDetailPage';
 import ServiceRequestDetailPage from './pages/ServiceRequestDetailPage';
+import RecognitionPage from './pages/RecognitionPage';
+import EventsPage from './pages/EventsPage';
 
 function App() {
   return (
@@ -83,6 +85,8 @@ function App() {
           <Route path="/open-roles" element={<OpenRolesPage />} />
           <Route path="/job/:id" element={<JobDetailPage />} />
           <Route path="/service-request/:id" element={<ServiceRequestDetailPage />} />
+          <Route path="/recognition" element={<RecognitionPage />} />
+          <Route path="/events" element={<EventsPage />} />
           <Route path="/admin/jobs" element={<AdminJobsPage />} />
         </Routes>
       </Router>

@@ -9,7 +9,7 @@ export default function AddListingCTA() {
     <section className="py-24 bg-primary">
       <div className="container mx-auto px-12 max-w-4xl text-center">
         <h2 className="text-5xl font-heading font-medium text-primary-foreground mb-6 tracking-tight">
-          Apply for Membership
+          Participation Levels
         </h2>
         <p className="text-xl text-primary-foreground/80 mb-12 max-w-2xl mx-auto leading-relaxed">
           Access the right placements without public exposure.

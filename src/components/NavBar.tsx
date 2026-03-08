@@ -166,7 +166,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                           to="/collective"
                           className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
                         >
-                          <div className="text-sm font-medium leading-none">Join Community</div>
+                          <div className="text-sm font-medium leading-none">Join Your Community</div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                             Connect with your local estate community
                           </p>
@@ -208,6 +208,32 @@ export default function NavBar({ currentPage }: NavBarProps) {
                           <div className="text-sm font-medium leading-none">News</div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                             Estate management insights
+                          </p>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          to="/recognition"
+                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
+                        >
+                          <div className="text-sm font-medium leading-none">Estate Services Recognition</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                            Celebrating excellence in the industry
+                          </p>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          to="/events"
+                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
+                        >
+                          <div className="text-sm font-medium leading-none">Events</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                            Industry events and networking opportunities
                           </p>
                         </Link>
                       </NavigationMenuLink>
@@ -380,12 +406,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 >
                   Sign In
                 </Button>
-                <Button
-                  onClick={() => navigate('/add-listing')}
-                  className="bg-[#A89F91] text-white hover:bg-[#8A8279] shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
-                >
-                  Get Started
-                </Button>
               </>
             )}
           </div>
@@ -509,7 +529,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 onClick={() => handleNavigation('/collective')}
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
               >
-                Join Community
+                Join Your Community
               </button>
               <button
                 onClick={() => handleNavigation('/tools')}
@@ -584,7 +604,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 Login
               </button>
               <button className="w-full text-left px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                Apply for Membership
+                Participation Levels
               </button>
               <button
                 onClick={() => handleNavigation('/saved-profiles')}

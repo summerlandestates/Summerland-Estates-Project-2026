@@ -37,8 +37,10 @@ interface JobPosting {
   evening_work_required: boolean;
   overnight_stays_required: boolean;
   on_call_required: boolean;
+  holidays_required: boolean;
   experience_required: string | null;
   qualifications: string | null;
+  personality_fit: string | null;
   drivers_license_required: boolean;
   background_check_required: boolean;
   references_required: boolean;
@@ -260,6 +262,12 @@ export default function JobDetailPage() {
                         {job.on_call_required ? 'Required' : 'Not Required'}
                       </span>
                     </div>
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <span className="text-muted-foreground">Holidays</span>
+                      <span className={`font-medium ${job.holidays_required ? 'text-orange-600' : 'text-green-600'}`}>
+                        {job.holidays_required ? 'Required' : 'Not Required'}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 {job.days_required && job.days_required.length > 0 && (
@@ -299,6 +307,14 @@ export default function JobDetailPage() {
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <p className="text-muted-foreground mb-1">Qualifications</p>
                       <p className="font-medium">{job.qualifications}</p>
+                    </div>
+                  )}
+                  
+                  {/* Personality Fit */}
+                  {job.personality_fit && (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-muted-foreground mb-1">Personality Fit</p>
+                      <p className="font-medium">{job.personality_fit}</p>
                     </div>
                   )}
                   
