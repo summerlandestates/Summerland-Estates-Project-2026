@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -67,6 +68,7 @@ interface ServiceRequest {
 
 export default function AdminJobsPage() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,14 +79,32 @@ export default function AdminJobsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if admin is logged in
-    const adminLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
-    if (!adminLoggedIn) {
+    if (authLoading) return;
+    checkAdminAccess();
+  }, [authLoading, user]);
+
+  const checkAdminAccess = async () => {
+    if (!user) {
       navigate('/admin/login');
       return;
     }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.role !== 'admin') {
+      toast.error('Access Denied', {
+        description: 'You do not have admin privileges',
+      });
+      navigate('/');
+      return;
+    }
+
     fetchData();
-  }, [navigate]);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -223,6 +243,61 @@ export default function AdminJobsPage() {
       </header>
 
       <main className="container mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card className="p-4 bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {jobs.filter(j => j.status === 'active').length}
+                </p>
+                <p className="text-sm text-gray-500">Published Jobs</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {jobs.filter(j => j.status !== 'active').length}
+                </p>
+                <p className="text-sm text-gray-500">Draft Jobs</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {serviceRequests.filter(s => s.status === 'open').length}
+                </p>
+                <p className="text-sm text-gray-500">Published Services</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {serviceRequests.filter(s => s.status !== 'open').length}
+                </p>
+                <p className="text-sm text-gray-500">Draft Services</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
         {/* Search */}
         <div className="mb-6">
           <div className="relative max-w-md">
@@ -341,7 +416,7 @@ export default function AdminJobsPage() {
                                     onClick={() => handlePublishToggle(job.id, 'job', job.status)}
                                     className="cursor-pointer"
                                   >
-                                    {job.status === 'published' ? (
+                                    {job.status === 'active' ? (
                                       <>
                                         <EyeOff className="w-4 h-4 mr-2" />
                                         Unpublish
@@ -458,7 +533,7 @@ export default function AdminJobsPage() {
                                     onClick={() => handlePublishToggle(service.id, 'service', service.status)}
                                     className="cursor-pointer"
                                   >
-                                    {service.status === 'published' ? (
+                                    {service.status === 'open' ? (
                                       <>
                                         <EyeOff className="w-4 h-4 mr-2" />
                                         Unpublish
@@ -501,61 +576,6 @@ export default function AdminJobsPage() {
           )}
         </Tabs>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8">
-          <Card className="p-4 bg-white">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {jobs.filter(j => j.status === 'published').length}
-                </p>
-                <p className="text-sm text-gray-500">Published Jobs</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4 bg-white">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                <XCircle className="w-5 h-5 text-gray-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {jobs.filter(j => j.status !== 'published').length}
-                </p>
-                <p className="text-sm text-gray-500">Draft Jobs</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4 bg-white">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {serviceRequests.filter(s => s.status === 'published').length}
-                </p>
-                <p className="text-sm text-gray-500">Published Services</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4 bg-white">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                <XCircle className="w-5 h-5 text-gray-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {serviceRequests.filter(s => s.status !== 'published').length}
-                </p>
-                <p className="text-sm text-gray-500">Draft Services</p>
-              </div>
-            </div>
-          </Card>
-        </div>
       </main>
 
       {/* Delete Confirmation Dialog */}

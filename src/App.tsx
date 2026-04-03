@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import DirectoryPage from './pages/DirectoryPage';
@@ -12,8 +12,6 @@ import JobPostingPage from './pages/JobPostingPage';
 import ServiceRequestsPage from './pages/ServiceRequestsPage';
 import SavedProfilesPage from './pages/SavedProfilesPage';
 import ComparisonPage from './pages/ComparisonPage';
-import MessagingPage from './pages/MessagingPage';
-import ConversationPage from './pages/ConversationPage';
 import NotificationSettingsPage from './pages/NotificationSettingsPage';
 import NewsPage from './pages/NewsPage';
 import FAQsPage from './pages/FAQsPage';
@@ -32,6 +30,7 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import AdminContentPage from './pages/AdminContentPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import MyProfilePage from './pages/MyProfilePage';
+import EditProfilePage from './pages/EditProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import CheckoutPage from './pages/CheckoutPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
@@ -41,6 +40,11 @@ import JobDetailPage from './pages/JobDetailPage';
 import ServiceRequestDetailPage from './pages/ServiceRequestDetailPage';
 import RecognitionPage from './pages/RecognitionPage';
 import EventsPage from './pages/EventsPage';
+import SearchPage from './pages/SearchPage';
+import AdminApplicationsPage from './pages/AdminApplicationsPage';
+import AdminApplicationDetailPage from './pages/AdminApplicationDetailPage';
+import DashboardPage from './pages/DashboardPage';
+import RegistrationPendingPage from './pages/RegistrationPendingPage';
 
 function App() {
   return (
@@ -55,6 +59,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/my-profile" element={<MyProfilePage />} />
+          <Route path="/my-profile/edit" element={<EditProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -69,8 +74,8 @@ function App() {
           <Route path="/collective" element={<CollectivePage />} />
           <Route path="/post-job" element={<JobPostingPage />} />
           <Route path="/service-requests" element={<ServiceRequestsPage />} />
-          <Route path="/messaging" element={<MessagingPage />} />
-          <Route path="/conversation/:id" element={<ConversationPage />} />
+          <Route path="/messaging" element={<Navigate to="/collective" replace />} />
+          <Route path="/conversation/:id" element={<Navigate to="/collective" replace />} />
           <Route path="/notification-settings" element={<NotificationSettingsPage />} />
           <Route path="/saved-profiles" element={<SavedProfilesPage />} />
           <Route path="/compare" element={<ComparisonPage />} />
@@ -88,6 +93,11 @@ function App() {
           <Route path="/recognition" element={<RecognitionPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/admin/jobs" element={<AdminJobsPage />} />
+          <Route path="/admin/applications" element={<AdminApplicationsPage />} />
+          <Route path="/admin/applications/:id" element={<AdminApplicationDetailPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/registration-pending" element={<RegistrationPendingPage />} />
         </Routes>
       </Router>
     </AuthProvider>

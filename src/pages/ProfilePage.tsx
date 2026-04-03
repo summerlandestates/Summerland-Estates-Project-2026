@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle, BadgeCheck, Shield, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import Footer from '../components/Footer';
 import UpgradePrompt from '../components/UpgradePrompt';
 import { listings } from '../data/listings';
 import { getVisibilityRules, formatNameForDisplay, canAccessProfile } from '@/utils/profileVisibility';
-import type { PricingTier } from '../types';
+import type { PricingTier, Review } from '../types';
 
 export default function ProfilePage() {
   const { id } = useParams();
@@ -22,6 +23,16 @@ export default function ProfilePage() {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [bookingType, setBookingType] = useState('video');
+  const [bookingMessage, setBookingMessage] = useState('');
+  const [serviceType, setServiceType] = useState('');
+  const [serviceLocation, setServiceLocation] = useState('');
+  const [serviceMessage, setServiceMessage] = useState('');
+  const [reviews, setReviews] = useState<Review[]>(listing?.reviews || []);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [serviceSubmitting, setServiceSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -57,6 +68,19 @@ export default function ProfilePage() {
     if (connections && id) {
       const connectedIds = JSON.parse(connections);
       setIsConnected(connectedIds.includes(id));
+    }
+
+    if (id) {
+      const storedReviews = localStorage.getItem(`profile_reviews_${id}`);
+      if (storedReviews) {
+        try {
+          setReviews(JSON.parse(storedReviews));
+        } catch {
+          setReviews(listing?.reviews || []);
+        }
+      } else {
+        setReviews(listing?.reviews || []);
+      }
     }
   }, [id]);
 
@@ -198,6 +222,121 @@ export default function ProfilePage() {
 
   const displayName = formatNameForDisplay(listing, visibilityRules.canViewFullName);
   const displayPhoto = visibilityRules.canViewPhoto ? listing.profilePhoto : 'https://via.placeholder.com/400x400/e5e5e5/666666?text=Profile';
+  const averageRating =
+    reviews.length > 0
+      ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
+      : listing.rating.toFixed(1);
+
+  const persistCollection = (key: string, nextValue: unknown) => {
+    localStorage.setItem(key, JSON.stringify(nextValue));
+  };
+
+  const resetReviewForm = () => {
+    setShowReviewModal(false);
+    setReviewRating(0);
+    setReviewComment('');
+    setReviewSubmitting(false);
+  };
+
+  const resetBookingForm = () => {
+    setShowBookingModal(false);
+    setSelectedDate('');
+    setSelectedTime('');
+    setBookingType('video');
+    setBookingMessage('');
+    setBookingSubmitting(false);
+  };
+
+  const resetServiceForm = () => {
+    setShowServiceModal(false);
+    setSelectedDate('');
+    setSelectedTime('');
+    setServiceType('');
+    setServiceLocation('');
+    setServiceMessage('');
+    setServiceSubmitting(false);
+  };
+
+  const handleSubmitReview = () => {
+    if (!id || reviewRating === 0) return;
+
+    setReviewSubmitting(true);
+
+    const nextReview: Review = {
+      id: `${id}-${Date.now()}`,
+      reviewerName: 'Community Member',
+      reviewerRole: 'Verified Member',
+      rating: reviewRating,
+      date: new Date().toISOString().split('T')[0],
+      comment: reviewComment.trim() || 'No written feedback provided.',
+      verified: true,
+    };
+
+    const nextReviews = [nextReview, ...reviews];
+    setReviews(nextReviews);
+    persistCollection(`profile_reviews_${id}`, nextReviews);
+
+    toast.success('Review submitted', {
+      description: 'Your feedback has been added to this profile.',
+    });
+
+    resetReviewForm();
+  };
+
+  const handleSubmitInterviewRequest = () => {
+    if (!id || !selectedDate || !selectedTime) return;
+
+    setBookingSubmitting(true);
+
+    const existing = JSON.parse(localStorage.getItem('profile_interview_requests') || '[]');
+    const nextRequest = {
+      id: `${id}-${Date.now()}`,
+      profileId: id,
+      profileName: listing.name,
+      requestedDate: selectedDate,
+      requestedTime: selectedTime,
+      interviewType: bookingType,
+      message: bookingMessage.trim(),
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+    };
+
+    persistCollection('profile_interview_requests', [nextRequest, ...existing]);
+
+    toast.success('Interview request sent', {
+      description: `Your request for ${selectedDate} at ${selectedTime} has been saved.`,
+    });
+
+    resetBookingForm();
+  };
+
+  const handleSubmitServiceRequest = () => {
+    if (!id || !selectedDate || !selectedTime) return;
+
+    setServiceSubmitting(true);
+
+    const existing = JSON.parse(localStorage.getItem('profile_service_requests') || '[]');
+    const nextRequest = {
+      id: `${id}-${Date.now()}`,
+      profileId: id,
+      profileName: listing.name,
+      requestedDate: selectedDate,
+      requestedTime: selectedTime,
+      serviceType: serviceType || 'general',
+      location: serviceLocation.trim(),
+      message: serviceMessage.trim(),
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+    };
+
+    persistCollection('profile_service_requests', [nextRequest, ...existing]);
+
+    toast.success('Service request sent', {
+      description: `Your request for ${selectedDate} has been saved for follow-up.`,
+    });
+
+    resetServiceForm();
+  };
 
   return (
     <div className="min-h-screen bg-background page-transition">
@@ -235,9 +374,27 @@ export default function ProfilePage() {
                 
                 <div className="space-y-4">
                   <div>
-                    <h1 className="text-3xl font-heading font-bold text-foreground mb-2">
-                      {displayName}
-                    </h1>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h1 className="text-3xl font-heading font-bold text-foreground">
+                        {displayName}
+                      </h1>
+                      {listing.verified && (
+                        <div className="relative group">
+                          <BadgeCheck className="w-6 h-6 text-[#A89F91] fill-[#A89F91]/20" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                            Verified
+                          </div>
+                        </div>
+                      )}
+                      {listing.backgroundCheckAvailable && (
+                        <div className="relative group">
+                          <Shield className="w-5 h-5 text-green-600" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                            Background Check Available
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <p className="text-xl text-muted-foreground">{listing.role}</p>
                     {!listing.isOnlineNow && listing.lastOnline && (
                       <p className="text-sm text-muted-foreground mt-1">
@@ -262,7 +419,7 @@ export default function ProfilePage() {
 
                   <div className="flex items-center text-foreground">
                     <Star className="w-5 h-5 mr-2 fill-accent text-accent" />
-                    <span className="font-semibold">{listing.rating}</span>
+                    <span className="font-semibold">{averageRating}</span>
                     <span className="text-muted-foreground ml-1">/5.0</span>
                   </div>
 
@@ -495,7 +652,7 @@ export default function ProfilePage() {
                     </Card>
                   )}
 
-                  {listing.reviews && listing.reviews.length > 0 && (
+                  {reviews && reviews.length > 0 && (
                     <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl">
                       <div className="flex items-center justify-between mb-3">
                         <h2 className="text-xl font-heading font-bold text-foreground">
@@ -506,7 +663,7 @@ export default function ProfilePage() {
                         </Badge>
                       </div>
                       <div className="space-y-4">
-                        {listing.reviews.map((review) => (
+                        {reviews.map((review) => (
                           <div key={review.id} className="border-l-2 border-primary pl-4 pb-4 border-b border-border last:border-b-0 last:pb-0">
                             <div className="flex items-start justify-between mb-2">
                               <div>
@@ -561,7 +718,7 @@ export default function ProfilePage() {
                 <button
                   key={star}
                   onClick={() => setReviewRating(star)}
-                  className="p-1 transition-transform hover:scale-110"
+                  className="p-1 transition-transform hover:scale-110 cursor-pointer"
                 >
                   <Star
                     className={`w-10 h-10 ${
@@ -573,27 +730,33 @@ export default function ProfilePage() {
                 </button>
               ))}
             </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Review Comment
+              </label>
+              <textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="Share a few words about your experience..."
+                rows={4}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91] resize-none"
+              />
+            </div>
             <div className="flex gap-3">
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => {
-                  setShowReviewModal(false);
-                  setReviewRating(0);
-                }}
+                onClick={resetReviewForm}
+                disabled={reviewSubmitting}
               >
                 Cancel
               </Button>
               <Button
                 className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
-                onClick={() => {
-                  // TODO: Save review to database
-                  setShowReviewModal(false);
-                  setReviewRating(0);
-                }}
-                disabled={reviewRating === 0}
+                onClick={handleSubmitReview}
+                disabled={reviewRating === 0 || reviewSubmitting}
               >
-                Submit Review
+                {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
               </Button>
             </div>
           </Card>
@@ -655,15 +818,36 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-foreground mb-2">Interview Type</label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="interviewType" value="video" defaultChecked className="text-[#A89F91]" />
+                    <input
+                      type="radio"
+                      name="interviewType"
+                      value="video"
+                      checked={bookingType === 'video'}
+                      onChange={(e) => setBookingType(e.target.value)}
+                      className="text-[#A89F91]"
+                    />
                     <span className="text-sm text-foreground">Video Call</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="interviewType" value="phone" className="text-[#A89F91]" />
+                    <input
+                      type="radio"
+                      name="interviewType"
+                      value="phone"
+                      checked={bookingType === 'phone'}
+                      onChange={(e) => setBookingType(e.target.value)}
+                      className="text-[#A89F91]"
+                    />
                     <span className="text-sm text-foreground">Phone Call</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="interviewType" value="inperson" className="text-[#A89F91]" />
+                    <input
+                      type="radio"
+                      name="interviewType"
+                      value="inperson"
+                      checked={bookingType === 'inperson'}
+                      onChange={(e) => setBookingType(e.target.value)}
+                      className="text-[#A89F91]"
+                    />
                     <span className="text-sm text-foreground">In Person</span>
                   </label>
                 </div>
@@ -672,6 +856,8 @@ export default function ProfilePage() {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Message (Optional)</label>
                 <textarea
+                  value={bookingMessage}
+                  onChange={(e) => setBookingMessage(e.target.value)}
                   placeholder="Add a note about the interview..."
                   rows={3}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91] resize-none"
@@ -683,26 +869,17 @@ export default function ProfilePage() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => {
-                  setShowBookingModal(false);
-                  setSelectedDate('');
-                  setSelectedTime('');
-                }}
+                onClick={resetBookingForm}
+                disabled={bookingSubmitting}
               >
                 Cancel
               </Button>
               <Button
                 className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
-                onClick={() => {
-                  // TODO: Save booking request to database
-                  alert(`Interview request sent to ${listing?.name} for ${selectedDate} at ${selectedTime}`);
-                  setShowBookingModal(false);
-                  setSelectedDate('');
-                  setSelectedTime('');
-                }}
-                disabled={!selectedDate || !selectedTime}
+                onClick={handleSubmitInterviewRequest}
+                disabled={!selectedDate || !selectedTime || bookingSubmitting}
               >
-                Send Request
+                {bookingSubmitting ? 'Sending...' : 'Send Request'}
               </Button>
             </div>
           </Card>
@@ -724,6 +901,8 @@ export default function ProfilePage() {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Service Type</label>
                 <select
+                  value={serviceType}
+                  onChange={(e) => setServiceType(e.target.value)}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
                 >
                   <option value="">Select a service</option>
@@ -765,6 +944,8 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-foreground mb-2">Service Location</label>
                 <input
                   type="text"
+                  value={serviceLocation}
+                  onChange={(e) => setServiceLocation(e.target.value)}
                   placeholder="Enter your address"
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
                 />
@@ -773,6 +954,8 @@ export default function ProfilePage() {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Description of Service Needed</label>
                 <textarea
+                  value={serviceMessage}
+                  onChange={(e) => setServiceMessage(e.target.value)}
                   placeholder="Describe what you need help with..."
                   rows={3}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91] resize-none"
@@ -784,25 +967,17 @@ export default function ProfilePage() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => {
-                  setShowServiceModal(false);
-                  setSelectedDate('');
-                  setSelectedTime('');
-                }}
+                onClick={resetServiceForm}
+                disabled={serviceSubmitting}
               >
                 Cancel
               </Button>
               <Button
                 className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
-                onClick={() => {
-                  alert(`Service request sent to ${listing?.name} for ${selectedDate}`);
-                  setShowServiceModal(false);
-                  setSelectedDate('');
-                  setSelectedTime('');
-                }}
-                disabled={!selectedDate || !selectedTime}
+                onClick={handleSubmitServiceRequest}
+                disabled={!selectedDate || !selectedTime || !serviceType || serviceSubmitting}
               >
-                Request Service
+                {serviceSubmitting ? 'Sending...' : 'Request Service'}
               </Button>
             </div>
           </Card>

@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { requiresMembershipPayment } from '@/lib/membership';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Lock, Chrome, Loader2 } from 'lucide-react';
+import { Mail, Lock, Loader2 } from 'lucide-react';
+import GoogleAuthButton from '@/components/GoogleAuthButton';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 
@@ -15,7 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
-  const { signIn, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, signIn, signInWithGoogle, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -39,6 +42,22 @@ export default function LoginPage() {
     }
   }, [location.state]);
 
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const redirectLoggedInUser = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      navigate(profile?.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+    };
+
+    redirectLoggedInUser();
+  }, [authLoading, navigate, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -51,10 +70,72 @@ export default function LoginPage() {
       });
       setLoading(false);
     } else {
+      const {
+        data: { user: signedInUser },
+      } = await supabase.auth.getUser();
+
+      if (!signedInUser) {
+        toast.error('Login Failed', {
+          description: 'Could not load your account after sign-in.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('status, rejection_reason, application_data')
+        .eq('id', signedInUser.id)
+        .maybeSingle();
+
+      const accountStatus =
+        profile?.status ||
+        profile?.application_data?.account_status ||
+        signedInUser.user_metadata?.account_status ||
+        (signedInUser.user_metadata?.application_data ? 'pending' : null);
+      const rejectionReason =
+        profile?.rejection_reason ||
+        profile?.application_data?.rejection_reason ||
+        signedInUser.user_metadata?.rejection_reason;
+
+      if (accountStatus === 'pending') {
+        await signOut();
+        toast.info('Account under review', {
+          description: 'Your registration is still pending admin approval.',
+        });
+        setLoading(false);
+        navigate('/registration-pending', { state: { email } });
+        return;
+      }
+
+      if (accountStatus === 'rejected') {
+        await signOut();
+        toast.error('Application not approved', {
+          description: rejectionReason || 'Your registration was not approved. Please contact support.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (requiresMembershipPayment(profile, signedInUser)) {
+        toast.info('Membership payment required', {
+          description: 'Your application is approved. Please complete payment to activate your account.',
+        });
+        setLoading(false);
+        navigate('/checkout');
+        return;
+      }
+
+      const { data: roleProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', signedInUser.id)
+        .maybeSingle();
+
       toast.success('Login Successful!', {
         description: 'Welcome back to Summerland Estates',
       });
-      setTimeout(() => navigate('/'), 500);
+      setTimeout(() => navigate(roleProfile?.role === 'admin' ? '/admin/dashboard' : '/dashboard'), 500);
     }
   };
 
@@ -92,16 +173,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-              >
-                <Chrome className="w-5 h-5 mr-2" />
-                Continue with Google
-              </Button>
+              <GoogleAuthButton onClick={handleGoogleSignIn} disabled={loading} />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -173,8 +245,15 @@ export default function LoginPage() {
 
               <div className="text-center text-sm">
                 Don't have an account?{' '}
-                <Link to="/signup" className="text-primary font-semibold hover:underline">
+                <Link to="/add-listing" className="text-primary font-semibold hover:underline">
                   Sign up
+                </Link>
+              </div>
+
+              <div className="rounded-xl border border-[#E8DED1] bg-[#FBF8F4] p-4 text-center">
+                <p className="text-sm font-medium text-foreground">Looking to apply for membership?</p>
+                <Link to="/add-listing" className="mt-2 inline-flex text-sm font-semibold text-[#8A8279] hover:underline">
+                  Start the application
                 </Link>
               </div>
             </CardContent>

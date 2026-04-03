@@ -240,10 +240,39 @@ export default function ToolsPage() {
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const navigate = useNavigate();
 
+  const storeDownloadedTemplate = (tool: Tool) => {
+    try {
+      const existing = localStorage.getItem('downloadedTemplates');
+      const parsed = existing ? JSON.parse(existing) : [];
+      const nextItems = Array.isArray(parsed) ? parsed : [];
+
+      const nextEntry = {
+        id: tool.id,
+        title: tool.title,
+        type: tool.category,
+        savedDate: new Date().toLocaleDateString(),
+      };
+
+      const deduped = nextItems.filter((item: any) => item?.id !== tool.id);
+      localStorage.setItem('downloadedTemplates', JSON.stringify([nextEntry, ...deduped]));
+    } catch {
+      localStorage.setItem(
+        'downloadedTemplates',
+        JSON.stringify([
+          {
+            id: tool.id,
+            title: tool.title,
+            type: tool.category,
+            savedDate: new Date().toLocaleDateString(),
+          },
+        ])
+      );
+    }
+  };
+
   const handleDownload = (tool: Tool) => {
     if (tool.price === 'Free') {
-      // Free download
-      console.log('Downloading:', tool.title);
+      storeDownloadedTemplate(tool);
       toast.success('Download Started!', {
         description: `${tool.title} is being downloaded.`,
       });
@@ -256,6 +285,7 @@ export default function ToolsPage() {
 
   const handlePurchase = () => {
     if (selectedTool) {
+      storeDownloadedTemplate(selectedTool);
       toast.success('Redirecting to checkout...', {
         description: `Purchasing ${selectedTool.title} for ${selectedTool.price}`,
       });
@@ -459,51 +489,76 @@ export default function ToolsPage() {
       {showPricingModal && selectedTool && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md p-6 bg-card">
-            <h3 className="text-xl font-heading font-semibold text-foreground mb-2 text-center">
-              Download Template
-            </h3>
-            <p className="text-muted-foreground mb-6 text-center text-sm">
-              {selectedTool.title}
-            </p>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-heading font-semibold text-foreground">
+                  Download Template
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  {selectedTool.title}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowPricingModal(false);
+                  setSelectedTool(null);
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
             
             <div className="space-y-4">
-              {/* Purchase Option */}
+              {/* Purchase Option - $15.99 */}
               <div 
                 className="border-2 border-[#A89F91] rounded-lg p-4 cursor-pointer hover:bg-[#A89F91]/5 transition-colors"
                 onClick={handlePurchase}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground">One-Time Purchase</span>
-                  <span className="text-xl font-bold text-[#A89F91]">{selectedTool.price}</span>
+                  <span className="text-xl font-bold text-[#A89F91]">$15.99</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Download this template immediately
+                  Download this template immediately with lifetime access
                 </p>
               </div>
 
               {/* Join Now Option */}
               <div 
-                className="border-2 border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                className="border-2 border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors relative overflow-hidden"
                 onClick={() => {
                   setShowPricingModal(false);
                   navigate('/add-listing');
                 }}
               >
+                <div className="absolute top-0 right-0 bg-green-500 text-white text-xs px-2 py-1 rounded-bl">
+                  Best Value
+                </div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground">Join Now</span>
-                  <span className="text-sm font-medium text-green-600">Included in Pro Plans</span>
+                  <span className="text-sm font-medium text-green-600">Unlimited Access</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Get unlimited access to all templates with a membership
+                  Get access to all templates with a Pro membership
                 </p>
+                <ul className="mt-3 space-y-1">
+                  <li className="text-xs text-muted-foreground flex items-center">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></span>
+                    Unlimited template downloads
+                  </li>
+                  <li className="text-xs text-muted-foreground flex items-center">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></span>
+                    Community access
+                  </li>
+                  <li className="text-xs text-muted-foreground flex items-center">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></span>
+                    Priority support
+                  </li>
+                </ul>
               </div>
             </div>
-
-            {selectedTool.includedInPlan && selectedTool.includedInPlan.length > 0 && (
-              <p className="text-xs text-muted-foreground mt-4 text-center">
-                This template is included in: {selectedTool.includedInPlan.map(p => p.replace('estates-', 'Estates ').replace('agency-', 'Agency ')).join(', ')} plans
-              </p>
-            )}
 
             <div className="flex gap-3 mt-6">
               <Button
@@ -520,7 +575,7 @@ export default function ToolsPage() {
                 className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
                 onClick={handlePurchase}
               >
-                Purchase {selectedTool.price}
+                Purchase $15.99
               </Button>
             </div>
           </Card>

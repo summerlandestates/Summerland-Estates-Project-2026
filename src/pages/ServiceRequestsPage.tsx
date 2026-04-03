@@ -75,7 +75,9 @@ export default function ServiceRequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [showBidModal, setShowBidModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [bidSubmitting, setBidSubmitting] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState('');
   const [bidMessage, setBidMessage] = useState('');
   const [serviceForm, setServiceForm] = useState<ServiceFormData>({
@@ -90,34 +92,102 @@ export default function ServiceRequestsPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    // Filter out expired requests
-    const today = new Date();
-    const activeRequests = serviceRequests.filter(request => {
-      const requestDate = new Date(request.dateNeeded);
-      return requestDate >= today && request.status === 'active';
-    });
-    setServiceRequests(activeRequests);
+
+    const loadServiceRequests = async () => {
+      setPageLoading(true);
+
+      const { data, error } = await supabase
+        .from('service_requests')
+        .select('id, service_needed, location, date_needed, details, special_requests, status, created_at')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        const today = new Date();
+        const activeRequests = mockServiceRequests.filter((request) => {
+          const requestDate = new Date(request.dateNeeded);
+          return requestDate >= today && request.status === 'active';
+        });
+
+        setServiceRequests(activeRequests);
+        setPageLoading(false);
+
+        toast.error('Showing fallback service requests', {
+          description: error.message || 'Live service requests could not be loaded.',
+        });
+        return;
+      }
+
+      const mappedRequests: ServiceRequest[] = (data || []).map((request: any) => ({
+        id: request.id,
+        serviceNeeded: request.service_needed,
+        location: request.location,
+        dateNeeded: request.date_needed,
+        details: request.details,
+        specialRequests: request.special_requests || undefined,
+        postedBy: 'Summerland Estates Member',
+        postedDate: request.created_at,
+        status: request.status === 'open' ? 'active' : 'filled',
+      }));
+
+      setServiceRequests(mappedRequests);
+      setPageLoading(false);
+    };
+
+    loadServiceRequests();
   }, []);
 
   const handleBidClick = (request: ServiceRequest) => {
+    if (!user) {
+      toast.error('Apply or sign in to bid on service requests', {
+        description: 'Membership approval is required before you can submit bids.',
+      });
+      navigate('/add-listing');
+      return;
+    }
+
     setSelectedRequest(request);
     setShowBidModal(true);
   };
 
   const handleSubmitBid = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!selectedRequest) return;
-    
-    // In a real app, this would create a private message thread
-    alert(`Bid submitted for ${selectedRequest.serviceNeeded}!\n\nYour quote: ${quoteAmount}\n\nA private message thread has been created with the poster.`);
-    
-    // Reset form
-    setQuoteAmount('');
-    setBidMessage('');
-    setShowBidModal(false);
-    setSelectedRequest(null);
+
+    if (!selectedRequest || !user) return;
+
+    const submitBid = async () => {
+      setBidSubmitting(true);
+
+      const { error } = await supabase.from('service_bids').insert({
+        service_request_id: selectedRequest.id,
+        bidder_id: user.id,
+        quote_amount: parseFloat(quoteAmount),
+        message: bidMessage.trim() || null,
+      });
+
+      if (error) {
+        toast.error('Failed to submit bid', {
+          description:
+            error.code === '23505'
+              ? 'You already submitted a bid for this request.'
+              : error.message || 'Please try again.',
+        });
+        setBidSubmitting(false);
+        return;
+      }
+
+      toast.success('Bid submitted', {
+        description: `Your quote has been sent for ${selectedRequest.serviceNeeded}.`,
+      });
+
+      setBidSubmitting(false);
+      setQuoteAmount('');
+      setBidMessage('');
+      setShowBidModal(false);
+      setSelectedRequest(null);
+    };
+
+    submitBid();
   };
 
   const handleCloseBidModal = () => {
@@ -125,12 +195,15 @@ export default function ServiceRequestsPage() {
     setSelectedRequest(null);
     setQuoteAmount('');
     setBidMessage('');
+    setBidSubmitting(false);
   };
 
   const handleCreateServiceRequest = () => {
     if (!user) {
-      toast.error('Please sign in to create a service request');
-      navigate('/login');
+      toast.error('Apply or sign in to create a service request', {
+        description: 'Posting requests is available after membership approval.',
+      });
+      navigate('/add-listing');
       return;
     }
     setShowCreateModal(true);
@@ -140,8 +213,8 @@ export default function ServiceRequestsPage() {
     e.preventDefault();
     
     if (!user) {
-      toast.error('Please sign in to create a service request');
-      navigate('/login');
+      toast.error('Apply or sign in to create a service request');
+      navigate('/add-listing');
       return;
     }
 
@@ -165,6 +238,20 @@ export default function ServiceRequestsPage() {
       toast.success('Service Request Posted!', {
         description: 'Service providers can now submit bids for your request.',
       });
+
+      const nextRequest: ServiceRequest = {
+        id: crypto.randomUUID(),
+        serviceNeeded: serviceForm.serviceNeeded,
+        location: serviceForm.location,
+        dateNeeded: serviceForm.dateNeeded,
+        details: serviceForm.details,
+        specialRequests: serviceForm.specialRequests || undefined,
+        postedBy: user.email || 'You',
+        postedDate: new Date().toISOString(),
+        status: 'active',
+      };
+
+      setServiceRequests((current) => [nextRequest, ...current]);
       
       setShowCreateModal(false);
       setServiceForm({
@@ -176,9 +263,6 @@ export default function ServiceRequestsPage() {
         budgetMin: '',
         budgetMax: '',
       });
-      
-      // Refresh the page to show new request
-      window.location.reload();
     } catch (error: any) {
       toast.error('Failed to post service request', {
         description: error.message || 'Please try again',
@@ -214,7 +298,23 @@ export default function ServiceRequestsPage() {
             </div>
           </div>
 
-          {serviceRequests.length === 0 ? (
+          {pageLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Card key={index} className="p-6 bg-card text-card-foreground animate-pulse">
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="h-6 w-2/3 rounded bg-muted" />
+                      <div className="h-4 w-1/2 rounded bg-muted" />
+                      <div className="h-6 w-20 rounded bg-muted" />
+                    </div>
+                    <div className="h-16 rounded bg-muted" />
+                    <div className="h-10 rounded bg-muted" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : serviceRequests.length === 0 ? (
             <Card className="p-12 bg-card text-card-foreground text-center">
               <p className="text-xl text-muted-foreground mb-4">
                 No active service requests at this time
@@ -352,16 +452,27 @@ export default function ServiceRequestsPage() {
                 type="button"
                 variant="outline"
                 onClick={handleCloseBidModal}
+                disabled={bidSubmitting}
                 className="flex-1 border-border text-foreground hover:bg-muted"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
+                disabled={bidSubmitting}
                 className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                <Send className="w-4 h-4 mr-2" />
-                Send Bid
+                {bidSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Send Bid
+                  </>
+                )}
               </Button>
             </div>
           </form>

@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, DollarSign, Clock, Loader2 } from 'lucide-react';
+import { MapPin, DollarSign, Clock, Loader2, Briefcase, Users } from 'lucide-react';
 
 interface JobFormData {
   jobTitle: string;
@@ -98,8 +98,10 @@ export default function JobPostingPage() {
     e.preventDefault();
     
     if (!user) {
-      toast.error('Please sign in to post a job');
-      navigate('/login');
+      toast.error('Apply or sign in to post a placement', {
+        description: 'Posting placements is available after membership approval.',
+      });
+      navigate('/add-listing');
       return;
     }
 

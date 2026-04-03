@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Lock, User, Chrome, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Loader2 } from 'lucide-react';
+import GoogleAuthButton from '@/components/GoogleAuthButton';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 
@@ -80,16 +81,7 @@ export default function SignupPage() {
               <CardDescription>Join the Summerland Estates network</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-              >
-                <Chrome className="w-5 h-5 mr-2" />
-                Continue with Google
-              </Button>
+              <GoogleAuthButton onClick={handleGoogleSignIn} disabled={loading} />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -189,6 +181,13 @@ export default function SignupPage() {
                 Already have an account?{' '}
                 <Link to="/login" className="text-primary font-semibold hover:underline">
                   Sign in
+                </Link>
+              </div>
+
+              <div className="rounded-xl border border-[#E8DED1] bg-[#FBF8F4] p-4 text-center">
+                <p className="text-sm font-medium text-foreground">Ready to apply for membership?</p>
+                <Link to="/add-listing" className="mt-2 inline-flex text-sm font-semibold text-[#8A8279] hover:underline">
+                  Go to the application page
                 </Link>
               </div>
             </CardContent>

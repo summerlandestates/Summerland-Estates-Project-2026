@@ -1,157 +1,266 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle2, Home, RefreshCw, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
+import type { CheckoutData } from '../types';
+import { buildCheckoutDataFromMembership } from '@/lib/membership';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const MAX_RETRIES = 3;
+
+function isSupabaseConnectionIssue(error: unknown) {
+  const message = String((error as { message?: string })?.message || error || '');
+  return /failed to fetch|network|name_not_resolved|dns|load failed/i.test(message);
+}
+
+function getSupabaseConnectionMessage() {
+  return `Unable to reach the configured Supabase project at ${supabaseUrl || 'VITE_SUPABASE_URL'}. Please verify the URL/DNS in your .env file.`;
+}
 
 export default function PaymentSuccessPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   const [processing, setProcessing] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [checkoutData, setCheckoutData] = useState<any>(null);
-  const MAX_RETRIES = 3;
+  const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
 
-  useEffect(() => {
-    const sessionId = searchParams.get('session_id');
-    
-    if (!sessionId) {
-      toast.error('Invalid payment session');
-      navigate('/add-listing');
-      return;
-    }
+  const clearStoredCheckout = () => {
+    sessionStorage.removeItem('checkoutData');
+    sessionStorage.removeItem('checkoutDataDraft');
+  };
 
-    // Get checkout data from sessionStorage
-    const checkoutDataStr = sessionStorage.getItem('checkoutData');
-    if (!checkoutDataStr) {
-      toast.error('Checkout data not found');
-      navigate('/add-listing');
-      return;
-    }
+  const createLegacyPaidAccount = useCallback(
+    async (data: CheckoutData) => {
+      const accountPassword =
+        data.password ||
+        Math.random().toString(36).slice(-12) +
+          Math.random().toString(36).slice(-12).toUpperCase() +
+          '!@#';
 
-    const parsedData = JSON.parse(checkoutDataStr);
-    setCheckoutData(parsedData);
-
-    // Create account after successful payment
-    createAccount(parsedData);
-  }, [searchParams, navigate]);
-
-  const createAccount = useCallback(async (data: any, retry = 0) => {
-    setProcessing(true);
-    setError(null);
-    setRetryCount(retry);
-
-    try {
-      // Check if Supabase is reachable first
-      const healthCheck = await Promise.race([
-        supabase.from('profiles').select('count').limit(1),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 10000))
-      ]).catch(() => null);
-
-      if (!healthCheck) {
-        throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
-      }
-
-      // Generate a random password (user will reset via email)
-      const randomPassword = Math.random().toString(36).slice(-12) + 
-                            Math.random().toString(36).slice(-12).toUpperCase() + 
-                            '!@#';
-
-      // Create auth user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
-        password: randomPassword,
+        password: accountPassword,
         options: {
           data: {
             full_name: data.name,
+            account_status: 'pending',
+            payment_status: 'paid',
+            phone: data.phone || null,
+            location: data.location || null,
+            role: data.role || null,
+            bio: data.bio || null,
             profile_type: data.profileType,
             tier: data.selectedTier,
+            application_data: {
+              ...data.applicationData,
+              account_status: 'pending',
+              payment_status: 'paid',
+              profile_type: data.profileType,
+              selected_tier: data.selectedTier,
+              payment_completed_at: new Date().toISOString(),
+            },
           },
         },
       });
 
       if (signUpError) {
-        // Check if user already exists
         if (signUpError.message?.includes('already registered')) {
           throw new Error('An account with this email already exists. Please sign in instead.');
         }
         throw signUpError;
       }
 
-      // Create profile entry
       if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: data.email,
-            full_name: data.name,
-            phone: data.phone,
-            location: data.location,
-            bio: data.bio,
-            role: data.role || null,
-            profile_type: data.profileType,
-            tier: data.selectedTier,
-            email_verified: false,
-          });
+        const roleMapping: Record<string, string> = {
+          professional: 'professional',
+          'service-provider': 'business',
+          agency: 'agency',
+          estates: 'estates',
+        };
+        const dbRole = roleMapping[data.profileType] || data.role || 'professional';
+        const profileApplicationData = {
+          ...data.applicationData,
+          account_status: 'pending',
+          rejection_reason: null,
+          payment_status: 'paid',
+          payment_completed_at: new Date().toISOString(),
+          profile_type: data.profileType,
+          selected_tier: data.selectedTier,
+        };
 
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // Don't throw - auth user was created, profile can be created later
-        }
+        await supabase.from('profiles').upsert({
+          id: authData.user.id,
+          email: data.email,
+          full_name: data.name,
+          role: dbRole,
+          phone: data.phone,
+          location: data.location,
+          profile_type: data.profileType,
+          tier: data.selectedTier,
+          application_data: profileApplicationData,
+        });
       }
 
-      // Clear checkout data
-      sessionStorage.removeItem('checkoutData');
-
+      await supabase.auth.signOut();
+      clearStoredCheckout();
       setSuccess(true);
       setProcessing(false);
 
-      toast.success('Payment Successful!', {
-        description: 'Your account has been created. Check your email for verification.',
+      toast.success('Payment received', {
+        description: 'Your registration has been paid and is now pending admin approval.',
       });
 
-      // Redirect to home after 3 seconds
       setTimeout(() => {
-        navigate('/');
-      }, 3000);
-    } catch (err: any) {
-      console.error('Account creation error:', err);
-      
-      // Check if it's a network error and we can retry
-      const isNetworkError = err.message?.includes('fetch') || 
-                             err.message?.includes('network') ||
-                             err.message?.includes('timeout') ||
-                             err.message?.includes('Unable to connect');
-      
-      if (isNetworkError && retry < MAX_RETRIES) {
-        // Auto-retry after a delay
-        toast.info(`Connection issue. Retrying... (${retry + 1}/${MAX_RETRIES})`);
-        setTimeout(() => {
-          createAccount(data, retry + 1);
-        }, 2000 * (retry + 1)); // Exponential backoff
-        return;
+        navigate('/registration-pending', {
+          state: {
+            name: data.name,
+            email: data.email,
+            requiresPayment: false,
+          },
+        });
+      }, 1200);
+    },
+    [navigate]
+  );
+
+  const markApprovedMembershipPaid = useCallback(
+    async (storedCheckoutData?: CheckoutData | null) => {
+      if (!user) {
+        throw new Error('Unable to confirm the approved member account for this payment.');
       }
 
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('email, full_name, phone, location, role, profile_type, tier, application_data')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      const resolvedCheckoutData = storedCheckoutData || buildCheckoutDataFromMembership(profile, user);
+
+      if (!resolvedCheckoutData) {
+        throw new Error('Unable to determine the approved membership details for this payment.');
+      }
+
+      const updatedApplicationData = {
+        ...(profile?.application_data || {}),
+        ...resolvedCheckoutData.applicationData,
+        account_status: 'approved',
+        payment_status: 'paid',
+        payment_completed_at: new Date().toISOString(),
+        selected_tier: resolvedCheckoutData.selectedTier,
+        profile_type: resolvedCheckoutData.profileType,
+      };
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          tier: resolvedCheckoutData.selectedTier,
+          profile_type: resolvedCheckoutData.profileType || profile?.profile_type,
+          application_data: updatedApplicationData,
+        })
+        .eq('id', user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      clearStoredCheckout();
+      setSuccess(true);
       setProcessing(false);
-      setError(err.message || 'An unexpected error occurred. Please try again.');
-      
-      toast.error('Account Creation Failed', {
-        description: err.message || 'Please contact support',
+
+      toast.success('Membership activated', {
+        description: 'Your payment has been received and your approved membership is now active.',
       });
-    }
-  }, [navigate]);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1200);
+    },
+    [navigate, user]
+  );
+
+  const processPaymentSuccess = useCallback(
+    async (retry = 0) => {
+      setProcessing(true);
+      setError(null);
+      setRetryCount(retry);
+
+      try {
+        const sessionId = searchParams.get('session_id');
+        if (!sessionId) {
+          toast.error('Invalid payment session');
+          navigate(user ? '/dashboard' : '/add-listing');
+          return;
+        }
+
+        const storedCheckoutData = sessionStorage.getItem('checkoutData');
+        const parsedCheckoutData = storedCheckoutData ? (JSON.parse(storedCheckoutData) as CheckoutData) : null;
+        setCheckoutData(parsedCheckoutData);
+
+        if (user) {
+          await markApprovedMembershipPaid(parsedCheckoutData);
+          return;
+        }
+
+        if (!parsedCheckoutData) {
+          throw new Error('Checkout data not found. Please sign in and complete payment again.');
+        }
+
+        await createLegacyPaidAccount(parsedCheckoutData);
+      } catch (err: any) {
+        console.error('Payment success handling error:', err);
+
+        const isNetworkError =
+          err.message?.includes('fetch') ||
+          err.message?.includes('network') ||
+          err.message?.includes('timeout') ||
+          err.message?.includes('Unable to connect');
+
+        if (isNetworkError && retry < MAX_RETRIES) {
+          toast.info(`Connection issue. Retrying... (${retry + 1}/${MAX_RETRIES})`);
+          setTimeout(() => {
+            processPaymentSuccess(retry + 1);
+          }, 2000 * (retry + 1));
+          return;
+        }
+
+        setProcessing(false);
+        setError(
+          isSupabaseConnectionIssue(err)
+            ? getSupabaseConnectionMessage()
+            : err.message || 'An unexpected error occurred. Please try again.'
+        );
+
+        toast.error('Payment Confirmation Failed', {
+          description: isSupabaseConnectionIssue(err)
+            ? getSupabaseConnectionMessage()
+            : err.message || 'Please contact support',
+        });
+      }
+    },
+    [createLegacyPaidAccount, markApprovedMembershipPaid, navigate, searchParams, user]
+  );
+
+  useEffect(() => {
+    if (authLoading) return;
+    processPaymentSuccess();
+  }, [authLoading, processPaymentSuccess]);
 
   const handleRetry = () => {
-    if (checkoutData) {
-      createAccount(checkoutData, 0);
-    }
+    processPaymentSuccess(0);
   };
 
   return (

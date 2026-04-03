@@ -159,7 +159,7 @@ export default function SavedProfilesPage() {
                       size="icon"
                       variant="secondary"
                       onClick={() => handleRemoveProfile(profile.id)}
-                      className="bg-white/90 hover:bg-white text-destructive"
+                      className="bg-white/90 hover:bg-[#5f6756] text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

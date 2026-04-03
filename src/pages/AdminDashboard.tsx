@@ -3,24 +3,53 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { loadSessionJson, saveSessionJson } from '@/lib/adminSession';
 import AdminSidebar from '@/components/AdminSidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, FileText, Activity, TrendingUp, Loader2 } from 'lucide-react';
 
+const parseApiResponse = async (response: Response) => {
+  const responseText = await response.text();
+
+  try {
+    return responseText ? JSON.parse(responseText) : {};
+  } catch {
+    throw new Error(
+      response.status === 404
+        ? 'Membership applications API was not found. Restart the local API server.'
+        : 'The API returned an invalid response. Restart the local API server and try again.'
+    );
+  }
+};
+
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
+  const cachedStats = loadSessionJson('admin-dashboard-stats', {
     totalUsers: 0,
     newUsersThisMonth: 0,
     totalPages: 0,
     activeUsers: 0,
+    pendingApprovals: 0,
   });
-  const [loading, setLoading] = useState(true);
-  const { user, signOut } = useAuth();
+  const [stats, setStats] = useState(cachedStats);
+  const [loading, setLoading] = useState(
+    cachedStats.totalUsers === 0 &&
+      cachedStats.newUsersThisMonth === 0 &&
+      cachedStats.totalPages === 0 &&
+      cachedStats.activeUsers === 0 &&
+      cachedStats.pendingApprovals === 0
+  );
+  const { user, signOut, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     checkAdminAccess();
-  }, [user]);
+  }, [authLoading, user]);
+
+  useEffect(() => {
+    saveSessionJson('admin-dashboard-stats', stats);
+  }, [stats]);
 
   const checkAdminAccess = async () => {
     if (!user) {
@@ -46,24 +75,51 @@ export default function AdminDashboard() {
   };
 
   const fetchStats = async () => {
-    setLoading(true);
-    
-    const { data: users } = await supabase.from('profiles').select('*');
-    const { data: pages } = await supabase.from('content_pages').select('*');
+    if (loading) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
 
-    const now = new Date();
-    const thisMonth = users?.filter(
-      (u) => new Date(u.created_at).getMonth() === now.getMonth()
-    ).length || 0;
+    try {
+      const [usersResult, pagesResult, applicationsResponse] = await Promise.all([
+        supabase.from('profiles').select('*'),
+        supabase.from('content_pages').select('*'),
+        fetch('/api/admin-membership-applications'),
+      ]);
 
-    setStats({
-      totalUsers: users?.length || 0,
-      newUsersThisMonth: thisMonth,
-      totalPages: pages?.length || 0,
-      activeUsers: users?.filter((u) => u.role).length || 0,
-    });
+      const users = usersResult.data;
+      const pages = pagesResult.data;
+      const applicationsPayload = await parseApiResponse(applicationsResponse);
+      const applications = applicationsResponse.ok ? applicationsPayload.applications || [] : [];
 
-    setLoading(false);
+      const now = new Date();
+      const thisMonth = users?.filter(
+        (u) => new Date(u.created_at).getMonth() === now.getMonth()
+      ).length || 0;
+
+      const nextStats = {
+        totalUsers: users?.length || 0,
+        newUsersThisMonth: thisMonth,
+        totalPages: pages?.length || 0,
+        activeUsers: applications.filter((u: any) => u.status === 'approved').length || 0,
+        pendingApprovals: applications.filter((u: any) => u.status === 'pending').length || 0,
+      };
+
+      setStats(nextStats);
+    } catch (error: any) {
+      toast.error('Failed to load dashboard stats', {
+        description: error.message || 'Please restart the local API server.',
+      });
+      setStats((current) => ({
+        ...current,
+        pendingApprovals: 0,
+        activeUsers: 0,
+      }));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -85,14 +141,22 @@ export default function AdminDashboard() {
 
       <main className="flex-1 p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
             <h1 className="text-4xl font-heading font-bold text-gray-900 mb-2">
               Dashboard
             </h1>
             <p className="text-gray-600">Welcome back, Admin</p>
+            </div>
+            {refreshing && (
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#D9D1C6] bg-white px-4 py-2 text-sm text-[#7B7368] shadow-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Refreshing
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <Card className="border-gray-200 hover:border-[#A89F91] transition-all duration-300">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
@@ -144,6 +208,22 @@ export default function AdminDashboard() {
                 <p className="text-xs text-gray-500 mt-1">With assigned roles</p>
               </CardContent>
             </Card>
+
+            <Card
+              className="cursor-pointer border-gray-200 transition-all duration-300 hover:border-[#A89F91] hover:bg-[#A89F91]/5"
+              onClick={() => navigate('/admin/applications?status=pending')}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Pending Approvals
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-[#A89F91]">{stats.pendingApprovals}</div>
+                <p className="text-xs text-gray-500 mt-1">Click to review users</p>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -162,6 +242,13 @@ export default function AdminDashboard() {
                   >
                     <h4 className="font-semibold text-gray-900 mb-1">Manage Users</h4>
                     <p className="text-sm text-gray-600">View and manage all registered users</p>
+                  </button>
+                  <button
+                    onClick={() => navigate('/admin/applications?status=pending')}
+                    className="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-[#A89F91] hover:bg-[#A89F91]/5 transition-all duration-300"
+                  >
+                    <h4 className="font-semibold text-gray-900 mb-1">Pending Approvals</h4>
+                    <p className="text-sm text-gray-600">Approve or reject newly submitted accounts</p>
                   </button>
                   <button
                     onClick={() => navigate('/admin/content')}

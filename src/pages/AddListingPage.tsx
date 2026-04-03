@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -11,13 +12,29 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, X, ArrowLeft, ArrowRight, Check, User, Building2, Briefcase, Home } from 'lucide-react';
+import { Upload, X, ArrowLeft, ArrowRight, Check, User, Building2, Briefcase, Home, Shield, FileText, Image as ImageIcon, Loader2, Sparkles } from 'lucide-react';
 import { getPlansByUserType } from '../data/pricing';
+import { submitMembershipApplication } from '@/lib/membershipApplication';
+import { isComplimentaryTier } from '@/lib/membership';
+import PersonalityAssessmentDialog from '@/components/PersonalityAssessmentDialog';
+import { formatPersonalitySummary, type PersonalityAssessmentResult } from '@/lib/personalityAssessment';
+import { parseResumeFile, type ResumeParseResult } from '@/lib/resumeParser';
 import { professionalTitles, genderOptions, languages, workAvailability, workPreference, certifications, animalExperience, comfortLevels, cookingExperience } from '../data/profileOptions';
-import type { OnboardingType, OnboardingStep, UserType, PricingTier, ApplicationFormData } from '../types';
+import type { OnboardingType, OnboardingStep, UserType, PricingTier, ApplicationFormData, SerializedApplicationData, CheckoutData } from '../types';
 
 type ProfileType = 'professional' | 'service-provider' | 'agency' | 'estates' | null;
 type EstatesSubType = 'estate-manager' | 'chief-of-staff' | 'personal-assistant' | 'executive-assistant' | 'principal' | null;
+
+interface UploadPreviewItem {
+  name: string;
+  size: number;
+  type: string;
+  previewUrl: string | null;
+}
+
+type ResumeParserState = 'idle' | 'parsing' | 'success' | 'error';
+
+const APPLICATION_UPLOAD_BUCKET = import.meta.env.VITE_APPLICATION_UPLOAD_BUCKET || 'avatars';
 
 const profileTypeToUserType: { [key: string]: UserType } = {
   'professional': 'professional',
@@ -125,6 +142,83 @@ const estatesSteps: OnboardingStep[] = [
   }
 ];
 
+async function uploadApplicationFile(file: File, key: string, profileType: NonNullable<ProfileType>) {
+  const response = await fetch('/api/application-upload', {
+    method: 'POST',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+      'x-file-name': file.name,
+      'x-file-type': file.type || 'application/octet-stream',
+      'x-profile-type': profileType,
+      'x-field-key': key,
+    },
+    body: file,
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      result.error ||
+        `Unable to upload ${file.name}. Please ensure the API server is running and "${APPLICATION_UPLOAD_BUCKET}" is configured.`
+    );
+  }
+
+  return {
+    name: result.name || file.name,
+    size: typeof result.size === 'number' ? result.size : file.size,
+    type: result.type || file.type,
+    storagePath: result.storagePath || null,
+    publicUrl: result.publicUrl || null,
+  };
+}
+
+async function serializeApplicationForm(
+  formData: FormData,
+  profileType: NonNullable<ProfileType>,
+  selectedTier: PricingTier
+): Promise<SerializedApplicationData> {
+  const serializedData: SerializedApplicationData = {
+    profile_type: profileType,
+    selected_tier: selectedTier,
+  };
+
+  const groupedEntries = new Map<string, FormDataEntryValue[]>();
+
+  for (const [key, value] of formData.entries()) {
+    const currentValues = groupedEntries.get(key) ?? [];
+    currentValues.push(value);
+    groupedEntries.set(key, currentValues);
+  }
+
+  for (const [key, values] of groupedEntries.entries()) {
+    if (key === 'account_password' || key === 'confirm_password') {
+      continue;
+    }
+
+    const fileValues = values.filter((value): value is File => value instanceof File && value.name);
+
+    if (fileValues.length > 0) {
+      serializedData[key] = await Promise.all(
+        fileValues.map((file) => uploadApplicationFile(file, key, profileType))
+      );
+      continue;
+    }
+
+    const normalizedValues = values
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => (value === 'on' ? 'true' : value));
+
+    if (normalizedValues.length === 1) {
+      serializedData[key] = normalizedValues[0] === 'true' ? true : normalizedValues[0];
+    } else if (normalizedValues.length > 1) {
+      serializedData[key] = normalizedValues;
+    }
+  }
+
+  return serializedData;
+}
+
 export default function AddListingPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -136,7 +230,515 @@ export default function AddListingPage() {
   const [showPricing, setShowPricing] = useState(false);
   const [formData, setFormData] = useState<Partial<ApplicationFormData>>({});
   const [isCommunityOnly, setIsCommunityOnly] = useState(false);
+  const [submittingApplication, setSubmittingApplication] = useState(false);
   const [showStandardsNotice, setShowStandardsNotice] = useState(false);
+  const [formStep, setFormStep] = useState(1);
+  const [filePreviews, setFilePreviews] = useState<Record<string, UploadPreviewItem[]>>({});
+  const [resumeParserState, setResumeParserState] = useState<ResumeParserState>('idle');
+  const [resumeParserMessage, setResumeParserMessage] = useState<string | null>(null);
+  const [resumeInsights, setResumeInsights] = useState<ResumeParseResult | null>(null);
+  const [resumeAutofilledFields, setResumeAutofilledFields] = useState<string[]>([]);
+  const [personalityDialogOpen, setPersonalityDialogOpen] = useState(false);
+  const [personalityResult, setPersonalityResult] = useState<PersonalityAssessmentResult | null>(null);
+  const totalFormSteps = 3;
+  const formRef = useRef<HTMLFormElement>(null);
+  const sectionCardClassName = 'rounded-[32px] border border-border/60 bg-card/95 p-5 shadow-sm sm:p-6';
+  const sectionBodyClassName = 'space-y-4 md:space-y-5 xl:max-h-[calc(100vh-23rem)] xl:overflow-y-auto xl:pr-3';
+  const accountFormSteps = [
+    { id: 1, title: 'Basic Information', description: 'Profile essentials', icon: User },
+    { id: 2, title: 'Professional Details', description: 'Experience and preferences', icon: Briefcase },
+    { id: 3, title: 'Contact & Account', description: 'Verification and final review', icon: Building2 },
+  ];
+
+  const revokePreviewUrls = (items: UploadPreviewItem[]) => {
+    items.forEach((item) => {
+      if (item.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+    });
+  };
+
+  const getNamedField = (name: string) =>
+    formRef.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`) ?? null;
+
+  const hasContactLikeContent = (value?: string) =>
+    Boolean(value && /https?:\/\/|@[A-Z0-9.-]+\.[A-Z]{2,}|(?:\+?\d{1,2}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?){2}\d{4}/i.test(value));
+
+  const getSafeResumeSummary = (parsedResume: ResumeParseResult) =>
+    parsedResume.summary && !hasContactLikeContent(parsedResume.summary) ? parsedResume.summary : undefined;
+
+  const getSafeResumeSkills = (parsedResume: ResumeParseResult) =>
+    parsedResume.skills.filter((skill) => !hasContactLikeContent(skill)).join(', ');
+
+  const setFieldValueIfEmpty = (name: string, value: string | undefined, label: string) => {
+    if (!value) return null;
+
+    const field = getNamedField(name);
+    if (!field) return null;
+
+    const currentValue = field.value?.trim();
+    if (currentValue) {
+      return null;
+    }
+
+    field.value = value;
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+    return label;
+  };
+
+  const applyResumeAutofill = (parsedResume: ResumeParseResult) => {
+    const safeSummary = getSafeResumeSummary(parsedResume);
+    const safeSkills = getSafeResumeSkills(parsedResume);
+
+    const appliedFields = [
+      setFieldValueIfEmpty('name', parsedResume.name, 'Name'),
+      setFieldValueIfEmpty('email', parsedResume.email, 'Email'),
+      setFieldValueIfEmpty('phone', parsedResume.phone, 'Phone'),
+      setFieldValueIfEmpty('location', parsedResume.location, 'Location'),
+      setFieldValueIfEmpty('linkedin_url', parsedResume.linkedinUrl, 'LinkedIn'),
+      setFieldValueIfEmpty('website_url', parsedResume.websiteUrl, 'Website'),
+      setFieldValueIfEmpty('portfolio_url', parsedResume.portfolioUrl, 'Portfolio URL'),
+      setFieldValueIfEmpty('bio', safeSummary, 'Profile Summary'),
+      setFieldValueIfEmpty('skills', safeSkills, 'Skills'),
+      setFieldValueIfEmpty('skills_summary', safeSkills, 'Skills Summary'),
+      setFieldValueIfEmpty('years_experience', parsedResume.yearsExperience, 'Years Experience'),
+      setFieldValueIfEmpty('experience', parsedResume.yearsExperience, 'Experience'),
+      setFieldValueIfEmpty('work_title_1', parsedResume.workHistory[0]?.title, 'Work History 1'),
+      setFieldValueIfEmpty('work_employer_1', parsedResume.workHistory[0]?.employer, 'Employer 1'),
+      setFieldValueIfEmpty('work_start_1', parsedResume.workHistory[0]?.startDate, 'Work Start 1'),
+      setFieldValueIfEmpty('work_end_1', parsedResume.workHistory[0]?.endDate === 'Present' ? '' : parsedResume.workHistory[0]?.endDate, 'Work End 1'),
+      setFieldValueIfEmpty('work_description_1', parsedResume.workHistory[0]?.description, 'Work Description 1'),
+      setFieldValueIfEmpty('work_title_2', parsedResume.workHistory[1]?.title, 'Work History 2'),
+      setFieldValueIfEmpty('work_employer_2', parsedResume.workHistory[1]?.employer, 'Employer 2'),
+      setFieldValueIfEmpty('work_start_2', parsedResume.workHistory[1]?.startDate, 'Work Start 2'),
+      setFieldValueIfEmpty('work_end_2', parsedResume.workHistory[1]?.endDate === 'Present' ? '' : parsedResume.workHistory[1]?.endDate, 'Work End 2'),
+      setFieldValueIfEmpty('work_description_2', parsedResume.workHistory[1]?.description, 'Work Description 2'),
+      setFieldValueIfEmpty('ref_name_1', parsedResume.references[0]?.name, 'Reference 1'),
+      setFieldValueIfEmpty('ref_phone_1', parsedResume.references[0]?.phone, 'Reference Phone 1'),
+      setFieldValueIfEmpty('ref_email_1', parsedResume.references[0]?.email, 'Reference Email 1'),
+      setFieldValueIfEmpty('ref_name_2', parsedResume.references[1]?.name, 'Reference 2'),
+      setFieldValueIfEmpty('ref_phone_2', parsedResume.references[1]?.phone, 'Reference Phone 2'),
+      setFieldValueIfEmpty('ref_email_2', parsedResume.references[1]?.email, 'Reference Email 2'),
+    ].filter(Boolean) as string[];
+
+    setResumeAutofilledFields(appliedFields);
+
+    return appliedFields;
+  };
+
+  const handleResumeAutofill = async (file?: File) => {
+    if (!file) {
+      setResumeParserState('idle');
+      setResumeParserMessage(null);
+      setResumeInsights(null);
+      setResumeAutofilledFields([]);
+      return;
+    }
+
+    setResumeParserState('parsing');
+    setResumeParserMessage('Reading your resume and matching details to the form...');
+
+    try {
+      const parsedResume = await parseResumeFile(file);
+      setResumeInsights(parsedResume);
+
+      const usefulSignals = [
+        parsedResume.name,
+        parsedResume.email,
+        parsedResume.phone,
+        parsedResume.location,
+        parsedResume.linkedinUrl,
+        parsedResume.websiteUrl,
+        parsedResume.portfolioUrl,
+        parsedResume.summary,
+        parsedResume.yearsExperience,
+        parsedResume.skills.length > 0 ? 'skills' : '',
+        parsedResume.workHistory.length > 0 ? 'work-history' : '',
+        parsedResume.references.length > 0 ? 'references' : '',
+      ].filter(Boolean).length;
+
+      if (parsedResume.rawText.length < 80 && usefulSignals < 2) {
+        setResumeParserState('error');
+        setResumeParserMessage('The resume uploaded successfully, but there was not enough readable text to auto-fill fields.');
+        setResumeAutofilledFields([]);
+        return;
+      }
+
+      const appliedFields = applyResumeAutofill(parsedResume);
+      if (appliedFields.length === 0 && usefulSignals < 2) {
+        setResumeParserState('error');
+        setResumeParserMessage('The resume was uploaded, but this file did not contain clean readable text for reliable auto-fill.');
+        return;
+      }
+
+      setResumeParserState('success');
+      setResumeParserMessage(
+        appliedFields.length > 0
+          ? `We filled ${appliedFields.length} field${appliedFields.length === 1 ? '' : 's'} from your resume.`
+          : 'The resume was read successfully, but your existing entries were kept where fields were already filled.'
+      );
+
+      toast.success('Resume processed', {
+        description:
+          appliedFields.length > 0
+            ? `Auto-filled: ${appliedFields.slice(0, 4).join(', ')}${appliedFields.length > 4 ? '...' : ''}`
+            : 'Your resume was uploaded and reviewed. No blank fields needed to be filled.',
+      });
+    } catch (error: any) {
+      setResumeParserState('error');
+      setResumeParserMessage(error.message || 'We could not extract readable text from this file.');
+      setResumeAutofilledFields([]);
+      toast.error('Resume parsing failed', {
+        description: error.message || 'The file still uploaded, but auto-fill could not run.',
+      });
+    }
+  };
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const inputName = event.target.name;
+    const selectedFiles = Array.from(event.target.files ?? []);
+
+    setFilePreviews((current) => {
+      const previousItems = current[inputName] ?? [];
+      revokePreviewUrls(previousItems);
+
+      return {
+        ...current,
+        [inputName]: selectedFiles.map((file) => ({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+        })),
+      };
+    });
+
+    if (inputName === 'resume') {
+      void handleResumeAutofill(selectedFiles[0]);
+    }
+  };
+
+  const renderFilePreview = (inputName: string) => {
+    const files = filePreviews[inputName];
+
+    if (!files?.length) {
+      return null;
+    }
+
+    return (
+      <div className="mt-3 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          Selected file{files.length > 1 ? 's' : ''}
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {files.map((file) => {
+            const isImage = Boolean(file.previewUrl);
+
+            return (
+              <div
+                key={`${inputName}-${file.name}-${file.size}`}
+                className="overflow-hidden rounded-2xl border border-border/70 bg-muted/20"
+              >
+                {isImage ? (
+                  <div className="aspect-[4/3] overflow-hidden bg-muted/40">
+                    <img
+                      src={file.previewUrl ?? undefined}
+                      alt={file.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 border-b border-border/60 bg-background/80 px-4 py-4">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F5F0EA] text-[#8A8279]">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Document ready</p>
+                      <p className="text-xs text-muted-foreground">Preview available after submission</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    {isImage ? (
+                      <ImageIcon className="h-4 w-4 text-[#8A8279]" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-[#8A8279]" />
+                    )}
+                    <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {(file.size / (1024 * 1024)).toFixed(2)} MB
+                    {file.type ? ` • ${file.type}` : ''}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const focusFormStep = (step: number) => {
+    setFormStep(step);
+    window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 0);
+  };
+
+  const validateCurrentFormStep = () => {
+    const stepElement = formRef.current?.querySelector<HTMLElement>(`[data-form-step="${formStep}"]`);
+    if (!stepElement) return true;
+
+    const fields = Array.from(
+      stepElement.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')
+    );
+
+    for (const field of fields) {
+      if (field.disabled || field.type === 'hidden') continue;
+      if (!field.checkValidity()) {
+        field.reportValidity();
+        field.focus();
+        return false;
+      }
+    }
+
+    if (formStep === 3) {
+      const passwordField = stepElement.querySelector<HTMLInputElement>('input[name="account_password"]');
+      const confirmPasswordField = stepElement.querySelector<HTMLInputElement>('input[name="confirm_password"]');
+
+      if (confirmPasswordField) {
+        confirmPasswordField.setCustomValidity('');
+      }
+
+      if (passwordField && confirmPasswordField && passwordField.value !== confirmPasswordField.value) {
+        confirmPasswordField.setCustomValidity('Passwords do not match.');
+        confirmPasswordField.reportValidity();
+        confirmPasswordField.focus();
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const renderPersonalityAssessmentSection = ({
+    fieldId,
+    title,
+    helper,
+  }: {
+    fieldId: string;
+    title: string;
+    helper: string;
+  }) => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="space-y-1">
+          <Label htmlFor={fieldId} className="text-foreground text-sm">{title}</Label>
+          <p className="text-xs text-muted-foreground">{helper}</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setPersonalityDialogOpen(true)}
+          className="rounded-xl border-[#CFC5B9] bg-[#FCFAF8] text-foreground hover:bg-[#F7F2EC]"
+        >
+          <Sparkles className="mr-2 h-4 w-4 text-[#8A8279]" />
+          {personalityResult ? 'Retake Assessment' : 'Start Assessment'}
+        </Button>
+      </div>
+
+      {personalityResult ? (
+        <div className="rounded-[24px] border border-border/70 bg-muted/20 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="rounded-full bg-[#A89F91] px-3 py-1 text-white">{personalityResult.type}</Badge>
+            <Badge variant="secondary" className="rounded-full px-3 py-1">{personalityResult.headline}</Badge>
+          </div>
+          <p className="mt-3 text-sm font-medium text-foreground">{personalityResult.summary}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{personalityResult.workStyle}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {personalityResult.strengths.map((strength) => (
+              <span key={strength} className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs text-foreground">
+                {strength}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-[24px] border border-dashed border-border/70 bg-muted/10 p-4 text-sm text-muted-foreground">
+          Complete the assessment to save a structured personality result with your application.
+        </div>
+      )}
+
+      <Textarea
+        id={fieldId}
+        name="personality"
+        value={personalityResult ? formatPersonalitySummary(personalityResult) : ''}
+        readOnly
+        rows={3}
+        placeholder="Your assessment result will appear here."
+        className="bg-background text-foreground border-border"
+        data-bwignore="true"
+        data-lpignore="true"
+        data-1p-ignore="true"
+        autoComplete="off"
+      />
+      <input type="hidden" name="personality_type" value={personalityResult?.type ?? ''} data-bwignore="true" autoComplete="off" />
+      <input type="hidden" name="personality_headline" value={personalityResult?.headline ?? ''} data-bwignore="true" autoComplete="off" />
+      <input type="hidden" name="personality_work_style" value={personalityResult?.workStyle ?? ''} data-bwignore="true" autoComplete="off" />
+      <input type="hidden" name="personality_strengths" value={personalityResult?.strengths.join(', ') ?? ''} data-bwignore="true" autoComplete="off" />
+      <input type="hidden" name="personality_completed_at" value={personalityResult?.completedAt ?? ''} data-bwignore="true" autoComplete="off" />
+      <PersonalityAssessmentDialog
+        open={personalityDialogOpen}
+        onOpenChange={setPersonalityDialogOpen}
+        initialResult={personalityResult}
+        inline
+        onComplete={async (result) => {
+          setPersonalityResult(result);
+          setPersonalityDialogOpen(false);
+          toast.success('Personality assessment saved', {
+            description: `${result.type} - ${result.headline}`,
+          });
+        }}
+      />
+    </div>
+  );
+
+  const renderResumeAutofillSection = () => {
+    const resumeFile = filePreviews.resume?.[0];
+    const isProcessingResume = resumeParserState === 'parsing';
+    const isResumeComplete = resumeParserState === 'success' && Boolean(resumeFile);
+    const isResumeError = resumeParserState === 'error';
+
+    return (
+    <div className="space-y-4 rounded-[28px] border border-[#E6DED3] bg-[#FCFAF8] p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <Label htmlFor="resume" className="text-foreground text-sm">Upload a recent resume or CV</Label>
+          <p className="text-xs text-muted-foreground">
+            Autofill your profile in seconds by uploading your resume.
+          </p>
+        </div>
+        <Badge variant="secondary" className="w-fit rounded-full px-3 py-1">
+          PDF, DOC, DOCX
+        </Badge>
+      </div>
+
+      <div
+        className={`rounded-[28px] border-2 border-dashed p-6 text-center transition-all sm:p-8 ${
+          isResumeComplete
+            ? 'border-[#B9B0A4] bg-white'
+            : isResumeError
+            ? 'border-red-200 bg-red-50/50'
+            : 'border-border bg-white hover:border-[#A89F91]'
+        }`}
+      >
+        <Input
+          id="resume"
+          name="resume"
+          type="file"
+          accept=".pdf,.doc,.docx,.txt"
+          onChange={handleFileInputChange}
+          className="hidden"
+          data-bwignore="true"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          autoComplete="off"
+        />
+        <label htmlFor="resume" className="cursor-pointer">
+          {isProcessingResume ? (
+            <div className="space-y-4">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#F4F0FF]">
+                <Loader2 className="h-10 w-10 animate-spin text-[#5B4BF1]" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-2xl font-semibold text-foreground">Uploading...</p>
+                <p className="text-sm text-muted-foreground">or browse files on your computer</p>
+                <p className="text-xs text-muted-foreground">Supports PDF up to 5MB</p>
+              </div>
+            </div>
+          ) : isResumeComplete && resumeFile ? (
+            <div className="space-y-4">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#5B4BF1] text-white shadow-lg shadow-[#5B4BF1]/20">
+                <Check className="h-10 w-10" />
+              </div>
+              <div className="space-y-1">
+                <p className="mx-auto max-w-[28rem] break-words text-xl font-semibold text-foreground">{resumeFile.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Uploaded on {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#F5F0EA] text-[#8A8279]">
+                <Upload className="h-8 w-8" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-lg font-semibold text-foreground">Upload resume to auto-fill your profile</p>
+                <p className="text-sm text-muted-foreground">or browse files on your computer</p>
+                <p className="text-xs text-muted-foreground">Searchable PDFs and text-based resumes work best</p>
+              </div>
+            </div>
+          )}
+        </label>
+      </div>
+
+      {resumeParserState !== 'idle' && (
+        <div className={`rounded-2xl border p-4 ${
+          resumeParserState === 'error'
+            ? 'border-red-200 bg-red-50'
+            : resumeParserState === 'success'
+            ? 'border-emerald-200 bg-emerald-50'
+            : 'border-[#D9D0C4] bg-[#FCFAF8]'
+        }`}>
+          <div className="flex items-start gap-3">
+            {resumeParserState === 'parsing' ? (
+              <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-[#8A8279]" />
+            ) : (
+              <FileText className={`mt-0.5 h-4 w-4 ${resumeParserState === 'error' ? 'text-red-500' : 'text-emerald-600'}`} />
+            )}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">
+                {resumeParserState === 'parsing'
+                  ? 'Reading resume'
+                  : resumeParserState === 'success'
+                  ? 'Resume auto-fill complete'
+                  : 'Resume uploaded without auto-fill'}
+              </p>
+              {resumeParserMessage ? <p className="text-xs text-muted-foreground">{resumeParserMessage}</p> : null}
+              {resumeAutofilledFields.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {resumeAutofilledFields.map((field) => (
+                    <Badge key={field} variant="secondary" className="rounded-full px-3 py-1">
+                      {field}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+      <input type="hidden" name="resume_autofill_status" value={resumeParserState} data-bwignore="true" autoComplete="off" />
+      <input type="hidden" name="resume_autofill_fields" value={resumeAutofilledFields.join(', ')} data-bwignore="true" autoComplete="off" />
+      <input type="hidden" name="resume_detected_skills" value={resumeInsights?.skills.join(', ') ?? ''} data-bwignore="true" autoComplete="off" />
+      <input type="hidden" name="resume_detected_summary" value={resumeInsights?.summary ?? ''} data-bwignore="true" autoComplete="off" />
+    </div>
+    );
+  };
+
+  const handleNextFormStep = () => {
+    if (!validateCurrentFormStep()) return;
+    focusFormStep(Math.min(formStep + 1, totalFormSteps));
+  };
+
+  const handlePreviousFormStep = () => {
+    focusFormStep(Math.max(formStep - 1, 1));
+  };
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -146,6 +748,44 @@ export default function AddListingPage() {
       setIsCommunityOnly(true);
     }
   }, [location.state]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(filePreviews).forEach(revokePreviewUrls);
+    };
+  }, [filePreviews]);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+
+    const fields = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
+    fields.forEach((field) => {
+      const fieldName = (field.getAttribute('name') || '').toLowerCase();
+      const keepAutofill = new Set(['name', 'email', 'phone', 'account_password', 'confirm_password']);
+      const shouldIgnore = !keepAutofill.has(fieldName);
+
+      if (shouldIgnore) {
+        field.setAttribute('data-bwignore', 'true');
+        field.setAttribute('data-lpignore', 'true');
+        field.setAttribute('data-1p-ignore', 'true');
+        if (!field.getAttribute('autocomplete')) {
+          field.setAttribute('autocomplete', 'off');
+        }
+        return;
+      }
+
+      if (fieldName === 'email') {
+        field.setAttribute('autocomplete', 'email');
+      } else if (fieldName === 'phone') {
+        field.setAttribute('autocomplete', 'tel');
+      } else if (fieldName === 'name') {
+        field.setAttribute('autocomplete', 'name');
+      } else {
+        field.setAttribute('autocomplete', 'new-password');
+      }
+    });
+  }, [profileType, currentStep, showPricing, formStep, personalityDialogOpen, resumeParserState]);
 
   const getSteps = (): OnboardingStep[] => {
     if (profileType === 'professional') return professionalSteps;
@@ -163,7 +803,7 @@ export default function AddListingPage() {
       setCurrentStep(currentStep + 1);
     } else {
       // After onboarding, auto-select community tier if community-only flow
-      if (isCommunityOnly && profileType) {
+        if (isCommunityOnly && profileType) {
         const userType = profileTypeToUserType[profileType];
         const communityTier = userType === 'professional' 
           ? 'professional-community' 
@@ -172,6 +812,7 @@ export default function AddListingPage() {
           : `${userType}-community` as PricingTier;
         
         setSelectedTier(communityTier);
+        setFormStep(1);
         setCurrentStep(999); // Skip to form
       } else {
         setShowPricing(true);
@@ -204,10 +845,11 @@ export default function AddListingPage() {
       return;
     }
     setShowPricing(false);
+    setFormStep(1);
     setCurrentStep(999);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedTier) {
@@ -217,26 +859,72 @@ export default function AddListingPage() {
 
     const formElement = e.target as HTMLFormElement;
     const formData = new FormData(formElement);
+    const password = String(formData.get('account_password') || '');
+    const confirmPassword = String(formData.get('confirm_password') || '');
+
+    if (!password || password.length < 8) {
+      alert('Please create a password with at least 8 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      alert('Passwords do not match.');
+      return;
+    }
     
-    const plans = getPlansByUserType(profileTypeToUserType[profileType!]);
-    const selectedPlan = plans.find(p => p.id === selectedTier);
+    setSubmittingApplication(true);
 
-    // Prepare checkout data
-    const checkoutData = {
-      name: formData.get('name') as string,
-      email: formData.get('email') as string,
-      phone: formData.get('phone') as string,
-      location: formData.get('location') as string,
-      role: formData.get('role') as string || undefined,
-      bio: formData.get('bio') as string,
-      profileType: profileType!,
-      selectedTier: selectedTier,
-      planName: selectedPlan?.name || '',
-      planPrice: selectedPlan?.price || '',
-    };
+    try {
+      const plans = getPlansByUserType(profileTypeToUserType[profileType!]);
+      const selectedPlan = plans.find(p => p.id === selectedTier);
+      const applicationData = await serializeApplicationForm(formData, profileType!, selectedTier);
 
-    // Navigate to checkout page with data
-    navigate('/checkout', { state: { checkoutData } });
+      const checkoutData: CheckoutData = {
+        name: typeof applicationData.name === 'string' ? applicationData.name : '',
+        email: typeof applicationData.email === 'string' ? applicationData.email : '',
+        password,
+        phone: typeof applicationData.phone === 'string' ? applicationData.phone : '',
+        location: typeof applicationData.location === 'string' ? applicationData.location : '',
+        role: typeof applicationData.role === 'string' ? applicationData.role : undefined,
+        bio: typeof applicationData.bio === 'string' ? applicationData.bio : '',
+        profileType: profileType!,
+        selectedTier: selectedTier,
+        planName: selectedPlan?.name || '',
+        planPrice: selectedPlan?.price || '',
+        applicationData,
+      };
+
+      setFormData(applicationData);
+
+      if (user) {
+        sessionStorage.setItem('checkoutDataDraft', JSON.stringify(checkoutData));
+        navigate('/checkout', { state: { checkoutData } });
+        return;
+      }
+
+      await submitMembershipApplication(checkoutData);
+      sessionStorage.removeItem('checkoutDataDraft');
+
+      toast.success('Application submitted', {
+        description: isComplimentaryTier(selectedTier)
+          ? 'Your account has been created and is now pending admin review.'
+          : 'Your application is pending admin review. Payment will be requested after approval.',
+      });
+
+      navigate('/registration-pending', {
+        state: {
+          name: checkoutData.name,
+          email: checkoutData.email,
+          requiresPayment: !isComplimentaryTier(selectedTier),
+        },
+      });
+    } catch (error: any) {
+      toast.error('Unable to submit application', {
+        description: error.message || 'Please review the form and try again.',
+      });
+    } finally {
+      setSubmittingApplication(false);
+    }
   };
 
   // If user is logged in and hasn't selected a profile type, show upgrade options
@@ -792,11 +1480,13 @@ export default function AddListingPage() {
         <NavBar currentPage="add-listing" />
         
         <main className="pt-32 pb-16">
-          <div className="container mx-auto px-12 max-w-3xl">
+          <div className="container mx-auto px-6 max-w-7xl">
             <Button
               variant="ghost"
               onClick={() => {
-                if (isCommunityOnly) {
+                if (formStep > 1) {
+                  handlePreviousFormStep();
+                } else if (isCommunityOnly) {
                   setProfileType(null);
                   setCurrentStep(1);
                 } else {
@@ -804,31 +1494,72 @@ export default function AddListingPage() {
                   setShowPricing(true);
                 }
               }}
-              className="mb-8 text-foreground"
+              className="mb-6 text-foreground"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
               Back
             </Button>
 
-            <div className="mb-12 text-center">
-              <h1 className="text-5xl font-heading font-medium text-foreground mb-6 tracking-tight">
+            <div className="mb-8 text-center">
+              <h1 className="text-4xl font-heading font-medium text-foreground mb-4 tracking-tight">
                 Create Account
               </h1>
-              <p className="text-xl text-muted-foreground leading-relaxed">
+              <p className="text-lg text-muted-foreground">
                 {isCommunityOnly 
-                  ? 'Complete your profile to access community features'
-                  : 'Complete your profile to proceed to payment'}
+                  ? 'Complete your profile to submit your community application'
+                  : 'Complete your profile to submit your application for review'}
               </p>
             </div>
 
-            <Card className="p-8 bg-card text-card-foreground border-border/50">
-              <form onSubmit={handleFormSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="mx-auto mb-6 grid max-w-5xl gap-3 md:grid-cols-3">
+              {accountFormSteps.map((step) => {
+                const Icon = step.icon;
+                const isActive = formStep === step.id;
+                const isCompleted = formStep > step.id;
+
+                return (
+                  <div
+                    key={step.id}
+                    className={`rounded-3xl border px-4 py-4 text-left transition-all ${
+                      isActive
+                        ? 'border-[#A89F91] bg-[#F5F0EA] shadow-sm'
+                        : isCompleted
+                        ? 'border-[#D8CFC3] bg-background'
+                        : 'border-border/60 bg-card/70'
+                    }`}
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span
+                        className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
+                          isActive || isCompleted ? 'bg-[#A89F91] text-white' : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {isCompleted ? <Check className="h-4 w-4" /> : `0${step.id}`}
+                      </span>
+                      <Icon className={`h-5 w-5 ${isActive ? 'text-[#8A8279]' : 'text-muted-foreground'}`} />
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{step.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{step.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <Card className="mx-auto max-w-5xl border-border/50 bg-card/95 p-5 text-card-foreground shadow-sm sm:p-6 xl:p-7">
+              <form ref={formRef} onSubmit={handleFormSubmit} className="space-y-8">
+                <div className="space-y-5">
                   {/* Left Column - Basic Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-xl font-heading font-medium text-foreground tracking-tight mb-4">
-                      Basic Information
-                    </h3>
+                  <Card
+                    className={`${sectionCardClassName} ${formStep === 1 ? 'block' : 'hidden'}`}
+                    data-form-step="1"
+                  >
+                  <div className={sectionBodyClassName}>
+                    <div className="flex items-center gap-2 pb-3 border-b border-border/30">
+                      <User className="w-5 h-5 text-[#A89F91]" />
+                      <h3 className="text-lg font-heading font-semibold text-foreground tracking-tight">
+                        Basic Information
+                      </h3>
+                    </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="name" className="text-foreground text-sm">
@@ -848,6 +1579,8 @@ export default function AddListingPage() {
 
                     {profileType === 'professional' && (
                       <>
+                        {renderResumeAutofillSection()}
+
                         <div className="space-y-2">
                           <Label htmlFor="role" className="text-foreground text-sm">Professional Title</Label>
                           <Select name="role" required>
@@ -904,6 +1637,17 @@ export default function AddListingPage() {
                         </div>
 
                         <div className="space-y-2">
+                          <Label htmlFor="portfolio_url" className="text-foreground text-sm">Portfolio URL</Label>
+                          <Input
+                            id="portfolio_url"
+                            name="portfolio_url"
+                            type="url"
+                            placeholder="https://yourportfolio.com"
+                            className="bg-background text-foreground border-border"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
                           <Label htmlFor="skills" className="text-foreground text-sm">Skills</Label>
                           <Textarea
                             id="skills"
@@ -914,17 +1658,11 @@ export default function AddListingPage() {
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="personality" className="text-foreground text-sm">Personality</Label>
-                          <Textarea
-                            id="personality"
-                            name="personality"
-                            placeholder="Describe your personality and work style..."
-                            rows={2}
-                            className="bg-background text-foreground border-border"
-                          />
-                          <p className="text-xs text-muted-foreground">Take the 16 Personalities test and share your results here</p>
-                        </div>
+                        {renderPersonalityAssessmentSection({
+                          fieldId: 'professional_personality',
+                          title: 'Personality Assessment',
+                          helper: 'Complete the integrated assessment to attach a structured work-style result to your profile.',
+                        })}
 
                         <div className="space-y-2">
                           <Label htmlFor="years_experience" className="text-foreground text-sm">Years Experience in this Field</Label>
@@ -954,25 +1692,6 @@ export default function AddListingPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="resume" className="text-foreground text-sm">Resume Upload (PDF)</Label>
-                          <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-[#A89F91] transition-colors">
-                            <Input
-                              id="resume"
-                              name="resume"
-                              type="file"
-                              accept=".pdf,.doc,.docx"
-                              className="hidden"
-                            />
-                            <label htmlFor="resume" className="cursor-pointer">
-                              <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                              <p className="text-sm text-muted-foreground">Click to upload resume</p>
-                              <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX (Max 5MB)</p>
-                            </label>
-                          </div>
-                          <p className="text-xs text-muted-foreground">Resume will be visible on your profile for employers to view</p>
-                        </div>
-
-                        <div className="space-y-2">
                           <Label htmlFor="portfolio" className="text-foreground text-sm">Portfolio Photos</Label>
                           <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-[#A89F91] transition-colors">
                             <Input
@@ -981,6 +1700,7 @@ export default function AddListingPage() {
                               type="file"
                               accept="image/*"
                               multiple
+                              onChange={handleFileInputChange}
                               className="hidden"
                             />
                             <label htmlFor="portfolio" className="cursor-pointer">
@@ -989,6 +1709,7 @@ export default function AddListingPage() {
                               <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP (Max 10MB each)</p>
                             </label>
                           </div>
+                          {renderFilePreview('portfolio')}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -1013,33 +1734,15 @@ export default function AddListingPage() {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Animal Experience</Label>
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="animal-dogs" name="animal_experience" value="Dogs" />
-                              <Label htmlFor="animal-dogs" className="text-sm text-foreground cursor-pointer">Dogs</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="animal-cats" name="animal_experience" value="Cats" />
-                              <Label htmlFor="animal-cats" className="text-sm text-foreground cursor-pointer">Cats</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="animal-farm" name="animal_experience" value="Farm Animals" />
-                              <Label htmlFor="animal-farm" className="text-sm text-foreground cursor-pointer">Farm Animals</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="animal-exotic" name="animal_experience" value="Exotic" />
-                              <Label htmlFor="animal-exotic" className="text-sm text-foreground cursor-pointer">Exotic</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="animal-birds" name="animal_experience" value="Birds" />
-                              <Label htmlFor="animal-birds" className="text-sm text-foreground cursor-pointer">Birds</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="animal-reptiles" name="animal_experience" value="Reptiles" />
-                              <Label htmlFor="animal-reptiles" className="text-sm text-foreground cursor-pointer">Reptiles</Label>
-                            </div>
+                        <div className="space-y-1">
+                          <Label className="text-foreground text-xs">Animal Experience</Label>
+                          <div className="flex flex-wrap gap-3">
+                            {['Dogs', 'Cats', 'Farm', 'Exotic', 'Birds', 'Reptiles'].map((animal) => (
+                              <div key={animal} className="flex items-center space-x-1">
+                                <Checkbox id={`animal-${animal.toLowerCase()}`} name="animal_experience" value={animal} />
+                                <Label htmlFor={`animal-${animal.toLowerCase()}`} className="text-xs text-foreground cursor-pointer">{animal}</Label>
+                              </div>
+                            ))}
                           </div>
                         </div>
 
@@ -1048,177 +1751,109 @@ export default function AddListingPage() {
                           <Label htmlFor="medication_experience" className="text-sm text-foreground cursor-pointer">Experience Handling Medications</Label>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Comfortable With</Label>
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-groups" name="comfortable_with" value="Big Groups" />
-                              <Label htmlFor="comfort-groups" className="text-sm text-foreground cursor-pointer">Big Groups</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-events" name="comfortable_with" value="Large Events" />
-                              <Label htmlFor="comfort-events" className="text-sm text-foreground cursor-pointer">Large Events</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-alone" name="comfortable_with" value="Alone" />
-                              <Label htmlFor="comfort-alone" className="text-sm text-foreground cursor-pointer">Alone</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-pets" name="comfortable_with" value="Pets" />
-                              <Label htmlFor="comfort-pets" className="text-sm text-foreground cursor-pointer">Pets</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-children" name="comfortable_with" value="Children" />
-                              <Label htmlFor="comfort-children" className="text-sm text-foreground cursor-pointer">Children</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-travel" name="comfortable_with" value="Travel" />
-                              <Label htmlFor="comfort-travel" className="text-sm text-foreground cursor-pointer">Travel</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-livein" name="comfortable_with" value="Live-In" />
-                              <Label htmlFor="comfort-livein" className="text-sm text-foreground cursor-pointer">Live-In</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-overnight" name="comfortable_with" value="Overnight" />
-                              <Label htmlFor="comfort-overnight" className="text-sm text-foreground cursor-pointer">Overnight</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="comfort-tech" name="comfortable_with" value="Tech" />
-                              <Label htmlFor="comfort-tech" className="text-sm text-foreground cursor-pointer">Tech</Label>
-                            </div>
+                        <div className="space-y-1">
+                          <Label className="text-foreground text-xs">Comfortable With</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {['Groups', 'Events', 'Alone', 'Pets', 'Children', 'Travel', 'Live-In', 'Overnight', 'Tech'].map((item) => (
+                              <div key={item} className="flex items-center space-x-1">
+                                <Checkbox id={`comfort-${item.toLowerCase()}`} name="comfortable_with" value={item} />
+                                <Label htmlFor={`comfort-${item.toLowerCase()}`} className="text-xs text-foreground cursor-pointer">{item}</Label>
+                              </div>
+                            ))}
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Cooking Experience</Label>
-                          <div className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="cooking-basic" name="cooking_experience" value="Basic" />
-                              <Label htmlFor="cooking-basic" className="text-sm text-foreground cursor-pointer">Basic</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="cooking-intermediate" name="cooking_experience" value="Intermediate" />
-                              <Label htmlFor="cooking-intermediate" className="text-sm text-foreground cursor-pointer">Intermediate</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="cooking-expert" name="cooking_experience" value="Expert" />
-                              <Label htmlFor="cooking-expert" className="text-sm text-foreground cursor-pointer">Expert</Label>
-                            </div>
+                        <div className="space-y-1">
+                          <Label className="text-foreground text-xs">Cooking Experience</Label>
+                          <div className="flex gap-3">
+                            {['Basic', 'Intermediate', 'Expert'].map((level) => (
+                              <div key={level} className="flex items-center space-x-1">
+                                <Checkbox id={`cooking-${level.toLowerCase()}`} name="cooking_experience" value={level} />
+                                <Label htmlFor={`cooking-${level.toLowerCase()}`} className="text-xs text-foreground cursor-pointer">{level}</Label>
+                              </div>
+                            ))}
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="hobbies" className="text-foreground text-sm">Hobbies</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="hobbies" className="text-foreground text-xs">Hobbies</Label>
                             <Textarea
                               id="hobbies"
                               name="hobbies"
-                              placeholder="List your hobbies..."
-                              rows={2}
-                              className="bg-background text-foreground border-border"
+                              placeholder="List hobbies..."
+                              rows={1}
+                              className="bg-background text-foreground border-border text-sm"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="interests" className="text-foreground text-sm">Interests</Label>
+                          <div className="space-y-1">
+                            <Label htmlFor="interests" className="text-foreground text-xs">Interests</Label>
                             <Textarea
                               id="interests"
                               name="interests"
-                              placeholder="List your interests..."
-                              rows={2}
+                              placeholder="List interests..."
+                              rows={1}
                               className="bg-background text-foreground border-border"
                             />
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Willing To</Label>
-                          <div className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="willing-travel" name="willing_to" value="Travel" />
-                              <Label htmlFor="willing-travel" className="text-sm text-foreground cursor-pointer">Travel</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="willing-relocate" name="willing_to" value="Relocate" />
-                              <Label htmlFor="willing-relocate" className="text-sm text-foreground cursor-pointer">Relocate</Label>
-                            </div>
+                        <div className="flex items-center gap-4">
+                          <Label className="text-foreground text-xs">Willing To:</Label>
+                          <div className="flex gap-3">
+                            {['Travel', 'Relocate'].map((item) => (
+                              <div key={item} className="flex items-center space-x-1">
+                                <Checkbox id={`willing-${item.toLowerCase()}`} name="willing_to" value={item} />
+                                <Label htmlFor={`willing-${item.toLowerCase()}`} className="text-xs text-foreground cursor-pointer">{item}</Label>
+                              </div>
+                            ))}
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="salary_min" className="text-foreground text-sm">Salary Expectation (Min)</Label>
-                            <Input
-                              id="salary_min"
-                              name="salary_min"
-                              type="number"
-                              placeholder="$50,000"
-                              className="bg-background text-foreground border-border"
-                            />
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="salary_min" className="text-foreground text-xs">Salary Min</Label>
+                            <Input id="salary_min" name="salary_min" type="number" placeholder="$50,000" className="bg-background text-foreground border-border h-8 text-sm" />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="salary_max" className="text-foreground text-sm">Salary Expectation (Max)</Label>
-                            <Input
-                              id="salary_max"
-                              name="salary_max"
-                              type="number"
-                              placeholder="$80,000"
-                              className="bg-background text-foreground border-border"
-                            />
+                          <div className="space-y-1">
+                            <Label htmlFor="salary_max" className="text-foreground text-xs">Salary Max</Label>
+                            <Input id="salary_max" name="salary_max" type="number" placeholder="$80,000" className="bg-background text-foreground border-border h-8 text-sm" />
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Work Preference</Label>
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="pref-fulltime" name="work_preference" value="Full Time" />
-                              <Label htmlFor="pref-fulltime" className="text-sm text-foreground cursor-pointer">Full Time</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="pref-parttime" name="work_preference" value="Part Time" />
-                              <Label htmlFor="pref-parttime" className="text-sm text-foreground cursor-pointer">Part Time</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="pref-contract" name="work_preference" value="Contract" />
-                              <Label htmlFor="pref-contract" className="text-sm text-foreground cursor-pointer">Contract</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="pref-seasonal" name="work_preference" value="Seasonal" />
-                              <Label htmlFor="pref-seasonal" className="text-sm text-foreground cursor-pointer">Seasonal</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="pref-temporary" name="work_preference" value="Temporary" />
-                              <Label htmlFor="pref-temporary" className="text-sm text-foreground cursor-pointer">Temporary</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="pref-remote" name="work_preference" value="Remote" />
-                              <Label htmlFor="pref-remote" className="text-sm text-foreground cursor-pointer">Remote</Label>
-                            </div>
+                        <div className="space-y-1">
+                          <Label className="text-foreground text-xs">Work Preference</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {['Full Time', 'Part Time', 'Contract', 'Seasonal', 'Temporary', 'Remote'].map((pref) => (
+                              <div key={pref} className="flex items-center space-x-1">
+                                <Checkbox id={`pref-${pref.toLowerCase().replace(' ', '')}`} name="work_preference" value={pref} />
+                                <Label htmlFor={`pref-${pref.toLowerCase().replace(' ', '')}`} className="text-xs text-foreground cursor-pointer">{pref}</Label>
+                              </div>
+                            ))}
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Vehicle & License</Label>
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="flex items-center space-x-2">
+                        <div className="space-y-1">
+                          <Label className="text-foreground text-xs">Vehicle & License</Label>
+                          <div className="flex gap-3">
+                            <div className="flex items-center space-x-1">
                               <Checkbox id="has-license" name="has_license" />
-                              <Label htmlFor="has-license" className="text-sm text-foreground cursor-pointer">Valid Driver's License</Label>
+                              <Label htmlFor="has-license" className="text-xs text-foreground cursor-pointer">Driver's License</Label>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1">
                               <Checkbox id="has-car" name="has_car" />
-                              <Label htmlFor="has-car" className="text-sm text-foreground cursor-pointer">Own Registered Car</Label>
+                              <Label htmlFor="has-car" className="text-xs text-foreground cursor-pointer">Own Car</Label>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1">
                               <Checkbox id="has-insurance" name="has_insurance" />
-                              <Label htmlFor="has-insurance" className="text-sm text-foreground cursor-pointer">Valid Insurance</Label>
+                              <Label htmlFor="has-insurance" className="text-xs text-foreground cursor-pointer">Insurance</Label>
                             </div>
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Certifications</Label>
-                          <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto border border-border rounded-lg p-3">
+                        <div className="space-y-1">
+                          <Label className="text-foreground text-xs">Certifications</Label>
+                          <div className="grid grid-cols-3 gap-1 max-h-[120px] overflow-y-auto border border-border rounded-lg p-2 text-xs">
                             <div className="flex items-center space-x-2">
                               <Checkbox id="cert-cpr" name="certifications" value="CPR/AED" />
                               <Label htmlFor="cert-cpr" className="text-xs text-foreground cursor-pointer">CPR / AED</Label>
@@ -1367,6 +2002,347 @@ export default function AddListingPage() {
                             className="bg-background text-foreground border-border mt-2"
                           />
                         </div>
+
+                        {/* Work History Section */}
+                        <div className="space-y-4 pt-4 border-t border-border">
+                          <h4 className="text-lg font-heading font-medium text-foreground">Work History</h4>
+                          <p className="text-xs text-muted-foreground">Add your previous employment history (most recent first)</p>
+                          
+                          <div className="space-y-4 border border-border rounded-lg p-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="work_title_1" className="text-foreground text-sm">Job Title</Label>
+                                <Input
+                                  id="work_title_1"
+                                  name="work_title_1"
+                                  placeholder="Estate Manager"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="work_employer_1" className="text-foreground text-sm">Employer/Family Name</Label>
+                                <Input
+                                  id="work_employer_1"
+                                  name="work_employer_1"
+                                  placeholder="Private Family"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="work_start_1" className="text-foreground text-sm">Start Date</Label>
+                                <Input
+                                  id="work_start_1"
+                                  name="work_start_1"
+                                  type="month"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="work_end_1" className="text-foreground text-sm">End Date</Label>
+                                <Input
+                                  id="work_end_1"
+                                  name="work_end_1"
+                                  type="month"
+                                  placeholder="Present"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="work_description_1" className="text-foreground text-sm">Description</Label>
+                              <Textarea
+                                id="work_description_1"
+                                name="work_description_1"
+                                placeholder="Describe your responsibilities and achievements..."
+                                rows={2}
+                                className="bg-background text-foreground border-border"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-4 border border-border rounded-lg p-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="work_title_2" className="text-foreground text-sm">Job Title</Label>
+                                <Input
+                                  id="work_title_2"
+                                  name="work_title_2"
+                                  placeholder="Previous Position"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="work_employer_2" className="text-foreground text-sm">Employer/Family Name</Label>
+                                <Input
+                                  id="work_employer_2"
+                                  name="work_employer_2"
+                                  placeholder="Previous Employer"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="work_start_2" className="text-foreground text-sm">Start Date</Label>
+                                <Input
+                                  id="work_start_2"
+                                  name="work_start_2"
+                                  type="month"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="work_end_2" className="text-foreground text-sm">End Date</Label>
+                                <Input
+                                  id="work_end_2"
+                                  name="work_end_2"
+                                  type="month"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="work_description_2" className="text-foreground text-sm">Description</Label>
+                              <Textarea
+                                id="work_description_2"
+                                name="work_description_2"
+                                placeholder="Describe your responsibilities and achievements..."
+                                rows={2}
+                                className="bg-background text-foreground border-border"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* References Section */}
+                        <div className="space-y-4 pt-4 border-t border-border">
+                          <h4 className="text-lg font-heading font-medium text-foreground">References</h4>
+                          <p className="text-xs text-muted-foreground">Provide professional references who can vouch for your work</p>
+                          
+                          <div className="space-y-4 border border-border rounded-lg p-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="ref_name_1" className="text-foreground text-sm">Reference Name</Label>
+                                <Input
+                                  id="ref_name_1"
+                                  name="ref_name_1"
+                                  placeholder="John Smith"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="ref_relationship_1" className="text-foreground text-sm">Relationship</Label>
+                                <Input
+                                  id="ref_relationship_1"
+                                  name="ref_relationship_1"
+                                  placeholder="Former Employer"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="ref_phone_1" className="text-foreground text-sm">Phone</Label>
+                                <Input
+                                  id="ref_phone_1"
+                                  name="ref_phone_1"
+                                  type="tel"
+                                  placeholder="(555) 123-4567"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="ref_email_1" className="text-foreground text-sm">Email</Label>
+                                <Input
+                                  id="ref_email_1"
+                                  name="ref_email_1"
+                                  type="email"
+                                  placeholder="reference@email.com"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4 border border-border rounded-lg p-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="ref_name_2" className="text-foreground text-sm">Reference Name</Label>
+                                <Input
+                                  id="ref_name_2"
+                                  name="ref_name_2"
+                                  placeholder="Jane Doe"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="ref_relationship_2" className="text-foreground text-sm">Relationship</Label>
+                                <Input
+                                  id="ref_relationship_2"
+                                  name="ref_relationship_2"
+                                  placeholder="Colleague"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="ref_phone_2" className="text-foreground text-sm">Phone</Label>
+                                <Input
+                                  id="ref_phone_2"
+                                  name="ref_phone_2"
+                                  type="tel"
+                                  placeholder="(555) 987-6543"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="ref_email_2" className="text-foreground text-sm">Email</Label>
+                                <Input
+                                  id="ref_email_2"
+                                  name="ref_email_2"
+                                  type="email"
+                                  placeholder="reference2@email.com"
+                                  className="bg-background text-foreground border-border"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="recommendation_letters" className="text-foreground text-sm">Recommendation Letters (PDF)</Label>
+                            <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-[#A89F91] transition-colors">
+                              <Input
+                                id="recommendation_letters"
+                                name="recommendation_letters"
+                                type="file"
+                                accept=".pdf"
+                                multiple
+                                onChange={handleFileInputChange}
+                                className="hidden"
+                              />
+                              <label htmlFor="recommendation_letters" className="cursor-pointer">
+                                <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                                <p className="text-sm text-muted-foreground">Click to upload recommendation letters</p>
+                                <p className="text-xs text-muted-foreground mt-1">PDF files only (Max 5MB each)</p>
+                              </label>
+                            </div>
+                            {renderFilePreview('recommendation_letters')}
+                          </div>
+                        </div>
+
+                        {/* Software & Systems Section */}
+                        <div className="space-y-4 pt-4 border-t border-border">
+                          <h4 className="text-lg font-heading font-medium text-foreground">Software & Systems Used</h4>
+                          <p className="text-xs text-muted-foreground">Select the software and systems you're proficient with</p>
+                          
+                          <div className="grid grid-cols-3 gap-2 max-h-[200px] overflow-y-auto border border-border rounded-lg p-3">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-excel" name="software" value="Microsoft Excel" />
+                              <Label htmlFor="sw-excel" className="text-xs text-foreground cursor-pointer">Microsoft Excel</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-word" name="software" value="Microsoft Word" />
+                              <Label htmlFor="sw-word" className="text-xs text-foreground cursor-pointer">Microsoft Word</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-outlook" name="software" value="Microsoft Outlook" />
+                              <Label htmlFor="sw-outlook" className="text-xs text-foreground cursor-pointer">Microsoft Outlook</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-gsheets" name="software" value="Google Sheets" />
+                              <Label htmlFor="sw-gsheets" className="text-xs text-foreground cursor-pointer">Google Sheets</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-gdocs" name="software" value="Google Docs" />
+                              <Label htmlFor="sw-gdocs" className="text-xs text-foreground cursor-pointer">Google Docs</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-gcal" name="software" value="Google Calendar" />
+                              <Label htmlFor="sw-gcal" className="text-xs text-foreground cursor-pointer">Google Calendar</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-quickbooks" name="software" value="QuickBooks" />
+                              <Label htmlFor="sw-quickbooks" className="text-xs text-foreground cursor-pointer">QuickBooks</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-netsuite" name="software" value="NetSuite" />
+                              <Label htmlFor="sw-netsuite" className="text-xs text-foreground cursor-pointer">NetSuite</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-sage" name="software" value="Sage" />
+                              <Label htmlFor="sw-sage" className="text-xs text-foreground cursor-pointer">Sage</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-asana" name="software" value="Asana" />
+                              <Label htmlFor="sw-asana" className="text-xs text-foreground cursor-pointer">Asana</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-trello" name="software" value="Trello" />
+                              <Label htmlFor="sw-trello" className="text-xs text-foreground cursor-pointer">Trello</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-monday" name="software" value="Monday.com" />
+                              <Label htmlFor="sw-monday" className="text-xs text-foreground cursor-pointer">Monday.com</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-slack" name="software" value="Slack" />
+                              <Label htmlFor="sw-slack" className="text-xs text-foreground cursor-pointer">Slack</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-zoom" name="software" value="Zoom" />
+                              <Label htmlFor="sw-zoom" className="text-xs text-foreground cursor-pointer">Zoom</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-teams" name="software" value="Microsoft Teams" />
+                              <Label htmlFor="sw-teams" className="text-xs text-foreground cursor-pointer">Microsoft Teams</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-estateman" name="software" value="Estate Management Software" />
+                              <Label htmlFor="sw-estateman" className="text-xs text-foreground cursor-pointer">Estate Management</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-crestron" name="software" value="Crestron" />
+                              <Label htmlFor="sw-crestron" className="text-xs text-foreground cursor-pointer">Crestron</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-control4" name="software" value="Control4" />
+                              <Label htmlFor="sw-control4" className="text-xs text-foreground cursor-pointer">Control4</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-savant" name="software" value="Savant" />
+                              <Label htmlFor="sw-savant" className="text-xs text-foreground cursor-pointer">Savant</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-lutron" name="software" value="Lutron" />
+                              <Label htmlFor="sw-lutron" className="text-xs text-foreground cursor-pointer">Lutron</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-pos" name="software" value="POS Systems" />
+                              <Label htmlFor="sw-pos" className="text-xs text-foreground cursor-pointer">POS Systems</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-inventory" name="software" value="Inventory Management" />
+                              <Label htmlFor="sw-inventory" className="text-xs text-foreground cursor-pointer">Inventory Management</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-scheduling" name="software" value="Scheduling Software" />
+                              <Label htmlFor="sw-scheduling" className="text-xs text-foreground cursor-pointer">Scheduling Software</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="sw-security" name="software" value="Security Systems" />
+                              <Label htmlFor="sw-security" className="text-xs text-foreground cursor-pointer">Security Systems</Label>
+                            </div>
+                          </div>
+                          <Input
+                            id="other_software"
+                            name="other_software"
+                            placeholder="Other software/systems (comma separated)"
+                            className="bg-background text-foreground border-border"
+                          />
+                        </div>
                       </>
                     )}
 
@@ -1487,6 +2463,7 @@ export default function AddListingPage() {
                               name="rate_sheet"
                               type="file"
                               accept=".pdf,.doc,.docx"
+                              onChange={handleFileInputChange}
                               className="hidden"
                             />
                             <label htmlFor="rate_sheet" className="cursor-pointer">
@@ -1495,6 +2472,7 @@ export default function AddListingPage() {
                               <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX (Max 5MB)</p>
                             </label>
                           </div>
+                          {renderFilePreview('rate_sheet')}
                         </div>
 
                         <div className="space-y-2">
@@ -1506,6 +2484,7 @@ export default function AddListingPage() {
                               type="file"
                               accept="image/*"
                               multiple
+                              onChange={handleFileInputChange}
                               className="hidden"
                             />
                             <label htmlFor="sp_portfolio" className="cursor-pointer">
@@ -1514,28 +2493,7 @@ export default function AddListingPage() {
                               <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP (Max 10MB each)</p>
                             </label>
                           </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="linkedin_url" className="text-foreground text-sm">LinkedIn URL</Label>
-                          <Input
-                            id="linkedin_url"
-                            name="linkedin_url"
-                            type="url"
-                            placeholder="https://linkedin.com/company/yourcompany"
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="website_url" className="text-foreground text-sm">Website URL</Label>
-                          <Input
-                            id="website_url"
-                            name="website_url"
-                            type="url"
-                            placeholder="https://yourwebsite.com"
-                            className="bg-background text-foreground border-border"
-                          />
+                          {renderFilePreview('sp_portfolio')}
                         </div>
 
                         <div className="space-y-2">
@@ -1647,16 +2605,11 @@ export default function AddListingPage() {
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="sp_personality" className="text-foreground text-sm">Business Personality & Approach</Label>
-                          <Textarea
-                            id="sp_personality"
-                            name="personality"
-                            placeholder="Describe your business approach and work style..."
-                            rows={2}
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
+                        {renderPersonalityAssessmentSection({
+                          fieldId: 'sp_personality',
+                          title: 'Business Personality & Approach',
+                          helper: 'Generate a structured description of how your business communicates, decides, and delivers.',
+                        })}
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -1702,6 +2655,7 @@ export default function AddListingPage() {
                               type="file"
                               accept=".pdf,.doc,.docx"
                               multiple
+                              onChange={handleFileInputChange}
                               className="hidden"
                             />
                             <label htmlFor="sp_letters_rec" className="cursor-pointer">
@@ -1710,6 +2664,7 @@ export default function AddListingPage() {
                               <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX (Max 5MB each)</p>
                             </label>
                           </div>
+                          {renderFilePreview('letters_of_rec')}
                         </div>
                       </>
                     )}
@@ -1763,52 +2718,56 @@ export default function AddListingPage() {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="agency_year_founded" className="text-foreground text-sm">Year Founded</Label>
-                          <Input
-                            id="agency_year_founded"
-                            name="year_founded"
-                            type="number"
-                            min="1900"
-                            max="2026"
-                            placeholder="2010"
-                            className="bg-background text-foreground border-border"
-                          />
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="agency_year_founded" className="text-foreground text-sm">Year Founded</Label>
+                            <Input
+                              id="agency_year_founded"
+                              name="year_founded"
+                              type="number"
+                              min="1900"
+                              max="2026"
+                              placeholder="2010"
+                              className="bg-background text-foreground border-border"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="agency_years_experience" className="text-foreground text-sm">Years Experience in this Field</Label>
+                            <Input
+                              id="agency_years_experience"
+                              name="years_experience"
+                              type="number"
+                              min="0"
+                              max="50"
+                              placeholder="e.g. 15"
+                              className="bg-background text-foreground border-border"
+                            />
+                          </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="agency_years_experience" className="text-foreground text-sm">Years Experience in this Field</Label>
-                          <Input
-                            id="agency_years_experience"
-                            name="years_experience"
-                            type="number"
-                            min="0"
-                            max="50"
-                            placeholder="e.g. 15"
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="agency_linkedin_url" className="text-foreground text-sm">LinkedIn URL</Label>
+                            <Input
+                              id="agency_linkedin_url"
+                              name="linkedin_url"
+                              type="url"
+                              placeholder="https://linkedin.com/company/youragency"
+                              className="bg-background text-foreground border-border"
+                            />
+                          </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="agency_linkedin_url" className="text-foreground text-sm">LinkedIn URL</Label>
-                          <Input
-                            id="agency_linkedin_url"
-                            name="linkedin_url"
-                            type="url"
-                            placeholder="https://linkedin.com/company/youragency"
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="agency_website_url" className="text-foreground text-sm">Website URL</Label>
-                          <Input
-                            id="agency_website_url"
-                            name="website_url"
-                            type="url"
-                            placeholder="https://youragency.com"
-                            className="bg-background text-foreground border-border"
-                          />
+                          <div className="space-y-2">
+                            <Label htmlFor="agency_website_url" className="text-foreground text-sm">Website URL</Label>
+                            <Input
+                              id="agency_website_url"
+                              name="website_url"
+                              type="url"
+                              placeholder="https://youragency.com"
+                              className="bg-background text-foreground border-border"
+                            />
+                          </div>
                         </div>
 
                         <div className="space-y-2">
@@ -1896,16 +2855,11 @@ export default function AddListingPage() {
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="agency_personality" className="text-foreground text-sm">Agency Culture & Personality</Label>
-                          <Textarea
-                            id="agency_personality"
-                            name="personality"
-                            placeholder="Describe your agency's culture and approach..."
-                            rows={2}
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
+                        {renderPersonalityAssessmentSection({
+                          fieldId: 'agency_personality',
+                          title: 'Agency Culture & Personality',
+                          helper: 'Capture your agency communication style and approach with a structured assessment.',
+                        })}
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -1987,6 +2941,7 @@ export default function AddListingPage() {
                               type="file"
                               accept=".pdf,.doc,.docx"
                               multiple
+                              onChange={handleFileInputChange}
                               className="hidden"
                             />
                             <label htmlFor="agency_letters_rec" className="cursor-pointer">
@@ -1995,6 +2950,7 @@ export default function AddListingPage() {
                               <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX (Max 5MB each)</p>
                             </label>
                           </div>
+                          {renderFilePreview('letters_of_rec')}
                         </div>
                       </>
                     )}
@@ -2031,26 +2987,28 @@ export default function AddListingPage() {
                           </Select>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="estates_linkedin_url" className="text-foreground text-sm">LinkedIn URL</Label>
-                          <Input
-                            id="estates_linkedin_url"
-                            name="linkedin_url"
-                            type="url"
-                            placeholder="https://linkedin.com/in/yourprofile"
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="estates_linkedin_url" className="text-foreground text-sm">LinkedIn URL</Label>
+                            <Input
+                              id="estates_linkedin_url"
+                              name="linkedin_url"
+                              type="url"
+                              placeholder="https://linkedin.com/in/yourprofile"
+                              className="bg-background text-foreground border-border"
+                            />
+                          </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="estates_website_url" className="text-foreground text-sm">Website URL</Label>
-                          <Input
-                            id="estates_website_url"
-                            name="website_url"
-                            type="url"
-                            placeholder="https://yourwebsite.com"
-                            className="bg-background text-foreground border-border"
-                          />
+                          <div className="space-y-2">
+                            <Label htmlFor="estates_website_url" className="text-foreground text-sm">Website URL</Label>
+                            <Input
+                              id="estates_website_url"
+                              name="website_url"
+                              type="url"
+                              placeholder="https://yourwebsite.com"
+                              className="bg-background text-foreground border-border"
+                            />
+                          </div>
                         </div>
 
                         <div className="space-y-2">
@@ -2091,453 +3049,156 @@ export default function AddListingPage() {
                       </>
                     )}
 
-                    {profileType === 'professional' && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="linkedin_url" className="text-foreground text-sm">LinkedIn URL</Label>
-                          <Input
-                            id="linkedin_url"
-                            name="linkedin_url"
-                            type="url"
-                            placeholder="https://linkedin.com/in/yourprofile"
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="website_url" className="text-foreground text-sm">Website URL</Label>
-                          <Input
-                            id="website_url"
-                            name="website_url"
-                            type="url"
-                            placeholder="https://yourwebsite.com"
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="skills" className="text-foreground text-sm">Skills</Label>
-                          <Textarea
-                            id="skills"
-                            name="skills"
-                            placeholder="List your key skills and expertise..."
-                            rows={3}
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="salary_min" className="text-foreground text-sm">Salary Expectation (Min)</Label>
-                            <Input
-                              id="salary_min"
-                              name="salary_min"
-                              type="number"
-                              placeholder="$50,000"
-                              className="bg-background text-foreground border-border"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="salary_max" className="text-foreground text-sm">Salary Expectation (Max)</Label>
-                            <Input
-                              id="salary_max"
-                              name="salary_max"
-                              type="number"
-                              placeholder="$100,000"
-                              className="bg-background text-foreground border-border"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Work Availability</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {workAvailability.map((availability) => (
-                              <div key={availability} className="flex items-center space-x-2">
-                                <Checkbox id={`availability-${availability}`} name="work_availability" value={availability} />
-                                <Label htmlFor={`availability-${availability}`} className="text-sm text-foreground cursor-pointer">
-                                  {availability}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Work Preference</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {workPreference.map((pref) => (
-                              <div key={pref} className="flex items-center space-x-2">
-                                <Checkbox id={`preference-${pref}`} name="work_preference" value={pref} />
-                                <Label htmlFor={`preference-${pref}`} className="text-sm text-foreground cursor-pointer">
-                                  {pref}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Willing To</Label>
-                          <div className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="willing_travel" name="willing_travel" />
-                              <Label htmlFor="willing_travel" className="text-sm text-foreground cursor-pointer">Travel</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="willing_relocate" name="willing_relocate" />
-                              <Label htmlFor="willing_relocate" className="text-sm text-foreground cursor-pointer">Relocate</Label>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Willing to Undergo</Label>
-                          <div className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="background_check" name="background_check" />
-                              <Label htmlFor="background_check" className="text-sm text-foreground cursor-pointer">Background Check</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="drug_test" name="drug_test" />
-                              <Label htmlFor="drug_test" className="text-sm text-foreground cursor-pointer">Drug Test</Label>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="valid_drivers_license" name="valid_drivers_license" />
-                          <Label htmlFor="valid_drivers_license" className="text-sm text-foreground cursor-pointer">
-                            Valid Driver's License or Identification Card
-                          </Label>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="own_car" name="own_car" />
-                          <Label htmlFor="own_car" className="text-sm text-foreground cursor-pointer">
-                            Own current registered car
-                          </Label>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="valid_insurance" name="valid_insurance" />
-                          <Label htmlFor="valid_insurance" className="text-sm text-foreground cursor-pointer">
-                            Valid/current insurance
-                          </Label>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="birthday_month" className="text-foreground text-sm">Birthday (Month/Day)</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                id="birthday_month"
-                                name="birthday_month"
-                                type="number"
-                                min="1"
-                                max="12"
-                                placeholder="MM"
-                                className="bg-background text-foreground border-border w-20"
-                              />
-                              <Input
-                                id="birthday_day"
-                                name="birthday_day"
-                                type="number"
-                                min="1"
-                                max="31"
-                                placeholder="DD"
-                                className="bg-background text-foreground border-border w-20"
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="originally_from" className="text-foreground text-sm">Originally From</Label>
-                            <Input
-                              id="originally_from"
-                              name="originally_from"
-                              placeholder="City, State"
-                              className="bg-background text-foreground border-border"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Animal Experience</Label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {animalExperience.map((animal) => (
-                              <div key={animal} className="flex items-center space-x-2">
-                                <Checkbox id={`animal-${animal}`} name="animal_experience" value={animal} />
-                                <Label htmlFor={`animal-${animal}`} className="text-sm text-foreground cursor-pointer">
-                                  {animal}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="medication_handling" name="medication_handling" />
-                          <Label htmlFor="medication_handling" className="text-sm text-foreground cursor-pointer">
-                            Experience Handling Medications
-                          </Label>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Comfortable With</Label>
-                          <div className="flex gap-4 flex-wrap">
-                            {comfortLevels.map((level) => (
-                              <div key={level} className="flex items-center space-x-2">
-                                <Checkbox id={`comfort-${level}`} name="comfort_levels" value={level} />
-                                <Label htmlFor={`comfort-${level}`} className="text-sm text-foreground cursor-pointer">
-                                  {level}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="cooking_experience" className="text-foreground text-sm">Cooking Experience</Label>
-                          <Select name="cooking_experience">
-                            <SelectTrigger className="bg-background text-foreground border-border">
-                              <SelectValue placeholder="Select level" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card">
-                              {cookingExperience.map((level) => (
-                                <SelectItem key={level} value={level.toLowerCase()}>
-                                  {level}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-4 border-t border-border pt-4 mt-4">
-                          <h4 className="text-lg font-heading font-medium text-foreground">Previous Work History</h4>
-                          <p className="text-xs text-muted-foreground">Add your previous work experience (you can add more after creating your profile)</p>
-                          
-                          <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-                            <div className="space-y-2">
-                              <Label htmlFor="work_job_title" className="text-foreground text-sm">Job Title</Label>
-                              <Input
-                                id="work_job_title"
-                                name="work_job_title"
-                                placeholder="e.g. Estate Manager"
-                                className="bg-background text-foreground border-border"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="work_city" className="text-foreground text-sm">City Worked</Label>
-                              <Input
-                                id="work_city"
-                                name="work_city"
-                                placeholder="e.g. Beverly Hills, CA"
-                                className="bg-background text-foreground border-border"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="work_duties" className="text-foreground text-sm">Duties</Label>
-                              <Textarea
-                                id="work_duties"
-                                name="work_duties"
-                                placeholder="Describe your responsibilities..."
-                                rows={2}
-                                className="bg-background text-foreground border-border"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4 border-t border-border pt-4 mt-4">
-                          <h4 className="text-lg font-heading font-medium text-foreground">References</h4>
-                          <p className="text-xs text-muted-foreground">Add professional references (you can add more after creating your profile)</p>
-                          
-                          <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <Label htmlFor="ref_name" className="text-foreground text-sm">Reference Name</Label>
-                                <Input
-                                  id="ref_name"
-                                  name="ref_name"
-                                  placeholder="Full name"
-                                  className="bg-background text-foreground border-border"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="ref_relationship" className="text-foreground text-sm">Relationship</Label>
-                                <Input
-                                  id="ref_relationship"
-                                  name="ref_relationship"
-                                  placeholder="e.g. Former Employer"
-                                  className="bg-background text-foreground border-border"
-                                />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <Label htmlFor="ref_phone" className="text-foreground text-sm">Phone Number</Label>
-                                <Input
-                                  id="ref_phone"
-                                  name="ref_phone"
-                                  type="tel"
-                                  placeholder="(555) 123-4567"
-                                  className="bg-background text-foreground border-border"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="ref_email" className="text-foreground text-sm">Email</Label>
-                                <Input
-                                  id="ref_email"
-                                  name="ref_email"
-                                  type="email"
-                                  placeholder="email@example.com"
-                                  className="bg-background text-foreground border-border"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="letters_of_rec" className="text-foreground text-sm">Letters of Recommendation</Label>
-                          <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-[#A89F91] transition-colors">
-                            <Input
-                              id="letters_of_rec"
-                              name="letters_of_rec"
-                              type="file"
-                              accept=".pdf,.doc,.docx"
-                              multiple
-                              className="hidden"
-                            />
-                            <label htmlFor="letters_of_rec" className="cursor-pointer">
-                              <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                              <p className="text-sm text-muted-foreground">Click to upload letters of recommendation</p>
-                              <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX (Max 5MB each)</p>
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4 border-t border-border pt-4 mt-4">
-                          <h4 className="text-lg font-heading font-medium text-foreground">Software & Systems Experience</h4>
-                          <p className="text-xs text-muted-foreground">Select the systems you have experience with</p>
-                          
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-sm font-medium text-foreground mb-2">Home Automation</p>
-                              <div className="grid grid-cols-3 gap-2">
-                                {['Lutron', 'Crestron', 'Control4', 'Savant', 'KNX', 'AMX'].map((system) => (
-                                  <div key={system} className="flex items-center space-x-2">
-                                    <Checkbox id={`system-${system}`} name="software_systems" value={system} />
-                                    <Label htmlFor={`system-${system}`} className="text-xs text-foreground cursor-pointer">{system}</Label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            <div>
-                              <p className="text-sm font-medium text-foreground mb-2">Audio/Video</p>
-                              <div className="grid grid-cols-3 gap-2">
-                                {['Sonos', 'Apple TV', 'Roku', 'Bang & Olufsen', 'Kaleidescape'].map((system) => (
-                                  <div key={system} className="flex items-center space-x-2">
-                                    <Checkbox id={`system-${system}`} name="software_systems" value={system} />
-                                    <Label htmlFor={`system-${system}`} className="text-xs text-foreground cursor-pointer">{system}</Label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            <div>
-                              <p className="text-sm font-medium text-foreground mb-2">Security</p>
-                              <div className="grid grid-cols-3 gap-2">
-                                {['Ring', 'Arlo', 'Nest Cam', 'ADT', 'Alarm.com', 'Avigilon'].map((system) => (
-                                  <div key={system} className="flex items-center space-x-2">
-                                    <Checkbox id={`system-${system}`} name="software_systems" value={system} />
-                                    <Label htmlFor={`system-${system}`} className="text-xs text-foreground cursor-pointer">{system}</Label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            <div>
-                              <p className="text-sm font-medium text-foreground mb-2">Climate & Pool</p>
-                              <div className="grid grid-cols-3 gap-2">
-                                {['Nest', 'Ecobee', 'Honeywell', 'iAquaLink', 'Pentair', 'Hayward'].map((system) => (
-                                  <div key={system} className="flex items-center space-x-2">
-                                    <Checkbox id={`system-${system}`} name="software_systems" value={system} />
-                                    <Label htmlFor={`system-${system}`} className="text-xs text-foreground cursor-pointer">{system}</Label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            <div>
-                              <p className="text-sm font-medium text-foreground mb-2">Productivity & Management</p>
-                              <div className="grid grid-cols-3 gap-2">
-                                {['Google Workspace', 'Microsoft 365', 'Notion', 'Airtable', 'Monday.com', 'QuickBooks'].map((system) => (
-                                  <div key={system} className="flex items-center space-x-2">
-                                    <Checkbox id={`system-${system}`} name="software_systems" value={system} />
-                                    <Label htmlFor={`system-${system}`} className="text-xs text-foreground cursor-pointer">{system}</Label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </div>
+                  </Card>
 
-                  {/* Right Column - Contact Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-xl font-heading font-medium text-foreground tracking-tight mb-4">
-                      Contact Information
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                      Your email and phone are used for verification only. Not displayed publicly.
+                  {/* Middle Column - Professional Details */}
+                  <Card
+                    className={`${sectionCardClassName} ${formStep === 2 ? 'block' : 'hidden'}`}
+                    data-form-step="2"
+                  >
+                  <div className={sectionBodyClassName}>
+                    <div className="flex items-center gap-2 pb-3 border-b border-border/30">
+                      <Briefcase className="w-5 h-5 text-[#A89F91]" />
+                      <h3 className="text-lg font-heading font-semibold text-foreground tracking-tight">
+                        Professional Details
+                      </h3>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="experience" className="text-foreground text-sm">Years of Experience</Label>
+                      <Input
+                        id="experience"
+                        name="experience"
+                        type="number"
+                        placeholder="e.g. 5"
+                        min="0"
+                        max="50"
+                        className="bg-background text-foreground border-border"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="available_date" className="text-foreground text-sm">Available From</Label>
+                      <Input
+                        id="available_date"
+                        name="available_date"
+                        type="date"
+                        className="bg-background text-foreground border-border"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground text-sm">Work Preference</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {['Full Time', 'Part Time', 'Contract', 'Remote'].map((pref) => (
+                          <div key={pref} className="flex items-center space-x-1">
+                            <Checkbox id={`pref-${pref.toLowerCase().replace(' ', '')}`} name="work_preference" value={pref} />
+                            <Label htmlFor={`pref-${pref.toLowerCase().replace(' ', '')}`} className="text-xs text-foreground cursor-pointer">{pref}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground text-sm">Languages</Label>
+                      <div className="grid grid-cols-2 gap-1 max-h-[120px] overflow-y-auto border border-border rounded-lg p-2 text-xs">
+                        {['English', 'Spanish', 'French', 'German', 'Mandarin', 'Italian'].map((lang) => (
+                          <div key={lang} className="flex items-center space-x-1">
+                            <Checkbox id={`lang-${lang.toLowerCase()}`} name="languages" value={lang} />
+                            <Label htmlFor={`lang-${lang.toLowerCase()}`} className="text-xs text-foreground cursor-pointer">{lang}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground text-sm">Skills</Label>
+                      <Textarea
+                        id="skills_summary"
+                        name="skills_summary"
+                        placeholder="Brief summary of your key skills..."
+                        rows={3}
+                        className="bg-background text-foreground border-border text-sm"
+                      />
+                    </div>
+                  </div>
+                  </Card>
+
+                  {/* Third Column - Contact Information */}
+                  <Card
+                    className={`${sectionCardClassName} ${formStep === 3 ? 'block' : 'hidden'}`}
+                    data-form-step="3"
+                  >
+                  <div className={sectionBodyClassName}>
+                    <div className="flex items-center gap-2 pb-3 border-b border-border/30">
+                      <Building2 className="w-5 h-5 text-[#A89F91]" />
+                      <h3 className="text-lg font-heading font-semibold text-foreground tracking-tight">
+                        Contact & Account
+                      </h3>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Email and phone are for verification only.
                     </p>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-foreground text-sm">Email</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="your.email@example.com"
-                        required
-                        className="bg-background text-foreground border-border"
-                      />
-                      <p className="text-xs text-muted-foreground">Not displayed publicly</p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-foreground text-sm">Email</Label>
+                        <Input
+                          id="email"
+                          name="email"
+                          type="email"
+                          placeholder="your.email@example.com"
+                          required
+                          className="bg-background text-foreground border-border"
+                        />
+                        <p className="text-xs text-muted-foreground">Not displayed publicly</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-foreground text-sm">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          name="phone"
+                          type="tel"
+                          placeholder="(555) 123-4567"
+                          required
+                          className="bg-background text-foreground border-border"
+                        />
+                        <p className="text-xs text-muted-foreground">Not displayed publicly</p>
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-foreground text-sm">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        name="phone"
-                        type="tel"
-                        placeholder="(555) 123-4567"
-                        required
-                        className="bg-background text-foreground border-border"
-                      />
-                      <p className="text-xs text-muted-foreground">Not displayed publicly</p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="account_password" className="text-foreground text-sm">Password</Label>
+                        <Input
+                          id="account_password"
+                          name="account_password"
+                          type="password"
+                          minLength={8}
+                          placeholder="At least 8 characters"
+                          required
+                          className="bg-background text-foreground border-border"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm_password" className="text-foreground text-sm">Confirm Password</Label>
+                        <Input
+                          id="confirm_password"
+                          name="confirm_password"
+                          type="password"
+                          minLength={8}
+                          placeholder="Re-enter your password"
+                          required
+                          className="bg-background text-foreground border-border"
+                        />
+                      </div>
                     </div>
 
                     {profileType === 'professional' && (
                       <>
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Languages Spoken</Label>
-                          <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto border border-border rounded-lg p-3">
-                            {languages.map((lang) => (
-                              <div key={lang} className="flex items-center space-x-2">
-                                <Checkbox id={`lang-${lang}`} name="languages" value={lang} />
-                                <Label htmlFor={`lang-${lang}`} className="text-xs text-foreground cursor-pointer">
-                                  {lang}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
                         <div className="space-y-2">
                           <Label className="text-foreground text-sm">Certifications</Label>
                           <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto border border-border rounded-lg p-3">
@@ -2551,28 +3212,6 @@ export default function AddListingPage() {
                             ))}
                           </div>
                           <p className="text-xs text-muted-foreground">Scroll for more options</p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="hobbies" className="text-foreground text-sm">Hobbies</Label>
-                          <Textarea
-                            id="hobbies"
-                            name="hobbies"
-                            placeholder="List your hobbies..."
-                            rows={2}
-                            className="bg-background text-foreground border-border"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="interests" className="text-foreground text-sm">Interests</Label>
-                          <Textarea
-                            id="interests"
-                            name="interests"
-                            placeholder="List your interests..."
-                            rows={2}
-                            className="bg-background text-foreground border-border"
-                          />
                         </div>
                       </>
                     )}
@@ -2608,32 +3247,76 @@ export default function AddListingPage() {
                       </div>
                     </div>
                   </div>
+                  </Card>
                 </div>
 
-                <div className="flex items-start space-x-3 pt-4 border-t border-border/30">
-                  <Checkbox id="terms" required />
-                  <Label htmlFor="terms" className="text-sm text-foreground cursor-pointer leading-relaxed">
-                    I agree to the <a href="/terms" className="text-primary">Standards & Conduct</a> and <a href="/privacy" className="text-primary">Privacy & Confidentiality</a>. Access varies by participation level.
-                  </Label>
+                <div className="flex flex-col gap-4 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Step {formStep} of {totalFormSteps}
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    {formStep > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handlePreviousFormStep}
+                        className="rounded-xl px-6"
+                      >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back
+                      </Button>
+                    )}
+
+                    {formStep < totalFormSteps && (
+                      <Button
+                        type="button"
+                        onClick={handleNextFormStep}
+                        className="rounded-xl bg-[#A89F91] px-6 text-white hover:bg-[#8A8279]"
+                      >
+                        Proceed
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-12 py-4 text-base rounded-xl"
-                >
-                  {isCommunityOnly || selectedTier.includes('community') || selectedTier.includes('free')
-                    ? 'Create Account & Join Community'
-                    : 'Submit Application'}
-                </Button>
+                {formStep === totalFormSteps && (
+                  <>
+                    <div className="flex items-start space-x-3 pt-2">
+                      <Checkbox id="terms" required />
+                      <Label htmlFor="terms" className="cursor-pointer text-sm leading-relaxed text-foreground">
+                        I agree to the <a href="/terms" className="text-primary">Standards & Conduct</a> and <a href="/privacy" className="text-primary">Privacy & Confidentiality</a>. Access varies by participation level.
+                      </Label>
+                    </div>
 
-                <p className="text-sm text-muted-foreground text-center mt-4">
-                  Approvals within 1-12 hours. We will Email & Text Your Approval.
-                </p>
+                    <Button
+                      type="submit"
+                      disabled={submittingApplication}
+                      className="w-full rounded-xl bg-[#A89F91] px-12 py-4 text-base text-white hover:bg-[#8A8279]"
+                    >
+                      {submittingApplication ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting Application...
+                        </>
+                      ) : isCommunityOnly || selectedTier.includes('community') || selectedTier.includes('free') ? (
+                        'Create Account & Submit Application'
+                      ) : (
+                        'Submit Application'
+                      )}
+                    </Button>
 
-                {!isCommunityOnly && !selectedTier.includes('free') && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    Your profile will be published after approval and payment is processed
-                  </p>
+                    <p className="mt-4 text-center text-sm text-muted-foreground">
+                      Approvals within 1-12 hours. We will Email & Text Your Approval.
+                    </p>
+
+                    {!isCommunityOnly && !selectedTier.includes('free') && (
+                      <p className="text-center text-xs text-muted-foreground">
+                        Your profile will be published after approval and payment is processed
+                      </p>
+                    )}
+                  </>
                 )}
               </form>
             </Card>

@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Lock, Loader2, Shield, Trash2, AlertTriangle, Upload, Camera, Mail, CheckCircle2, XCircle } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Lock, Loader2, Shield, Trash2, AlertTriangle, Upload, Camera, Mail, CheckCircle2, XCircle, PartyPopper, X } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -21,6 +22,10 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<'confirm' | 'hired' | 'feedback'>('confirm');
+  const [gotHired, setGotHired] = useState<boolean | null>(null);
+  const [deleteFeedback, setDeleteFeedback] = useState('');
   const [sendingVerification, setSendingVerification] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -137,38 +142,63 @@ export default function SettingsPage() {
     setLoading(false);
   };
 
-  const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete your account? This action cannot be undone.'
-    );
+  const handleDeleteAccount = () => {
+    setShowDeleteModal(true);
+    setDeleteStep('confirm');
+    setGotHired(null);
+    setDeleteFeedback('');
+  };
 
-    if (!confirmed) return;
-
-    const doubleConfirm = window.confirm(
-      'This will permanently delete all your data. Are you absolutely sure?'
-    );
-
-    if (!doubleConfirm) return;
-
+  const handleConfirmDelete = async () => {
     setDeleting(true);
 
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', user.id);
+    try {
+      // Save feedback data before deleting
+      if (gotHired !== null) {
+        await supabase.from('deletion_feedback').insert({
+          user_id: user.id,
+          got_hired: gotHired,
+          feedback: deleteFeedback,
+          deleted_at: new Date().toISOString(),
+        });
+      }
 
-    if (error) {
-      toast.error('Delete Failed', {
-        description: error.message,
-      });
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+
+      if (error) {
+        toast.error('Delete Failed', {
+          description: error.message,
+        });
+        setDeleting(false);
+      } else {
+        if (gotHired) {
+          toast.success('Congratulations on your new position!', {
+            description: 'We wish you all the best. Your account has been deleted.',
+          });
+        } else {
+          toast.success('Account Deleted', {
+            description: 'Your account has been permanently deleted',
+          });
+        }
+        await supabase.auth.signOut();
+        navigate('/');
+      }
+    } catch (err) {
       setDeleting(false);
-    } else {
-      toast.success('Account Deleted', {
-        description: 'Your account has been permanently deleted',
+      toast.error('Delete Failed', {
+        description: 'An error occurred while deleting your account',
       });
-      await supabase.auth.signOut();
-      navigate('/');
     }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeleteStep('confirm');
+    setGotHired(null);
+    setDeleteFeedback('');
   };
 
   const handlePhotoUpload = async () => {
@@ -473,6 +503,196 @@ export default function SettingsPage() {
       </main>
 
       <Footer />
+
+      {/* Delete Account Modal with "Did you get hired?" flow */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md bg-white">
+            <CardHeader className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-4 top-4"
+                onClick={closeDeleteModal}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+              
+              {deleteStep === 'confirm' && (
+                <>
+                  <CardTitle className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="w-5 h-5" />
+                    Delete Your Account
+                  </CardTitle>
+                  <CardDescription>
+                    This action cannot be undone. All your data will be permanently removed.
+                  </CardDescription>
+                </>
+              )}
+              
+              {deleteStep === 'hired' && (
+                <>
+                  <CardTitle className="flex items-center gap-2 text-[#A89F91]">
+                    <PartyPopper className="w-5 h-5" />
+                    Before you go...
+                  </CardTitle>
+                  <CardDescription>
+                    We'd love to know - did you find a position through Summerland Estates?
+                  </CardDescription>
+                </>
+              )}
+              
+              {deleteStep === 'feedback' && (
+                <>
+                  <CardTitle className="text-gray-900">
+                    {gotHired ? 'Congratulations!' : 'We\'re sorry to see you go'}
+                  </CardTitle>
+                  <CardDescription>
+                    {gotHired 
+                      ? 'We\'re thrilled you found a position! Any feedback for us?' 
+                      : 'Would you mind sharing why you\'re leaving?'}
+                  </CardDescription>
+                </>
+              )}
+            </CardHeader>
+            
+            <CardContent>
+              {deleteStep === 'confirm' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">
+                    Are you sure you want to delete your account? This will permanently remove:
+                  </p>
+                  <ul className="text-sm text-gray-600 space-y-1 ml-4">
+                    <li>• Your profile and all personal information</li>
+                    <li>• Your messages and conversations</li>
+                    <li>• Your saved profiles and preferences</li>
+                    <li>• Your membership and any remaining benefits</li>
+                  </ul>
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={closeDeleteModal}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={() => setDeleteStep('hired')}
+                    >
+                      Continue
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {deleteStep === 'hired' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600 mb-4">
+                    Did you get hired through our platform?
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button
+                      variant="outline"
+                      className={`h-24 flex flex-col items-center justify-center gap-2 ${
+                        gotHired === true ? 'border-green-500 bg-green-50' : ''
+                      }`}
+                      onClick={() => {
+                        setGotHired(true);
+                        setDeleteStep('feedback');
+                      }}
+                    >
+                      <PartyPopper className="w-8 h-8 text-green-600" />
+                      <span className="font-medium">Yes, I got hired!</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className={`h-24 flex flex-col items-center justify-center gap-2 ${
+                        gotHired === false ? 'border-gray-500 bg-gray-50' : ''
+                      }`}
+                      onClick={() => {
+                        setGotHired(false);
+                        setDeleteStep('feedback');
+                      }}
+                    >
+                      <XCircle className="w-8 h-8 text-gray-500" />
+                      <span className="font-medium">No, not yet</span>
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    className="w-full text-gray-500"
+                    onClick={() => setDeleteStep('feedback')}
+                  >
+                    Skip this question
+                  </Button>
+                </div>
+              )}
+              
+              {deleteStep === 'feedback' && (
+                <div className="space-y-4">
+                  {gotHired && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+                      <p className="text-green-700 font-medium flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5" />
+                        Congratulations on your new position!
+                      </p>
+                      <p className="text-sm text-green-600 mt-1">
+                        We're so happy we could help connect you with your new employer.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="feedback" className="text-gray-700">
+                      {gotHired ? 'Any feedback for us? (optional)' : 'Why are you leaving? (optional)'}
+                    </Label>
+                    <Textarea
+                      id="feedback"
+                      value={deleteFeedback}
+                      onChange={(e) => setDeleteFeedback(e.target.value)}
+                      placeholder={gotHired 
+                        ? "Tell us about your experience..." 
+                        : "Help us improve by sharing your feedback..."}
+                      rows={4}
+                      className="border-gray-300"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setDeleteStep('hired')}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={handleConfirmDelete}
+                      disabled={deleting}
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Account
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

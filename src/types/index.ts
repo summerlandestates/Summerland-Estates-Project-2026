@@ -282,6 +282,15 @@ export interface Listing {
   
   // Gender for title formatting
   gender?: 'male' | 'female' | 'other';
+  
+  // Additional features (add-ons)
+  backgroundCheckAvailable?: boolean;
+  priorityListing?: boolean;
+  featuredOnHomepage?: boolean;
+  
+  // Booking calendar
+  bookingCalendarEnabled?: boolean;
+  availableTimeSlots?: string[];
 }
 
 export interface Review {
@@ -381,4 +390,34 @@ export interface ApplicationFormData {
   experienceYears?: number;
   hourlyRate?: string;
   [key: string]: any;
+}
+
+export interface UploadedFileSummary {
+  name: string;
+  size: number;
+  type: string;
+  dataUrl?: string | null;
+  publicUrl?: string | null;
+  storagePath?: string | null;
+}
+
+export type ApplicationFieldValue = string | string[] | boolean | UploadedFileSummary[];
+
+export interface SerializedApplicationData {
+  [key: string]: ApplicationFieldValue;
+}
+
+export interface CheckoutData {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  location: string;
+  role?: string;
+  bio: string;
+  profileType: string;
+  selectedTier: string;
+  planName: string;
+  planPrice: string;
+  applicationData: SerializedApplicationData;
 }

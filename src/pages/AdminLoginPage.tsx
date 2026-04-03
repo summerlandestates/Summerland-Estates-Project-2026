@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,8 +13,24 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { user, loading: authLoading, signIn } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const redirectLoggedInAdmin = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      navigate(profile?.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+    };
+
+    redirectLoggedInAdmin();
+  }, [authLoading, navigate, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

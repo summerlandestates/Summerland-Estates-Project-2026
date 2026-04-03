@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X, User, ChevronDown, LogOut, Settings, Bookmark } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -26,8 +27,44 @@ interface NavBarProps {
 
 export default function NavBar({ currentPage }: NavBarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [profileFullName, setProfileFullName] = useState<string | null>(null);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const resourcesCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      if (!user) {
+        setIsAdminUser(false);
+        setProfileAvatarUrl(null);
+        setProfileFullName(null);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, avatar_url, full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      setIsAdminUser(profile?.role === 'admin');
+      setProfileAvatarUrl(profile?.avatar_url ?? null);
+      setProfileFullName(profile?.full_name ?? null);
+    };
+
+    checkAdminRole();
+  }, [user]);
+
+  useEffect(() => {
+    return () => {
+      if (resourcesCloseTimer.current) {
+        clearTimeout(resourcesCloseTimer.current);
+      }
+    };
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -37,7 +74,17 @@ export default function NavBar({ currentPage }: NavBarProps) {
     navigate('/login');
   };
 
-  const getInitials = (email: string) => {
+  const getInitials = (email: string, name?: string | null) => {
+    if (name?.trim()) {
+      return name
+        .trim()
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join('')
+        .substring(0, 2)
+        .toUpperCase();
+    }
+
     return email.substring(0, 2).toUpperCase();
   };
 
@@ -46,17 +93,36 @@ export default function NavBar({ currentPage }: NavBarProps) {
     setMobileMenuOpen(false);
   };
 
+  const openResourcesMenu = () => {
+    if (resourcesCloseTimer.current) {
+      clearTimeout(resourcesCloseTimer.current);
+    }
+    setResourcesOpen(true);
+  };
+
+  const closeResourcesMenu = () => {
+    if (resourcesCloseTimer.current) {
+      clearTimeout(resourcesCloseTimer.current);
+    }
+
+    resourcesCloseTimer.current = setTimeout(() => {
+      setResourcesOpen(false);
+    }, 140);
+  };
+
+  const dashboardPath = isAdminUser ? '/admin/dashboard' : '/dashboard';
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border/50 shadow-sm">
-      <nav className="container mx-auto px-12 h-24 flex items-center justify-between">
+      <nav className="container mx-auto flex h-20 items-center justify-between px-4 md:h-24 md:px-12">
         <Link
           to="/"
           className="flex items-center gap-3 hover:opacity-90 transition-opacity"
         >
           <img 
-            src="/logo.png" 
+            src="/public/images/logo.png" 
             alt="Summerland Estates" 
-            className="h-24 w-auto"
+            className="h-10 w-auto md:h-16"
           />
         </Link>
 
@@ -74,6 +140,21 @@ export default function NavBar({ currentPage }: NavBarProps) {
                     }`}
                   >
                     Home
+                  </Link>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <Link
+                    to="/search"
+                    className={`text-base font-normal transition-all duration-300 cursor-pointer hover:text-[#A89F91] relative pb-1 ${
+                      currentPage === 'search'
+                        ? 'text-[#A89F91] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#A89F91] after:rounded-full'
+                        : 'text-gray-700'
+                    }`}
+                  >
+                    Find Professionals
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
@@ -151,7 +232,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
               <NavigationMenuItem>
                 <NavigationMenuTrigger
                   className={`text-base font-normal transition-colors cursor-pointer hover:text-primary ${
-                    ['collective', 'tools', 'messaging', 'news'].includes(currentPage)
+                    ['collective', 'tools', 'news'].includes(currentPage)
                       ? 'text-primary font-semibold'
                       : 'text-foreground'
                   }`}
@@ -182,19 +263,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
                           <div className="text-sm font-medium leading-none">Estate Management Tools</div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                             Professional templates and resources
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to="/messaging"
-                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
-                        >
-                          <div className="text-sm font-medium leading-none">Private Correspondence</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Discreet communication within the network
                           </p>
                         </Link>
                       </NavigationMenuLink>
@@ -243,97 +311,78 @@ export default function NavBar({ currentPage }: NavBarProps) {
               </NavigationMenuItem>
 
               <NavigationMenuItem>
-                <NavigationMenuTrigger
-                  className={`text-base font-normal transition-colors cursor-pointer hover:text-primary ${
-                    ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing'].includes(currentPage)
-                      ? 'text-primary font-semibold'
-                      : 'text-foreground'
-                  }`}
+                <div
+                  className="relative"
+                  onMouseEnter={openResourcesMenu}
+                  onMouseLeave={closeResourcesMenu}
                 >
-                  Resources
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[400px] gap-2 p-4 bg-white rounded-xl shadow-lg border border-gray-100">
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to="/contact"
-                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
-                        >
-                          <div className="text-sm font-medium leading-none">Contact</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Get in touch
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to="/about"
-                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
-                        >
-                          <div className="text-sm font-medium leading-none">Our Philosophy</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Why we exist
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to="/faqs"
-                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
-                        >
-                          <div className="text-sm font-medium leading-none">FAQs</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Common questions
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to="/privacy"
-                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
-                        >
-                          <div className="text-sm font-medium leading-none">Privacy & Confidentiality</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            How we protect your data
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to="/terms"
-                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
-                        >
-                          <div className="text-sm font-medium leading-none">Standards & Conduct</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Network guidelines
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to="/pricing"
-                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
-                        >
-                          <div className="text-sm font-medium leading-none">Participation Levels</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Review participation options
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                  </ul>
-                </NavigationMenuContent>
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1 text-base font-normal transition-colors cursor-pointer hover:text-primary ${
+                      ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing'].includes(currentPage)
+                        ? 'text-primary font-semibold'
+                        : 'text-foreground'
+                    }`}
+                  >
+                    Resources
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${resourcesOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <div
+                    onMouseEnter={openResourcesMenu}
+                    onMouseLeave={closeResourcesMenu}
+                    className={`absolute right-0 top-full z-50 mt-2 w-[380px] rounded-xl border border-gray-100 bg-white p-4 shadow-lg transition-all duration-200 ${
+                      resourcesOpen
+                        ? 'pointer-events-auto visible translate-y-0 opacity-100'
+                        : 'pointer-events-none invisible translate-y-2 opacity-0'
+                    }`}
+                  >
+                    <div className="grid gap-2">
+                      <Link
+                        to="/contact"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">Contact</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Get in touch</p>
+                      </Link>
+                      <Link
+                        to="/about"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">Our Philosophy</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Why we exist</p>
+                      </Link>
+                      <Link
+                        to="/faqs"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">FAQs</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Common questions</p>
+                      </Link>
+                      <Link
+                        to="/privacy"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">Privacy & Confidentiality</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">How we protect your data</p>
+                      </Link>
+                      <Link
+                        to="/terms"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">Standards & Conduct</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Network guidelines</p>
+                      </Link>
+                      <Link
+                        to="/pricing"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">Participation Levels</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Review participation options</p>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </NavigationMenuItem>
             </NavigationMenuList>
           </NavigationMenu>
@@ -347,9 +396,9 @@ export default function NavBar({ currentPage }: NavBarProps) {
                     className="relative h-10 w-10 rounded-full"
                   >
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.user_metadata?.avatar_url} alt={user.email || ''} />
+                      <AvatarImage src={profileAvatarUrl || user.user_metadata?.avatar_url} alt={user.email || ''} />
                       <AvatarFallback className="bg-[#A89F91] text-white font-semibold">
-                        {getInitials(user.email || 'U')}
+                        {getInitials(user.email || 'U', profileFullName || user.user_metadata?.full_name)}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -357,8 +406,8 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 <DropdownMenuContent align="end" className="bg-popover text-popover-foreground w-56">
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
-                      {user.user_metadata?.full_name && (
-                        <p className="font-medium">{user.user_metadata.full_name}</p>
+                      {(profileFullName || user.user_metadata?.full_name) && (
+                        <p className="font-medium">{profileFullName || user.user_metadata?.full_name}</p>
                       )}
                       <p className="w-[200px] truncate text-sm text-muted-foreground">
                         {user.email}
@@ -366,6 +415,13 @@ export default function NavBar({ currentPage }: NavBarProps) {
                     </div>
                   </div>
                   <div className="h-px bg-border my-1" />
+                  <DropdownMenuItem 
+                    className="text-foreground cursor-pointer hover:bg-[#A89F91]/10 hover:text-[#A89F91] transition-colors"
+                    onClick={() => navigate(dashboardPath)}
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Dashboard
+                  </DropdownMenuItem>
                   <DropdownMenuItem 
                     className="text-foreground cursor-pointer hover:bg-[#A89F91]/10 hover:text-[#A89F91] transition-colors"
                     onClick={() => navigate('/my-profile')}
@@ -422,16 +478,26 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   className="text-foreground hover:bg-muted"
                 >
                   <Avatar className="h-8 w-8">
+                    <AvatarImage src={profileAvatarUrl || user.user_metadata?.avatar_url} alt={user.email || ''} />
                     <AvatarFallback className="bg-[#A89F91] text-white text-sm">
-                      {user.email?.charAt(0)?.toUpperCase() || 'U'}
+                      {getInitials(user.email || 'U', profileFullName || user.user_metadata?.full_name)}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-3 py-2 border-b border-gray-100">
+                  {(profileFullName || user.user_metadata?.full_name) && (
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {profileFullName || user.user_metadata?.full_name}
+                    </p>
+                  )}
                   <p className="text-sm font-medium text-foreground truncate">{user.email}</p>
                 </div>
+                <DropdownMenuItem onClick={() => navigate(dashboardPath)} className="cursor-pointer">
+                  <User className="w-4 h-4 mr-2" />
+                  Dashboard
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/my-profile')} className="cursor-pointer">
                   <User className="w-4 h-4 mr-2" />
                   My Profile
@@ -443,10 +509,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 <DropdownMenuItem onClick={() => navigate('/saved-profiles')} className="cursor-pointer">
                   <Bookmark className="w-4 h-4 mr-2" />
                   Saved Profiles
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/account')} className="cursor-pointer">
-                  <User className="w-4 h-4 mr-2" />
-                  Account Settings
                 </DropdownMenuItem>
                 <div className="border-t border-gray-100 mt-1 pt-1">
                   <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-600 focus:text-red-600">
@@ -536,12 +598,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
               >
                 Estate Management Tools
-              </button>
-              <button
-                onClick={() => handleNavigation('/messaging')}
-                className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
-              >
-                Private Correspondence
               </button>
               <button
                 onClick={() => handleNavigation('/news')}

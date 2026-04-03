@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import FilterToolbar from '../components/FilterToolbar';
@@ -9,29 +7,46 @@ import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { GitCompare, X, Shield, Users, Lock } from 'lucide-react';
+import { ArrowRight, BriefcaseBusiness, Search, Sparkles } from 'lucide-react';
 import { listings } from '../data/listings';
 import type { Listing, FilterState, PricingTier } from '../types';
 
-gsap.registerPlugin(ScrollTrigger);
+const homepageCollections = [
+  {
+    title: 'Private Chef',
+    image: '/public/images/private-chef.jpg',
+    tags: ['Household Staff', 'Estate Managers', 'Housekeepers', 'Private Chefs', 'Butlers'],
+  },
+  {
+    title: 'Housekeeping',
+    image: '/public/images/housekeeping.jpg',
+    tags: ['Lifestyle & Personal', 'Personal Assistants', 'Nannies', 'Companions'],
+  },
+  {
+    title: 'Masseuse',
+    image: '/public/images/Masseuse.jpg',
+    tags: ['Specialty', 'Yacht Crew', 'Equestrian Staff', 'Stylists', 'Travel Companions'],
+  },
+  {
+    title: 'Security',
+    image: '/public/images/security.jpg',
+    tags: ['Operations & Property', 'Property Managers', 'Maintenance Specialists', 'Security'],
+  },
+];
 
 export default function DirectoryPage() {
   const navigate = useNavigate();
   const [filteredListings, setFilteredListings] = useState<Listing[]>(listings);
-  const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedForComparison, setSelectedForComparison] = useState<string[]>([]);
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
   const [isPublicView, setIsPublicView] = useState(true);
-  const itemsPerPage = 12;
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    // Check if user is logged in and get their tier
+
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
     setIsPublicView(!loggedIn);
-    
+
     if (loggedIn) {
       const tier = localStorage.getItem('userTier') as PricingTier | undefined;
       setUserTier(tier);
@@ -76,12 +91,10 @@ export default function DirectoryPage() {
     }
 
     setFilteredListings(filtered);
-    setCurrentPage(1);
   };
 
   const handleResetFilters = () => {
     setFilteredListings(listings);
-    setCurrentPage(1);
   };
 
   const handleCardClick = (id: string, e?: React.MouseEvent) => {
@@ -91,285 +104,204 @@ export default function DirectoryPage() {
     navigate(`/profile/${id}`);
   };
 
-  const handleToggleSelection = (id: string) => {
-    if (selectedForComparison.includes(id)) {
-      setSelectedForComparison(selectedForComparison.filter(selectedId => selectedId !== id));
-    } else {
-      if (selectedForComparison.length >= 3) {
-        alert('You can only compare up to 3 profiles at a time');
-        return;
-      }
-      setSelectedForComparison([...selectedForComparison, id]);
-    }
-  };
-
-  const handleCompare = () => {
-    if (selectedForComparison.length < 2) {
-      alert('Please select at least 2 profiles to compare');
-      return;
-    }
-    navigate('/compare', { state: { profileIds: selectedForComparison } });
-  };
-
-  const handleClearSelection = () => {
-    setSelectedForComparison([]);
-  };
-
-  const totalPages = Math.ceil(filteredListings.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentListings = filteredListings.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
+  const directoryPreview = filteredListings.slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-background page-transition">
+    <div className="min-h-screen bg-[#f7f3ee] page-transition">
       <NavBar currentPage="home" />
-      
-      <main>
-        {/* Hero Section */}
-        <section className="pt-32 pb-24 border-b border-border/30 bg-gradient-to-b from-tertiary/20 to-background relative overflow-hidden">
-          {/* Wheel background image - bottom right corner */}
-          <div 
-            className="absolute -bottom-32 -right-32 w-96 h-96 opacity-10 pointer-events-none"
-            style={{
-              backgroundImage: 'url(/favicon.png)',
-              backgroundSize: 'contain',
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'center'
-            }}
-          />
-          <div className="container mx-auto px-12 max-w-6xl text-center relative z-10">
-            <div className="inline-block mb-6">
-              <Badge className="bg-[#A89F91]/10 text-[#A89F91] border-[#A89F91]/20 px-4 py-2 text-sm font-semibold">
-                Premium Estate Services
-              </Badge>
-            </div>
-            <h1 className="text-6xl md:text-7xl font-heading font-bold text-foreground mb-6 tracking-tight leading-tight">
-              Premium Estate Services<br />
-              <span className="text-[#A89F91]">Made Simple</span>
-            </h1>
-            <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed">
-              Connect with verified, background-checked professionals who understand the unique needs of luxury estates. From housekeepers to private chefs, find exceptional service providers in your area.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button
-                onClick={() => navigate('/add-listing')}
-                size="lg"
-                className="bg-[#A89F91] text-white hover:bg-[#8A8279] px-10 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-              >
-                Become a Provider
-              </Button>
-              <Button
-                onClick={() => {
-                  const directorySection = document.getElementById('directory-section');
-                  if (directorySection) {
-                    directorySection.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
-                variant="outline"
-                size="lg"
-                className="border-2 border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white px-10 transition-all duration-300 hover:-translate-y-1"
-              >
-                Find Professionals
-              </Button>
-            </div>
-          </div>
-        </section>
 
-        {/* Value Section */}
-        <section className="py-32 border-b border-border/30">
-          <div className="container mx-auto px-12 max-w-7xl">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <Card className="text-center p-8 border-gray-200 hover:border-[#A89F91] transition-all duration-300 hover:shadow-lg h-full flex flex-col">
-                <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-[#A89F91]/10 rounded-2xl">
-                  <Lock className="w-10 h-10 text-[#A89F91]" />
-                </div>
-                <h3 className="text-2xl font-heading font-semibold text-foreground mb-4 tracking-tight">
-                  Discretion by Design
-                </h3>
-                <p className="text-muted-foreground leading-relaxed flex-grow">
-                  All communication remains private and on-platform.
-                </p>
-              </Card>
-
-              <Card className="text-center p-8 border-gray-200 hover:border-[#A89F91] transition-all duration-300 hover:shadow-lg h-full flex flex-col">
-                <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-[#A89F91]/10 rounded-2xl">
-                  <Shield className="w-10 h-10 text-[#A89F91]" />
-                </div>
-                <h3 className="text-2xl font-heading font-semibold text-foreground mb-4 tracking-tight">
-                  Curated Membership
-                </h3>
-                <p className="text-muted-foreground leading-relaxed flex-grow">
-                  Every profile is reviewed. Standards come before scale.
-                </p>
-              </Card>
-
-              <Card className="text-center p-8 border-gray-200 hover:border-[#A89F91] transition-all duration-300 hover:shadow-lg h-full flex flex-col">
-                <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-[#A89F91]/10 rounded-2xl">
-                  <Users className="w-10 h-10 text-[#A89F91]" />
-                </div>
-                <h3 className="text-2xl font-heading font-semibold text-foreground mb-4 tracking-tight">
-                  Professional Integrity
-                </h3>
-                <p className="text-muted-foreground leading-relaxed flex-grow">
-                  This is not an open marketplace. It is a trusted network.
-                </p>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/* Philosophy Callout */}
-        <section className="py-32 border-b border-border/30">
-          <div className="container mx-auto px-12 max-w-4xl text-center">
-            <h2 className="text-5xl font-heading font-medium text-foreground mb-12 tracking-tight leading-tight">
-              Privacy isn't a setting. It's the foundation.
-            </h2>
-            <Button
-              onClick={() => navigate('/about')}
-              variant="outline"
-              size="lg"
-              className="border-border text-foreground px-12 py-6 text-base"
-            >
-              Our Philosophy
-            </Button>
-          </div>
-        </section>
-
-        {/* Featured Professionals Section */}
-        <section className="py-24 border-b border-border/30 bg-tertiary/10">
-          <div className="container mx-auto px-12 max-w-7xl">
-            <div className="mb-12 text-center">
-              <Badge className="bg-[#A89F91]/10 text-[#A89F91] border-[#A89F91]/20 px-4 py-2 text-sm font-semibold mb-4">
-                Featured
-              </Badge>
-              <h2 className="text-4xl font-heading font-medium text-foreground mb-4 tracking-tight">
-                Featured Professionals & Service Providers
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Premium members who have chosen to be highlighted in our network.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {listings.filter(l => l.verified).slice(0, 4).map((listing) => (
-                <Card 
-                  key={listing.id}
-                  className="p-6 cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-[#A89F91]/30 bg-card"
-                  onClick={() => navigate(`/profile/${listing.id}`)}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-20 h-20 rounded-full bg-[#A89F91]/20 flex items-center justify-center mb-4 overflow-hidden">
-                      {listing.profilePhoto ? (
-                        <img src={listing.profilePhoto} alt={listing.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Users className="w-10 h-10 text-[#A89F91]" />
-                      )}
-                    </div>
-                    <h3 className="font-heading font-semibold text-foreground mb-1">{listing.name}</h3>
-                    <p className="text-sm text-muted-foreground mb-2">{listing.role}</p>
-                    <p className="text-xs text-muted-foreground">{listing.location}</p>
-                    {listing.verified && (
-                      <Badge className="mt-3 bg-green-100 text-green-700 border-green-200">
-                        <Shield className="w-3 h-3 mr-1" />
-                        Verified
+      <main className="pt-24 md:pt-28">
+        <section className="pb-14 pt-6">
+          <div className="container mx-auto max-w-7xl px-5 md:px-10">
+            <Card className="overflow-hidden rounded-[28px] border border-[#d7cdc0] bg-white px-3 pb-6 pt-3 shadow-[0_24px_80px_rgba(74,73,63,0.08)] sm:px-4 sm:pb-8 sm:pt-4">
+              <div className="overflow-hidden rounded-[28px] border border-[#e8dfd3]">
+                <div className="relative h-[430px] sm:h-[480px] md:h-[520px]">
+                  <img
+                    src="/public/images/home-banner.jpg"
+                    alt="Summerland Estates"
+                    className="h-full w-full object-cover object-[18%_center] sm:object-[28%_center] md:object-center"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-[#1d2018]/10 via-transparent to-[#1d2018]/35" />
+                  <div className="absolute inset-x-0 top-4 flex justify-center px-4 text-center sm:top-6">
+                    <div className="max-w-3xl">
+                      <Badge className="rounded-full border border-white/40 bg-white/10 px-4 py-2 text-[11px] tracking-[0.32em] text-white backdrop-blur-sm sm:text-xs">
+                        Curated Estate Network
                       </Badge>
-                    )}
-                  </div>
-                </Card>
-              ))}
-            </div>
-
-            <div className="text-center mt-8">
-              <Button
-                variant="outline"
-                onClick={() => navigate('/pricing')}
-                className="border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white"
-              >
-                Get Featured on Homepage
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        {/* Directory Section */}
-        <section id="directory-section" className="py-32">
-          <div className="container mx-auto px-12 max-w-7xl">
-            <div className="mb-16 text-center">
-              <h2 className="text-5xl font-heading font-medium text-foreground mb-6 tracking-tight">
-                Network Directory
-              </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Vetted professionals and trusted service providers.
-              </p>
-            </div>
-
-            <FilterToolbar
-              onFilterChange={handleFilterChange}
-              onResetFilters={handleResetFilters}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-            />
-
-            {selectedForComparison.length >= 2 && (
-              <div className="fixed bottom-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-4 shadow-lg">
-                <div className="container mx-auto px-12 max-w-7xl">
-                  <Card className="p-4 bg-primary/90 border-primary-foreground/20">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <GitCompare className="w-6 h-6" />
-                        <span className="font-semibold">
-                          Compare selected profiles
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleClearSelection}
-                          className="text-primary-foreground hover:bg-primary-foreground/20"
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Clear
-                        </Button>
-                        <Button
-                          onClick={handleCompare}
-                          className="bg-tertiary text-tertiary-foreground hover:bg-tertiary/90"
-                        >
-                          Compare ({selectedForComparison.length})
-                        </Button>
-                      </div>
+                      {/* <h1 className="font-heading text-5xl font-medium italic leading-[0.95] text-white drop-shadow-[0_18px_35px_rgba(0,0,0,0.25)] md:text-7xl">
+                        Summerland
+                        <span className="not-italic"> </span>
+                        Estates
+                      </h1> */}
                     </div>
-                  </Card>
+                  </div>
+                  <div className="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
+                    <div className="flex w-full max-w-4xl flex-col gap-3 md:flex-row md:justify-center">
+                      <Button
+                        onClick={() => navigate('/add-listing')}
+                        className="min-h-12 min-w-[190px] rounded-full bg-[#a79f91] px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-[#948979]"
+                      >
+                        Become a Provider
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const directorySection = document.getElementById('directory-section');
+                          if (directorySection) {
+                            directorySection.scrollIntoView({ behavior: 'smooth' });
+                          }
+                        }}
+                        className="min-h-12 min-w-[190px] rounded-full border-white/75 bg-white/92 px-5 py-4 text-sm font-semibold text-white shadow-lg backdrop-blur-sm hover:bg-[#5f6756]"
+                      >
+                        Find Professionals
+                      </Button>
+                      <Button
+                        onClick={() => navigate('/open-roles')}
+                        className="min-h-12 min-w-[250px] rounded-full bg-[#6d7662] px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-[#5f6756]"
+                      >
+                        View Open Roles & Requests
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
 
-            <DirectoryGrid
-              listings={currentListings}
-              viewMode={viewMode}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              selectedForComparison={selectedForComparison}
-              onToggleSelection={handleToggleSelection}
-              onCardClick={handleCardClick}
-              userTier={userTier}
-              isPublicView={isPublicView}
-            />
+              <div className="mt-8 grid auto-rows-fr gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {homepageCollections.map((collection) => (
+                  <div key={collection.title} className="flex h-full flex-col gap-4">
+                    <div className="group overflow-hidden rounded-[22px] border border-[#ddd3c6] bg-[#f5efe7] shadow-sm">
+                      <div className="relative h-[190px]">
+                        <img
+                          src={collection.image}
+                          alt={collection.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#151812]/55 via-transparent to-transparent" />
+                        <div className="absolute inset-x-0 bottom-0 px-4 pb-4">
+                          <h3 className="font-heading text-2xl font-medium italic text-white">
+                            {collection.title}
+                          </h3>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex h-full min-h-[215px] flex-1 flex-col rounded-[20px] border border-[#e6ddd2] bg-[#fcfaf7] px-4 py-4">
+                      <h4 className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-[#6d7662]">
+                        {collection.tags[0]}
+                      </h4>
+                      <ul className="space-y-1 text-sm leading-6 text-[#4f4a43]">
+                        {collection.tags.slice(1).map((tag) => (
+                          <li key={tag} className="flex items-start gap-2">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#a79f91]" />
+                            <span>{tag}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
         </section>
 
-        {/* Trust Notice */}
-        <section className="py-16 border-t border-border/30">
-          <div className="container mx-auto px-12 max-w-4xl text-center">
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              This network is built on discretion.
-            </p>
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              Content that compromises trust is removed.
-            </p>
+        <section id="directory-section" className="pb-24">
+          <div className="container mx-auto max-w-7xl px-5 md:px-10">
+            <Card className="rounded-[32px] border border-[#d7cdc0] bg-white p-6 shadow-[0_18px_65px_rgba(74,73,63,0.07)] md:p-10">
+              <div className="mb-10 text-center">
+                <Badge className="mb-4 rounded-full border border-[#d7cdc0] bg-[#f8f4ee] px-4 py-2 text-xs tracking-[0.28em] text-[#6d7662]">
+                  Network Directory
+                </Badge>
+                <h2 className="font-heading text-4xl font-medium tracking-tight text-[#23231f] md:text-5xl">
+                  Network Directory
+                </h2>
+                <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-[#6b665f] md:text-lg">
+                  Vetted professionals and trusted service providers. This homepage shows a curated preview, while the full directory remains available for deeper browsing.
+                </p>
+              </div>
+
+              <div className="mb-8 grid gap-4 md:grid-cols-3">
+                <Card className="rounded-[24px] border border-[#e8dfd3] bg-[#fcfaf7] p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#6d7662]/10 text-[#6d7662]">
+                      <Search className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-lg font-semibold text-[#23231f]">Refined Search</h3>
+                      <p className="text-sm text-[#6b665f]">Search by role, location, and profile status.</p>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="rounded-[24px] border border-[#e8dfd3] bg-[#fcfaf7] p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#a79f91]/15 text-[#8c7f70]">
+                      <BriefcaseBusiness className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-lg font-semibold text-[#23231f]">Open Roles</h3>
+                      <p className="text-sm text-[#6b665f]">Explore current placements and service requests.</p>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="rounded-[24px] border border-[#e8dfd3] bg-[#fcfaf7] p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#23231f]/6 text-[#23231f]">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-lg font-semibold text-[#23231f]">Curated Preview</h3>
+                      <p className="text-sm text-[#6b665f]">A few featured profiles are highlighted below.</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              <FilterToolbar
+                onFilterChange={handleFilterChange}
+                onResetFilters={handleResetFilters}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+              />
+
+              <DirectoryGrid
+                listings={directoryPreview}
+                viewMode={viewMode}
+                currentPage={1}
+                totalPages={1}
+                onPageChange={() => undefined}
+                onCardClick={handleCardClick}
+                userTier={userTier}
+                isPublicView={isPublicView}
+              />
+
+              <div className="mt-10 flex flex-col items-center justify-between gap-4 rounded-[24px] border border-[#ebe2d7] bg-[#fbf8f3] px-6 py-5 text-center md:flex-row md:text-left">
+                <div>
+                  <h3 className="font-heading text-2xl font-medium text-[#23231f]">
+                    Looking for the full directory?
+                  </h3>
+                  <p className="mt-1 text-sm text-[#6b665f]">
+                    Continue browsing every available profile, or jump directly into current open roles and requests.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/search')}
+                    className="rounded-full border-[#d6cdc0] px-6 text-[#5c5a51] hover:bg-[#5f6756]"
+                  >
+                    Browse Full Directory
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={() => navigate('/open-roles')}
+                    className="rounded-full bg-[#6d7662] px-6 text-white hover:bg-[#5f6756]"
+                  >
+                    View Open Roles & Requests
+                  </Button>
+                </div>
+              </div>
+            </Card>
           </div>
         </section>
       </main>

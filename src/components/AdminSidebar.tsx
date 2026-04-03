@@ -7,22 +7,36 @@ import {
   LogOut,
   Shield,
   Home,
-  Briefcase
+  Briefcase,
+  ClipboardList
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface AdminSidebarProps {
-  onLogout: () => void;
+  onLogout?: () => void;
 }
 
 export default function AdminSidebar({ onLogout }: AdminSidebarProps) {
   const location = useLocation();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
+  const handleLogout = async () => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      await signOut();
+      localStorage.removeItem('isAdmin');
+      navigate('/admin/login');
+    }
+  };
+
   const menuItems = [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/admin/applications', icon: ClipboardList, label: 'Applications' },
     { path: '/admin/users', icon: Users, label: 'User Management' },
     { path: '/admin/jobs', icon: Briefcase, label: 'Jobs & Services' },
     { path: '/admin/content', icon: FileText, label: 'Content Pages' },
@@ -84,7 +98,7 @@ export default function AdminSidebar({ onLogout }: AdminSidebarProps) {
           <span className="font-medium">Back to Site</span>
         </Link>
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-red-900/20 hover:text-red-400 transition-all duration-300"
         >
           <LogOut className="w-5 h-5" />

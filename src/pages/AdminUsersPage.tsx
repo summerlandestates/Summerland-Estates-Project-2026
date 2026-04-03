@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +30,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, Trash2, MoreVertical, CheckCircle, XCircle, Loader2, Search, UserCog } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Users, Trash2, MoreVertical, CheckCircle, XCircle, Loader2, Search, UserCog, Clock3 } from 'lucide-react';
+
+const parseApiResponse = async (response: Response) => {
+  const responseText = await response.text();
+
+  try {
+    return responseText ? JSON.parse(responseText) : {};
+  } catch {
+    throw new Error(
+      response.status === 404
+        ? 'Membership applications API was not found. Restart the local API server.'
+        : 'The API returned an invalid response. Restart the local API server and try again.'
+    );
+  }
+};
 
 interface Profile {
   id: string;
@@ -38,25 +60,34 @@ interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   role: string | null;
+  status: 'pending' | 'approved' | 'rejected' | null;
+  rejection_reason: string | null;
+  profile_type: string | null;
+  location: string | null;
+  phone: string | null;
+  tier: string | null;
+  application_data: Record<string, unknown> | null;
   created_at: string;
+}
+
+interface ActionDialogState {
+  type: 'approve' | 'reject' | 'delete' | null;
+  profile: Profile | null;
 }
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<Profile[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [dialogState, setDialogState] = useState<ActionDialogState>({ type: null, profile: null });
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     checkAdminAccess();
   }, [user]);
-
-  useEffect(() => {
-    filterUsers();
-  }, [searchQuery, roleFilter, users]);
 
   const checkAdminAccess = async () => {
     if (!user) {
@@ -83,55 +114,81 @@ export default function AdminUsersPage() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
 
-    if (error) {
+    try {
+      const response = await fetch('/api/admin-membership-applications');
+      const result = await parseApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch users');
+      }
+
+      setUsers((result.applications || []).filter((profile: Profile) => profile.status === 'approved'));
+    } catch (error: any) {
       toast.error('Error', {
-        description: 'Failed to fetch users',
+        description: error.message || 'Failed to fetch users',
       });
-    } else {
-      setUsers(data || []);
     }
+
     setLoading(false);
   };
 
-  const filterUsers = () => {
-    let filtered = [...users];
+  const filteredUsers = useMemo(() => {
+    return users.filter((profile) => {
+      const matchesSearch =
+        !searchQuery ||
+        profile.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.location?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (u) =>
-          u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          u.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+      const matchesRole = roleFilter === 'all' || (profile.role ?? 'user') === roleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [roleFilter, searchQuery, users]);
 
-    if (roleFilter !== 'all') {
-      filtered = filtered.filter((u) => u.role === roleFilter);
-    }
-
-    setFilteredUsers(filtered);
+  const openDialog = (type: ActionDialogState['type'], profile: Profile) => {
+    setDialogState({ type, profile });
   };
 
-  const handleDeleteUser = async (userId: string, email: string) => {
-    if (!confirm(`Are you sure you want to delete user: ${email}?`)) {
+  const closeDialog = () => {
+    setDialogState({ type: null, profile: null });
+  };
+
+  const handleDeleteUser = async () => {
+    if (!dialogState.profile) {
       return;
     }
 
-    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    setActionLoading(true);
 
-    if (error) {
-      toast.error('Delete Failed', {
-        description: error.message,
+    try {
+      const response = await fetch('/api/admin-delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: dialogState.profile.id,
+        }),
       });
-    } else {
+
+      const result = await parseApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Unable to delete user');
+      }
+
       toast.success('User Deleted', {
-        description: `${email} has been removed`,
+        description: `${dialogState.profile.email} has been removed`,
       });
+      closeDialog();
       fetchUsers();
+    } catch (error: any) {
+      toast.error('Delete Failed', {
+        description: error.message || 'Please try again.',
+      });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -178,7 +235,7 @@ export default function AdminUsersPage() {
               User Management
             </h1>
             <p className="text-gray-600">
-              Manage all registered users and their permissions
+              Manage approved members and platform access
             </p>
           </div>
 
@@ -187,7 +244,7 @@ export default function AdminUsersPage() {
             <Card className="border-gray-200">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-gray-600">
-                  Total Users
+                  Approved Members
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -211,12 +268,12 @@ export default function AdminUsersPage() {
             <Card className="border-gray-200">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-gray-600">
-                  Regular Users
+                  Member Roles
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-gray-900">
-                  {users.filter((u) => u.role !== 'admin').length}
+                <div className="text-3xl font-bold text-amber-600">
+                  {users.filter((u) => u.role && u.role !== 'admin').length}
                 </div>
               </CardContent>
             </Card>
@@ -275,10 +332,10 @@ export default function AdminUsersPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#A89F91]" />
-                All Users ({filteredUsers.length})
+                Approved Members ({filteredUsers.length})
               </CardTitle>
               <CardDescription>
-                View and manage user accounts and permissions
+                View approved members, manage admin access, and delete accounts
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -286,8 +343,9 @@ export default function AdminUsersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
-                    <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -296,19 +354,49 @@ export default function AdminUsersPage() {
                   {filteredUsers.map((profile) => (
                     <TableRow key={profile.id} className="hover:bg-gray-50">
                       <TableCell>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start gap-3">
                           <Avatar className="h-10 w-10">
                             <AvatarImage src={profile.avatar_url || undefined} />
                             <AvatarFallback className="bg-[#A89F91] text-white">
-                              {profile.full_name?.[0] || profile.email[0].toUpperCase()}
+                              {(profile.full_name?.[0] || profile.email[0]).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="font-medium text-gray-900">
-                            {profile.full_name || 'No Name'}
-                          </span>
+                          <div className="space-y-1">
+                            <span className="font-medium text-gray-900">
+                              {profile.full_name || 'No Name'}
+                            </span>
+                            <p className="text-sm text-gray-600">{profile.email}</p>
+                            <p className="text-xs text-gray-500">
+                              {profile.location || 'Location not provided'}
+                            </p>
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-gray-600">{profile.email}</TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            (profile.status ?? 'pending') === 'approved'
+                              ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                              : (profile.status ?? 'pending') === 'rejected'
+                              ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                              : 'bg-amber-100 text-amber-700 hover:bg-amber-100'
+                          }
+                        >
+                          {(profile.status ?? 'pending') === 'approved' ? (
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                          ) : (profile.status ?? 'pending') === 'rejected' ? (
+                            <XCircle className="w-3 h-3 mr-1" />
+                          ) : (
+                            <Clock3 className="w-3 h-3 mr-1" />
+                          )}
+                          {profile.status ?? 'pending'}
+                        </Badge>
+                        {profile.rejection_reason && (
+                          <p className="mt-2 max-w-[220px] text-xs text-red-600">
+                            {profile.rejection_reason}
+                          </p>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           className={
@@ -319,6 +407,16 @@ export default function AdminUsersPage() {
                         >
                           {profile.role || 'user'}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-600">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-900">
+                            {(profile.profile_type || 'pending').replace(/-/g, ' ')}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {profile.tier ? profile.tier.replace(/-/g, ' ') : 'No plan selected'}
+                          </p>
+                        </div>
                       </TableCell>
                       <TableCell className="text-gray-600">
                         {new Date(profile.created_at).toLocaleDateString()}
@@ -334,7 +432,7 @@ export default function AdminUsersPage() {
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem
                               onClick={() =>
                                 handleUpdateRole(
@@ -350,9 +448,7 @@ export default function AdminUsersPage() {
                                 : 'Make Admin'}
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() =>
-                                handleDeleteUser(profile.id, profile.email)
-                              }
+                              onClick={() => openDialog('delete', profile)}
                               className="cursor-pointer text-red-600 hover:bg-red-50 hover:text-red-700"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
@@ -374,8 +470,42 @@ export default function AdminUsersPage() {
               )}
             </CardContent>
           </Card>
+
         </div>
       </main>
+
+      <Dialog open={Boolean(dialogState.type)} onOpenChange={(open) => !open && closeDialog()}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Delete user</DialogTitle>
+            <DialogDescription>
+              This will permanently remove the user account from the platform.
+            </DialogDescription>
+          </DialogHeader>
+
+          {dialogState.profile && (
+            <div className="rounded-2xl border border-border bg-muted/20 p-4 text-sm text-gray-700">
+              <p className="font-medium text-gray-900">
+                {dialogState.profile.full_name || 'No Name'}
+              </p>
+              <p>{dialogState.profile.email}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {(dialogState.profile.profile_type || 'pending').replace(/-/g, ' ')}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDialog} disabled={actionLoading}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteUser} disabled={actionLoading}>
+              {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Delete User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

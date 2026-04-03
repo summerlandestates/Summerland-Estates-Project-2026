@@ -122,17 +122,17 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
       <AdminSidebar />
       
-      <div className="ml-64 p-8">
-        <div className="max-w-4xl mx-auto">
+      <main className="flex-1 p-8">
+        <div className="max-w-5xl mx-auto">
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Settings</h1>
             <p className="text-gray-600">Manage system settings and user accounts</p>
           </div>
 
-          <div className="space-y-6">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
             {/* Password Reset Card */}
             <Card>
               <CardHeader>
@@ -223,7 +223,7 @@ export default function AdminSettingsPage() {
             </Card>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
