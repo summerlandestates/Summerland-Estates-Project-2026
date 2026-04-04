@@ -9,7 +9,7 @@ export default function Footer() {
           <div>
             <Link to="/" className="flex items-center gap-3 mb-4">
               <img
-                src="/logo.png"
+                src="/images/logo.png"
                 alt="Summerland Estates"
                 className="h-24 w-auto"
               />

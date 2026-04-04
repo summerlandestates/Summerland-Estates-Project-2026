@@ -5,7 +5,19 @@
       "destination": "/api/$1"
     },
     {
-      "source": "/((?!api|images|favicon\\.png|logo\\.png).*)",
+      "source": "/images/(.*)",
+      "destination": "/images/$1"
+    },
+    {
+      "source": "/favicon.png",
+      "destination": "/favicon.png"
+    },
+    {
+      "source": "/logo.png",
+      "destination": "/logo.png"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],

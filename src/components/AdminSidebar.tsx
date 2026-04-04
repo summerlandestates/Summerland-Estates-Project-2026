@@ -49,7 +49,7 @@ export default function AdminSidebar({ onLogout }: AdminSidebarProps) {
       <div className="p-6 border-b border-gray-800">
         <Link to="/" className="flex items-center gap-3">
           <img
-            src="/logo.png"
+            src="/images/logo.png"
             alt="Summerland Estates"
             className="h-10 w-auto"
           />

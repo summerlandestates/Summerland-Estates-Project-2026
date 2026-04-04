@@ -120,7 +120,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
           className="flex items-center gap-3 hover:opacity-90 transition-opacity"
         >
           <img 
-            src="/public/images/logo.png" 
+            src="/images/logo.png" 
             alt="Summerland Estates" 
             className="h-10 w-auto md:h-16"
           />
