@@ -1,0 +1,42 @@
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://summerlandestates.com/api/sitemap.xml
+
+# Disallow admin and private routes
+Disallow: /admin
+Disallow: /admin-dashboard
+Disallow: /admin-users
+Disallow: /admin-applications
+Disallow: /admin-application/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /my-profile
+Disallow: /edit-profile
+Disallow: /messaging
+Disallow: /saved-profiles
+Disallow: /account-management
+Disallow: /compare
+Disallow: /verify-email
+Disallow: /registration-pending
+
+# Allow public pages
+Allow: /
+Allow: /search
+Allow: /profile/
+Allow: /collective
+Allow: /about
+Allow: /contact
+Allow: /faqs
+Allow: /privacy
+Allow: /terms
+Allow: /signup
+Allow: /login
+Allow: /pricing
+Allow: /advertisements
+Allow: /post-job
+Allow: /open-roles
+Allow: /service-requests
+Allow: /events
+Allow: /add-listing

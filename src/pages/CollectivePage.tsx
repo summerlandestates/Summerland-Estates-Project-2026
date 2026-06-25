@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
+import FAQSection from '../components/FAQSection';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Text } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -361,6 +363,41 @@ export default function CollectivePage() {
     setCanStartCommunity(false);
   };
 
+  const handleJoinCommunity = (city: string, state: string) => {
+    if (!isLoggedIn) {
+      alert('Please create a profile first to join a community');
+      navigate('/add-listing', {
+        state: { communityOnly: true }
+      });
+      return;
+    }
+
+    // Check if community matches user's profile location
+    if (city.toLowerCase() !== userCity.toLowerCase() || state.toLowerCase() !== userState.toLowerCase()) {
+      alert(`You can only join the community for your location: ${userCity}, ${userState}`);
+      return;
+    }
+
+    // Check if already joined
+    const hasJoined = localStorage.getItem(`joined_${city}_${state}`) === 'true';
+    if (hasJoined) {
+      alert(`You have already joined the ${city}, ${state} community`);
+      return;
+    }
+
+    // Join community
+    localStorage.setItem(`joined_${city}_${state}`, 'true');
+    
+    // Update community member count
+    setCommunities(prev => prev.map(c => 
+      c.city === city && c.state === state 
+        ? { ...c, memberCount: c.memberCount + 1 }
+        : c
+    ));
+
+    alert(`You have successfully joined the ${city}, ${state} community!`);
+  };
+
   const handleStartTopicClick = () => {
     if (!isLoggedIn) {
       alert('Please join a community to start a forum topic');
@@ -440,6 +477,11 @@ export default function CollectivePage() {
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead
+        title="Community - Summerland Estates"
+        description="Join your local estate professional community. Connect with peers, share insights, and grow your network within Summerland Estates."
+        canonical="/collective"
+      />
       <NavBar currentPage="collective" />
       
       <main className="pt-32 pb-16">
@@ -510,11 +552,15 @@ export default function CollectivePage() {
                   </div>
 
                   <Button
-                    onClick={() => navigate('/pricing')}
+                    onClick={() => handleJoinCommunity(community.city, community.state)}
                     variant="outline"
                     className="w-full border-border text-foreground hover:bg-muted"
+                    disabled={community.city.toLowerCase() !== userCity.toLowerCase() || community.state.toLowerCase() !== userState.toLowerCase()}
                   >
-                    Join Community
+                    {community.city.toLowerCase() === userCity.toLowerCase() && community.state.toLowerCase() === userState.toLowerCase() 
+                      ? 'Join Community' 
+                      : `Not Available (Your location: ${userCity}, ${userState})`
+                    }
                   </Button>
                 </Card>
               ))}
@@ -837,6 +883,15 @@ export default function CollectivePage() {
           </form>
         </DialogContent>
       </Dialog>
+
+        {/* FAQ Section */}
+        <FAQSection 
+          category="Community"
+          title="Community FAQs"
+          subtitle="Common questions about our community forums and participation"
+          maxItems={5}
+          className="bg-muted/30"
+        />
 
       <Footer />
     </div>

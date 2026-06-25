@@ -90,6 +90,23 @@ export async function submitMembershipApplication(checkoutData: CheckoutData) {
 
   await supabase.auth.signOut();
 
+  // Send registration emails (welcome to user + notification to admin)
+  try {
+    await fetch('/api/send-registration-emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: checkoutData.name,
+        email: checkoutData.email,
+        profileType: checkoutData.profileType,
+        tier: checkoutData.selectedTier,
+        phone: checkoutData.phone,
+      }),
+    });
+  } catch (emailErr) {
+    console.error('Failed to send registration emails:', emailErr);
+  }
+
   return {
     userId: authData.user.id,
     paymentStatus,

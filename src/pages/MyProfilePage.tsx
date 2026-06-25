@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
+import SEOHead from '@/components/SEOHead';
 import PersonalityAssessmentDialog from '@/components/PersonalityAssessmentDialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -507,6 +508,7 @@ export default function MyProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#f6f1ea] page-transition">
+      <SEOHead title="My Profile - Summerland Estates" description="Manage your Summerland Estates profile." canonical="/my-profile" noIndex={true} />
       <NavBar currentPage="profile" />
 
       <main className="pt-24 pb-16 md:pt-32 md:pb-24">

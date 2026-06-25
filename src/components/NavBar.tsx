@@ -175,6 +175,21 @@ export default function NavBar({ currentPage }: NavBarProps) {
               </NavigationMenuItem>
 
               <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <Link
+                    to="/pricing"
+                    className={`text-base font-normal transition-all duration-300 cursor-pointer hover:text-[#A89F91] relative pb-1 ${
+                      currentPage === 'advertisements'
+                        ? 'text-[#A89F91] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#A89F91] after:rounded-full'
+                        : 'text-gray-700'
+                    }`}
+                  >
+                    Advertisements
+                  </Link>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+
+              <NavigationMenuItem>
                 <NavigationMenuTrigger
                   className={`text-base font-normal transition-all duration-300 cursor-pointer hover:text-[#A89F91] relative pb-1 ${
                     currentPage === 'jobs'
@@ -185,7 +200,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   Placements
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
-                  <ul className="grid w-[400px] gap-2 p-4 bg-white rounded-xl shadow-lg border border-gray-100">
+                  <ul className="grid w-[400px] gap-2 p-4 bg-background/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100">
                     <li>
                       <NavigationMenuLink asChild>
                         <Link
@@ -232,7 +247,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
               <NavigationMenuItem>
                 <NavigationMenuTrigger
                   className={`text-base font-normal transition-colors cursor-pointer hover:text-primary ${
-                    ['collective', 'tools', 'news'].includes(currentPage)
+                    ['collective', 'news'].includes(currentPage)
                       ? 'text-primary font-semibold'
                       : 'text-foreground'
                   }`}
@@ -240,7 +255,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   Collective
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
-                  <ul className="grid w-[400px] gap-2 p-4 bg-white rounded-xl shadow-lg border border-gray-100">
+                  <ul className="grid w-[400px] gap-2 p-4 bg-background/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100">
                     <li>
                       <NavigationMenuLink asChild>
                         <Link
@@ -254,20 +269,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                         </Link>
                       </NavigationMenuLink>
                     </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to="/tools"
-                          className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
-                        >
-                          <div className="text-sm font-medium leading-none">Estate Management Tools</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Professional templates and resources
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
+                                        <li>
                       <NavigationMenuLink asChild>
                         <Link
                           to="/news"
@@ -331,7 +333,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   <div
                     onMouseEnter={openResourcesMenu}
                     onMouseLeave={closeResourcesMenu}
-                    className={`absolute right-0 top-full z-50 mt-2 w-[380px] rounded-xl border border-gray-100 bg-white p-4 shadow-lg transition-all duration-200 ${
+                    className={`absolute right-0 top-full z-50 mt-2 w-[380px] rounded-xl border border-gray-100 bg-background/95 backdrop-blur-sm p-4 shadow-lg transition-all duration-200 ${
                       resourcesOpen
                         ? 'pointer-events-auto visible translate-y-0 opacity-100'
                         : 'pointer-events-none invisible translate-y-2 opacity-0'
@@ -535,13 +537,13 @@ export default function NavBar({ currentPage }: NavBarProps) {
       </nav>
 
       {mobileMenuOpen && (
-        <div className="md:hidden bg-card border-t border-border">
-          <div className="container mx-auto px-8 py-4 space-y-2">
+        <div className="md:hidden bg-card border-t border-border max-h-[80vh] overflow-y-auto">
+          <div className="container mx-auto px-4 py-4 space-y-1">
             <button
               onClick={() => handleNavigation('/')}
               className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
                 currentPage === 'home'
-                  ? 'bg-primary text-primary-foreground font-semibold'
+                  ? 'bg-[#A89F91] text-white font-semibold'
                   : 'text-foreground hover:bg-muted'
               }`}
             >
@@ -549,18 +551,29 @@ export default function NavBar({ currentPage }: NavBarProps) {
             </button>
 
             <button
-              onClick={() => handleNavigation('/add-listing')}
+              onClick={() => handleNavigation('/search')}
               className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                currentPage === 'add-listing'
-                  ? 'bg-primary text-primary-foreground font-semibold'
+                currentPage === 'search'
+                  ? 'bg-[#A89F91] text-white font-semibold'
                   : 'text-foreground hover:bg-muted'
               }`}
             >
-              Membership
+              Find Professionals
+            </button>
+
+            <button
+              onClick={() => handleNavigation('/add-listing')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                currentPage === 'add-listing'
+                  ? 'bg-[#A89F91] text-white font-semibold'
+                  : 'text-foreground hover:bg-muted'
+              }`}
+            >
+              Apply / Membership
             </button>
 
             <div className="border-t border-border pt-2 mt-2">
-              <div className="px-4 py-2 text-sm font-semibold text-muted-foreground">
+              <div className="px-4 py-2 text-sm font-semibold text-[#A89F91] !bg-transparent">
                 Placements
               </div>
               <button
@@ -584,7 +597,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
             </div>
 
             <div className="border-t border-border pt-2 mt-2">
-              <div className="px-4 py-2 text-sm font-semibold text-muted-foreground">
+              <div className="px-4 py-2 text-sm font-semibold text-[#A89F91]">
                 Collective
               </div>
               <button
@@ -592,12 +605,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
               >
                 Join Your Community
-              </button>
-              <button
-                onClick={() => handleNavigation('/tools')}
-                className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
-              >
-                Estate Management Tools
               </button>
               <button
                 onClick={() => handleNavigation('/news')}
@@ -608,7 +615,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
             </div>
 
             <div className="border-t border-border pt-2 mt-2">
-              <div className="px-4 py-2 text-sm font-semibold text-muted-foreground">
+              <div className="px-4 py-2 text-sm font-semibold text-[#A89F91]">
                 Resources
               </div>
               <button

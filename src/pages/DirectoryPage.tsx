@@ -4,6 +4,9 @@ import NavBar from '../components/NavBar';
 import FilterToolbar from '../components/FilterToolbar';
 import DirectoryGrid from '../components/DirectoryGrid';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
+import FAQSection from '../components/FAQSection';
+import BannerAds from '../components/BannerAds';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -106,8 +109,30 @@ export default function DirectoryPage() {
 
   const directoryPreview = filteredListings.slice(0, 4);
 
+  const homepageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Estate Professionals Directory',
+    description: 'A curated directory of verified estate professionals and service providers.',
+    url: 'https://summerlandestates.com',
+    numberOfItems: filteredListings.length,
+    itemListElement: directoryPreview.map((listing, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: listing.name,
+      description: listing.bio || listing.role,
+      url: `https://summerlandestates.com/profile/${listing.id}`,
+    })),
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f3ee] page-transition">
+      <SEOHead
+        title="Summerland Estates - Where Luxury Meets Trust"
+        description="A private network for trusted estate professionals and discreet households. Connect with verified private chefs, housekeepers, estate managers, and luxury service providers."
+        canonical="/"
+        schema={homepageSchema}
+      />
       <NavBar currentPage="home" />
 
       <main className="pt-24 md:pt-28">
@@ -257,6 +282,11 @@ export default function DirectoryPage() {
                 </Card>
               </div>
 
+              {/* Sponsored Banner Ads */}
+              <div className="mb-8">
+                <BannerAds position="directory_top" maxAds={3} />
+              </div>
+
               <FilterToolbar
                 onFilterChange={handleFilterChange}
                 onResetFilters={handleResetFilters}
@@ -304,6 +334,15 @@ export default function DirectoryPage() {
             </Card>
           </div>
         </section>
+
+        {/* FAQ Section */}
+        <FAQSection 
+          category="Directory"
+          title="Directory FAQs"
+          subtitle="Common questions about finding professionals and using our directory"
+          maxItems={5}
+          className="bg-muted/30"
+        />
       </main>
 
       <Footer />

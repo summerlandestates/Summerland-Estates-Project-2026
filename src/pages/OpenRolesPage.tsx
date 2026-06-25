@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
+import SEOHead from '@/components/SEOHead';
+import FAQSection from '@/components/FAQSection';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -125,6 +127,11 @@ export default function OpenRolesPage() {
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead
+        title="Open Roles - Summerland Estates"
+        description="Browse open estate professional positions. Find private chef, housekeeper, estate manager, and other luxury household roles."
+        canonical="/open-roles"
+      />
       <NavBar currentPage="open-roles" />
       
       <main className="pt-32 pb-16">
@@ -363,6 +370,15 @@ export default function OpenRolesPage() {
             </Card>
           </div>
         </div>
+
+        {/* FAQ Section */}
+        <FAQSection 
+          category="Jobs & Services"
+          title="Jobs & Services FAQs"
+          subtitle="Common questions about posting jobs and service requests"
+          maxItems={5}
+          className="bg-muted/30"
+        />
       </main>
 
       <Footer />

@@ -12,6 +12,7 @@ import { Mail, Lock, Loader2 } from 'lucide-react';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -154,6 +155,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead title="Sign In - Summerland Estates" description="Sign in to your Summerland Estates account." canonical="/login" noIndex={true} />
       <NavBar currentPage="" />
       
       <main className="pt-32 pb-16">

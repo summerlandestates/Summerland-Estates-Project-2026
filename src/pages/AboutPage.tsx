@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
 import { Card } from '@/components/ui/card';
 import { CheckCircle } from 'lucide-react';
 
@@ -11,6 +12,11 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead
+        title="About Us - Summerland Estates"
+        description="Learn about Summerland Estates — a private network dedicated to connecting trusted estate professionals with discerning households."
+        canonical="/about"
+      />
       <NavBar currentPage="about" />
       
       <main className="pt-32 pb-16">

@@ -1,12 +1,13 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
+import PageTransition from './components/PageTransition';
 import DirectoryPage from './pages/DirectoryPage';
 import ProfilePage from './pages/ProfilePage';
 import AddListingPage from './pages/AddListingPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
-import ToolsPage from './pages/ToolsPage';
+import AdvertisementsPage from './pages/AdvertisementsPage';
 import CollectivePage from './pages/CollectivePage';
 import JobPostingPage from './pages/JobPostingPage';
 import ServiceRequestsPage from './pages/ServiceRequestsPage';
@@ -17,7 +18,6 @@ import NewsPage from './pages/NewsPage';
 import FAQsPage from './pages/FAQsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
-import PricingPage from './pages/PricingPage';
 import AccountManagementPage from './pages/AccountManagementPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -43,15 +43,29 @@ import EventsPage from './pages/EventsPage';
 import SearchPage from './pages/SearchPage';
 import AdminApplicationsPage from './pages/AdminApplicationsPage';
 import AdminApplicationDetailPage from './pages/AdminApplicationDetailPage';
-import DashboardPage from './pages/DashboardPage';
+import AdminArticlesPage from './pages/AdminArticlesPage';
+import AdminNewsletterPage from './pages/AdminNewsletterPage';
+import AdminRecognitionPage from './pages/AdminRecognitionPage';
+import AdminEventsPage from './pages/AdminEventsPage';
+import AdminEventDetailPage from './pages/AdminEventDetailPage';
+import EventSubmissionPage from './pages/EventSubmissionPage';
+import EventDetailPage from './pages/EventDetailPage';
+import UserDashboard from './pages/UserDashboard';
 import RegistrationPendingPage from './pages/RegistrationPendingPage';
+import ArticlePage from './pages/ArticlePage';
+import SponsorshipPage from './pages/SponsorshipPage';
+import EmailBlastPage from './pages/EmailBlastPage';
+import AdminSponsorshipsPage from './pages/AdminSponsorshipsPage';
+import AdminEmailBlastsPage from './pages/AdminEmailBlastsPage';
+import CookieConsent from './components/CookieConsent';
 
-function App() {
+function AppRoutes() {
+  const location = useLocation();
+  
   return (
-    <AuthProvider>
-      <Toaster position="top-right" richColors />
-      <Router>
-        <Routes>
+    <PageTransition>
+      <CookieConsent />
+      <Routes location={location}>
           <Route path="/" element={<DirectoryPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
@@ -70,7 +84,7 @@ function App() {
           <Route path="/add-listing" element={<AddListingPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="/tools" element={<ToolsPage />} />
+          <Route path="/advertisements" element={<AdvertisementsPage />} />
           <Route path="/collective" element={<CollectivePage />} />
           <Route path="/post-job" element={<JobPostingPage />} />
           <Route path="/service-requests" element={<ServiceRequestsPage />} />
@@ -83,7 +97,7 @@ function App() {
           <Route path="/faqs" element={<FAQsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/pricing" element={<Navigate to="/advertisements" replace />} />
           <Route path="/account" element={<AccountManagementPage />} />
           <Route path="/payment-success" element={<PaymentSuccessPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
@@ -92,13 +106,35 @@ function App() {
           <Route path="/service-request/:id" element={<ServiceRequestDetailPage />} />
           <Route path="/recognition" element={<RecognitionPage />} />
           <Route path="/events" element={<EventsPage />} />
+          <Route path="/event/:id" element={<EventDetailPage />} />
           <Route path="/admin/jobs" element={<AdminJobsPage />} />
           <Route path="/admin/applications" element={<AdminApplicationsPage />} />
           <Route path="/admin/applications/:id" element={<AdminApplicationDetailPage />} />
+          <Route path="/admin/newsletter" element={<AdminNewsletterPage />} />
+          <Route path="/admin/articles" element={<AdminArticlesPage />} />
+          <Route path="/admin/recognition" element={<AdminRecognitionPage />} />
+          <Route path="/admin/events" element={<AdminEventsPage />} />
+          <Route path="/admin/event/:id" element={<AdminEventDetailPage />} />
+          <Route path="/submit-event" element={<EventSubmissionPage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/articles/:slug" element={<ArticlePage />} />
+          <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/registration-pending" element={<RegistrationPendingPage />} />
+          <Route path="/sponsorship" element={<SponsorshipPage />} />
+          <Route path="/email-blast" element={<EmailBlastPage />} />
+          <Route path="/admin/sponsorships" element={<AdminSponsorshipsPage />} />
+          <Route path="/admin/email-blasts" element={<AdminEmailBlastsPage />} />
         </Routes>
+      </PageTransition>
+    );
+  }
+
+function App() {
+  return (
+    <AuthProvider>
+      <Toaster position="top-right" richColors />
+      <Router>
+        <AppRoutes />
       </Router>
     </AuthProvider>
   );

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Alice:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -32,8 +32,8 @@
     --color-success: 142 71% 45%;
     --color-warning: 38 92% 50%;
     
-    --font-sans: "Lato", sans-serif;
-    --font-heading: "Figtree", sans-serif;
+    --font-sans: "Alice", serif;
+    --font-heading: "Alice", serif;
     
     --radius-lg: 12px;
     --radius-md: 8px;
@@ -47,16 +47,36 @@
   html,
   body {
     @apply bg-background text-foreground font-sans;
-    font-size: 16px;
+    font-size: 20px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-style: italic;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading text-foreground;
     font-weight: 500;
     letter-spacing: -0.02em;
+    font-style: italic;
+  }
+  
+  /* Apply italic to all text elements using Alice font */
+  * {
+    font-family: "Alice", serif;
+    font-style: italic;
+  }
+  
+  /* Override for elements that should not be italic */
+  code, pre, kbd, samp {
+    font-style: normal;
+    font-family: monospace;
+  }
+  
+  /* Ensure buttons and inputs use Alice font with italic */
+  button, input, textarea, select {
+    font-family: "Alice", serif;
+    font-style: italic;
   }
 
   /* Smooth transitions */
@@ -107,5 +127,39 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  /* Beautiful thin scrollbar for horizontal table scroll */
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 20px;
+  }
+  
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    background-color: #9ca3af;
+  }
+  
+  /* Firefox scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+  
+  /* Hide scrollbar but keep functionality (optional class) */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

@@ -38,7 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Users, Trash2, MoreVertical, CheckCircle, XCircle, Loader2, Search, UserCog, Clock3 } from 'lucide-react';
+import { Users, Trash2, MoreVertical, CheckCircle, XCircle, Loader2, Search, UserCog, Clock3, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const parseApiResponse = async (response: Response) => {
   const responseText = await response.text();
@@ -82,6 +82,8 @@ export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [dialogState, setDialogState] = useState<ActionDialogState>({ type: null, profile: null });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -145,6 +147,13 @@ export default function AdminUsersPage() {
       return matchesSearch && matchesRole;
     });
   }, [roleFilter, searchQuery, users]);
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter]);
 
   const openDialog = (type: ActionDialogState['type'], profile: Profile) => {
     setDialogState({ type, profile });
@@ -351,7 +360,7 @@ export default function AdminUsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((profile) => (
+                  {paginatedUsers.map((profile) => (
                     <TableRow key={profile.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="flex items-start gap-3">
@@ -461,6 +470,46 @@ export default function AdminUsersPage() {
                   ))}
                 </TableBody>
               </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-6">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="border-gray-300"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={currentPage === page ? 'bg-[#A89F91] text-white' : 'border-gray-300'}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="border-gray-300"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-gray-500 ml-2">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredUsers.length)} of {filteredUsers.length}
+                  </span>
+                </div>
+              )}
 
               {filteredUsers.length === 0 && (
                 <div className="text-center py-12">

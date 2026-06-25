@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle, BadgeCheck, Shield, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle, BadgeCheck, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
 import UpgradePrompt from '../components/UpgradePrompt';
+import ProfileAnalytics, { useProfileViewTracker } from '../components/ProfileAnalytics';
+import ServiceCalendar from '../components/ServiceCalendar';
+import NativeAd from '../components/NativeAd';
 import { listings } from '../data/listings';
 import { getVisibilityRules, formatNameForDisplay, canAccessProfile } from '@/utils/profileVisibility';
 import type { PricingTier, Review } from '../types';
@@ -16,7 +20,6 @@ export default function ProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const listing = listings.find((l) => l.id === id);
-  const [showShareModal, setShowShareModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -39,6 +42,10 @@ export default function ProfilePage() {
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
   const [isPublicView, setIsPublicView] = useState(true);
   const [profileIndex, setProfileIndex] = useState(0);
+  const [currentUserId] = useState(localStorage.getItem('userId') || '');
+
+  // Track profile views
+  useProfileViewTracker(currentUserId, id || '');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -338,8 +345,30 @@ export default function ProfilePage() {
     resetServiceForm();
   };
 
+  const profileSchema = listing ? {
+    '@context': 'https://schema.org',
+    '@type': listing.category === 'Business' ? 'LocalBusiness' : 'Person',
+    name: listing.name,
+    description: listing.bio || listing.role,
+    image: listing.profilePhoto,
+    jobTitle: listing.role,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: listing.location,
+      addressCountry: 'US',
+    },
+    url: `https://summerlandestates.com/profile/${listing.id}`,
+  } : undefined;
+
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead
+        title={listing ? `${listing.name} - ${listing.role} | Summerland Estates` : 'Profile | Summerland Estates'}
+        description={listing ? `${listing.name} is a ${listing.role} based in ${listing.location}. ${listing.bio || ''}`.slice(0, 160) : ''}
+        canonical={`/profile/${id}`}
+        ogImage={listing?.profilePhoto}
+        schema={profileSchema}
+      />
       <NavBar currentPage="" />
       
       <main className="pt-32 pb-16">
@@ -474,7 +503,7 @@ export default function ProfilePage() {
                   )}
                   
                   {/* Book Interview button for Professionals */}
-                  {(listing.category === 'Staff' || listing.category === 'staff') && (
+                  {listing.category === 'Staff' && (
                     <Button
                       variant="outline"
                       className="w-full border-accent text-accent hover:bg-accent/10"
@@ -544,6 +573,11 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </Card>
+
+              {/* Sponsored Content */}
+              <div className="mt-6">
+                <NativeAd position="profile_sidebar" />
+              </div>
             </div>
 
             {/* Right Content - Profile Details */}
@@ -650,6 +684,22 @@ export default function ProfilePage() {
                         ))}
                       </ul>
                     </Card>
+                  )}
+
+                  {/* Profile Analytics - Show for own profile or premium users */}
+                  {(currentUserId === id || (userTier as string) === 'premium' || (userTier as string) === 'platinum') && (
+                    <ProfileAnalytics 
+                      isPremium={(userTier as string) === 'premium' || (userTier as string) === 'platinum'}
+                      userId={id || ''}
+                    />
+                  )}
+
+                  {/* Service Calendar - Show for Service Provider accounts */}
+                  {listing?.category === 'Business' && (
+                    <ServiceCalendar 
+                      userId={id || ''}
+                      isOwner={currentUserId === id}
+                    />
                   )}
 
                   {reviews && reviews.length > 0 && (

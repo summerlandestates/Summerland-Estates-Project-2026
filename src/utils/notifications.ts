@@ -50,12 +50,18 @@ export function sendNotification(
 }
 
 function sendEmailNotification(payload: NotificationPayload, email: string): void {
-  // In a real app, this would call an email service API
+  // Email notifications are handled through Supabase Auth
+  // Configure custom email templates in Supabase Dashboard
+  // Email: summerlandestates@summerlandestates.com
   console.log('Sending email notification:', {
     to: email,
+    from: 'summerlandestates@summerlandestates.com',
     subject: payload.title,
     body: payload.body
   });
+  
+  // TODO: Integrate with Supabase Edge Functions for custom email sending
+  // or use Supabase's built-in email templates for notifications
 }
 
 function sendSMSNotification(payload: NotificationPayload, phone: string): void {
@@ -67,7 +73,7 @@ function sendSMSNotification(payload: NotificationPayload, phone: string): void 
 }
 
 export function subscribeToForumTopic(
-  userId: string,
+  _userId: string,
   topicId: string,
   preferences: NotificationPreferences
 ): NotificationPreferences {
@@ -82,7 +88,7 @@ export function subscribeToForumTopic(
 }
 
 export function unsubscribeFromForumTopic(
-  userId: string,
+  _userId: string,
   topicId: string,
   preferences: NotificationPreferences
 ): NotificationPreferences {

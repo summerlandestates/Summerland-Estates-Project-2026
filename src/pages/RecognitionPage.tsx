@@ -1,10 +1,20 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Award, Star, Trophy, Users, Sparkles, Building2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Award, Star, Trophy, Users, Sparkles, Building2, Loader2, CheckCircle2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { emailNotifications } from '@/services/emailNotifications';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface RecognitionItem {
   id: string;
@@ -83,9 +93,26 @@ const vendorExcellence: RecognitionItem[] = [
 
 export default function RecognitionPage() {
   const [activeTab, setActiveTab] = useState<'employee' | 'craft' | 'annual' | 'stories' | 'vendor'>('employee');
+  const [isNominationOpen, setIsNominationOpen] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleNominationClick = () => {
+    if (!user) {
+      toast.error('Please log in to submit a nomination');
+      navigate('/login', { state: { from: '/recognition' } });
+      return;
+    }
+    setIsNominationOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead
+        title="Estate Services Recognition - Summerland Estates"
+        description="Celebrating excellence in estate management. Recognizing top estate professionals, vendors, and service providers in the luxury household industry."
+        canonical="/recognition"
+      />
       <NavBar currentPage="recognition" />
 
       <main className="pt-32 pb-24">
@@ -350,15 +377,214 @@ export default function RecognitionPage() {
               <p className="text-muted-foreground max-w-xl mx-auto mb-6">
                 Nominate an exceptional professional or service provider for our recognition programs.
               </p>
-              <Button className="bg-[#A89F91] hover:bg-[#8A8279]">
+              <Button 
+                className="bg-[#A89F91] hover:bg-[#8A8279]"
+                onClick={handleNominationClick}
+              >
                 Submit a Nomination
               </Button>
             </Card>
           </div>
+
+          {/* Nomination Dialog */}
+          <NominationDialog 
+            isOpen={isNominationOpen} 
+            onClose={() => setIsNominationOpen(false)} 
+          />
         </div>
       </main>
 
       <Footer />
     </div>
+  );
+}
+
+// Nomination Dialog Component
+function NominationDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [formData, setFormData] = useState({
+    nomineeName: '',
+    nomineeTitle: '',
+    company: '',
+    category: 'employee_of_month',
+    reason: '',
+    submitterName: user?.user_metadata?.full_name || '',
+    submitterEmail: user?.email || '',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.nomineeName || !formData.reason) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const recognitionData = {
+        nominee_name: formData.nomineeName,
+        nominee_title: formData.nomineeTitle,
+        company: formData.company,
+        category: formData.category,
+        reason: formData.reason,
+        submitter_name: formData.submitterName,
+        submitter_email: formData.submitterEmail,
+        submitter_id: user?.id,
+        status: 'pending',
+      };
+
+      const { error } = await supabase.from('recognitions').insert(recognitionData);
+
+      if (error) throw error;
+
+      // Send notification to user
+      await emailNotifications.notifyRecognition({
+        userEmail: formData.submitterEmail,
+        userName: formData.submitterName,
+        nomineeName: formData.nomineeName,
+        category: formData.category,
+      });
+
+      // Send notification to admin
+      await emailNotifications.notifyAdminRecognition(recognitionData);
+
+      setIsSuccess(true);
+      toast.success('Nomination submitted successfully!');
+    } catch (error) {
+      console.error('Error submitting nomination:', error);
+      toast.error('Failed to submit nomination. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setIsSuccess(false);
+    setFormData({
+      nomineeName: '',
+      nomineeTitle: '',
+      company: '',
+      category: 'employee_of_month',
+      reason: '',
+      submitterName: user?.user_metadata?.full_name || '',
+      submitterEmail: user?.email || '',
+    });
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Submit a Nomination</DialogTitle>
+          <DialogDescription>
+            Nominate an exceptional professional for recognition
+          </DialogDescription>
+        </DialogHeader>
+
+        {isSuccess ? (
+          <div className="text-center py-6">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-6 h-6 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Nomination Submitted!</h3>
+            <p className="text-muted-foreground mb-4">
+              Thank you for recognizing excellence in the industry.
+            </p>
+            <Button onClick={handleClose} className="bg-[#A89F91] hover:bg-[#8A8279]">
+              Close
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="nomineeName">Nominee Name *</Label>
+              <Input
+                id="nomineeName"
+                value={formData.nomineeName}
+                onChange={(e) => setFormData({ ...formData, nomineeName: e.target.value })}
+                placeholder="Enter nominee's full name"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="nomineeTitle">Title/Position</Label>
+              <Input
+                id="nomineeTitle"
+                value={formData.nomineeTitle}
+                onChange={(e) => setFormData({ ...formData, nomineeTitle: e.target.value })}
+                placeholder="e.g., Estate Manager, Private Chef"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="company">Company/Property</Label>
+              <Input
+                id="company"
+                value={formData.company}
+                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                placeholder="Where do they work?"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="category">Category *</Label>
+              <select
+                id="category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full border rounded-md p-2"
+                required
+              >
+                <option value="employee_of_month">Employee of the Month</option>
+                <option value="craft_excellence">Craft Excellence Award</option>
+                <option value="vendor_excellence">Vendor Excellence</option>
+                <option value="annual_award">Annual Excellence Award</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="reason">Reason for Nomination *</Label>
+              <Textarea
+                id="reason"
+                value={formData.reason}
+                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                placeholder="Describe why this person deserves recognition..."
+                rows={4}
+                required
+              />
+            </div>
+
+            <div className="pt-4 flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-[#A89F91] hover:bg-[#8A8279]"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Nomination'
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

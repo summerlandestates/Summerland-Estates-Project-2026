@@ -10,6 +10,7 @@ import { Mail, Lock, User, Loader2 } from 'lucide-react';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
 
 export default function SignupPage() {
   const [name, setName] = useState('');
@@ -71,6 +72,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead title="Create Account - Summerland Estates" description="Join the Summerland Estates private network for estate professionals and luxury households." canonical="/signup" noIndex={true} />
       <NavBar currentPage="" />
       
       <main className="pt-32 pb-16">

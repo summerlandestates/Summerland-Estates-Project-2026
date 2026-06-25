@@ -1,4 +1,4 @@
-import { MapPin, Star, CheckCircle } from 'lucide-react';
+import { MapPin, Star, CheckCircle, BadgeCheck, Shield, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -118,8 +118,8 @@ export default function ListingCard({
 
   return (
     <Card
-      className={`listing-card bg-card text-card-foreground cursor-pointer overflow-hidden border relative transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${
-        isSelected ? 'border-primary border-2 shadow-lg' : 'border-border/50'
+      className={`listing-card bg-white text-card-foreground cursor-pointer overflow-hidden border border-[#e8dfd3] rounded-[20px] relative transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
+        isSelected ? 'border-primary border-2 shadow-lg' : ''
       }`}
       onClick={onClick}
     >
@@ -133,57 +133,66 @@ export default function ListingCard({
         </div>
       )}
       
-      <div className="relative">
-        <img
-          src={displayPhoto}
-          alt={displayName}
-          className="w-full h-64 object-cover"
-          loading="lazy"
-        />
-        {listing.isOnlineNow && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
-            <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-            Online
+      <div className="p-6">
+        <div className="flex flex-col items-center text-center">
+          {/* Circular Profile Photo */}
+          <div className="relative w-24 h-24 rounded-full bg-[#A89F91]/20 flex items-center justify-center mb-4 overflow-hidden">
+            {displayPhoto ? (
+              <img 
+                src={displayPhoto} 
+                alt={displayName} 
+                className="w-full h-full object-cover" 
+                loading="lazy"
+              />
+            ) : (
+              <Users className="w-12 h-12 text-[#A89F91]" />
+            )}
+            {listing.isOnlineNow && (
+              <div className="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+            )}
           </div>
-        )}
-      </div>
-      <div className="p-6 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-heading font-bold text-foreground mb-1 truncate">
+
+          {/* Name with Verified Badge */}
+          <div className="flex items-center gap-1 mb-1">
+            <h3 className="font-heading font-semibold text-foreground text-lg">
               {displayName}
             </h3>
-            <p className="text-muted-foreground truncate">{listing.role}</p>
+            {listing.verified && (
+              <BadgeCheck className="w-4 h-4 text-[#A89F91]" />
+            )}
+            {listing.backgroundCheckAvailable && (
+              <Shield className="w-4 h-4 text-green-600" />
+            )}
           </div>
-          {listing.verified && (
-            <CheckCircle className="w-5 h-5 text-success flex-shrink-0" />
-          )}
-        </div>
 
-        <div className="flex items-center gap-2">
-          <Badge
-            variant="secondary"
-            className="bg-gray-800 text-white hover:bg-gray-900"
-          >
-            {listing.category}
-          </Badge>
-          {listing.availability && (
-            <Badge className="bg-[#D97706] text-white hover:bg-[#B45309]">Available</Badge>
-          )}
-        </div>
+          {/* Role */}
+          <p className="text-sm text-muted-foreground mb-1">{listing.role}</p>
 
-        {canViewLocation && (
-          <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
-            <div className="flex items-center text-foreground">
-              <MapPin className="w-4 h-4 mr-1 text-accent" />
+          {/* Location */}
+          {canViewLocation && (
+            <div className="flex items-center text-xs text-muted-foreground mb-2">
+              <MapPin className="w-3 h-3 mr-1" />
               {listing.location}
             </div>
-            <div className="flex items-center text-foreground">
-              <Star className="w-4 h-4 mr-1 fill-accent text-accent" />
-              {listing.rating}
+          )}
+
+          {/* Rating and Experience */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center">
+              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 mr-1" />
+              <span className="text-xs font-medium">{listing.rating}</span>
             </div>
+            <span className="text-xs text-muted-foreground">•</span>
+            <span className="text-xs text-muted-foreground">{listing.experienceYears} yrs exp</span>
           </div>
-        )}
+
+          {/* Available Now Badge */}
+          {listing.availability && (
+            <Badge className="bg-green-100 text-green-700 border-green-200 text-xs font-medium uppercase tracking-wider">
+              Available Now
+            </Badge>
+          )}
+        </div>
       </div>
     </Card>
   );

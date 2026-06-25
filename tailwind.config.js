@@ -64,8 +64,24 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ["Lato", "sans-serif"],
-        heading: ["Figtree", "sans-serif"],
+        sans: ["Alice", "serif"],
+        heading: ["Alice", "serif"],
+        alice: ["Alice", "serif"],
+      },
+      fontSize: {
+        'xs': ['12px', '1.5'],
+        'sm': ['14px', '1.5'],
+        'base': ['16px', '1.5'],
+        'lg': ['18px', '1.5'],
+        'xl': ['20px', '1.5'],
+        '2xl': ['24px', '1.5'],
+        '3xl': ['30px', '1.5'],
+        '4xl': ['36px', '1.5'],
+        '5xl': ['48px', '1.5'],
+        '6xl': ['60px', '1.5'],
+        '7xl': ['72px', '1.5'],
+        '8xl': ['96px', '1.5'],
+        '9xl': ['128px', '1.5'],
       },
       borderRadius: {
         lg: "2px",
@@ -81,6 +97,20 @@ module.exports = {
         '32': '8rem',
         '48': '12rem',
         '64': '16rem',
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.3s ease-out",
+        "accordion-up": "accordion-up 0.3s ease-out",
       },
     },
   },

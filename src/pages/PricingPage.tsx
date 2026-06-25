@@ -1,292 +1,225 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, User, Building2, Briefcase, Home } from 'lucide-react';
-import { pricingPlans, getPlansByUserType } from '../data/pricing';
-import type { UserType, PricingTier } from '../types';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Mail, MapPin, Megaphone, Target, TrendingUp, Users } from 'lucide-react';
 
-export default function PricingPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [selectedUserType, setSelectedUserType] = useState<UserType | null>(
-    (location.state?.userType as UserType) || null
-  );
-
+export default function AdvertisementsPage() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  const handleSelectTier = (tierId: PricingTier) => {
-    localStorage.setItem('selectedTier', tierId);
-    
-    navigate('/add-listing', { 
-      state: { 
-        selectedTier: tierId,
-        fromPricing: true 
-      } 
-    });
-  };
+  return (
+    <div className="min-h-screen bg-background page-transition">
+      <NavBar currentPage="advertisements" />
+      
+      <main className="pt-32 pb-16">
+        <div className="container mx-auto px-8 max-w-5xl">
+          <div className="mb-12 text-center">
+            <h1 className="text-5xl font-heading font-bold text-foreground mb-4">
+              Advertisements & Promotions
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Partner with Summerland Estates to reach our exclusive network of high-net-worth households and estate professionals.
+            </p>
+          </div>
 
-  const handleJoinCommunity = () => {
-    // Redirect to profile type selection with community intent
-    navigate('/add-listing', {
-      state: {
-        communityOnly: true
-      }
-    });
-  };
-
-  const getUserTypeLabel = (type: UserType): string => {
-    switch (type) {
-      case 'professional':
-        return 'Private Estate Professionals';
-      case 'business':
-        return 'Estate Services Businesses';
-      case 'agency':
-        return 'Agencies';
-      case 'estates':
-        return 'Estate Principals';
-    }
-  };
-
-  if (!selectedUserType) {
-    return (
-      <div className="min-h-screen bg-background page-transition">
-        <NavBar currentPage="pricing" />
-        
-        <main className="pt-48 pb-32">
-          <div className="container mx-auto px-12 max-w-5xl">
-            <div className="mb-16 text-center">
-              <h1 className="text-6xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
-                Participation Levels
-              </h1>
-              <p className="text-xl text-muted-foreground leading-relaxed">
-                Access varies by participation level.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-              <Card 
-                className="p-12 bg-card text-card-foreground cursor-pointer border border-border/50 hover:border-primary/50 transition-all"
-                onClick={() => setSelectedUserType('professional')}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-[#A89F91]/10 rounded-xl flex items-center justify-center mx-auto mb-6">
-                    <User className="w-8 h-8 text-[#A89F91]" />
-                  </div>
-                  <h2 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
-                    Private Estate Professionals
-                  </h2>
-                  <p className="text-muted-foreground mb-8 leading-relaxed">
-                    Seeking placements in private estates
-                  </p>
-                  <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4">
-                    View Plans
-                  </Button>
-                </div>
-              </Card>
-
-              <Card 
-                className="p-12 bg-card text-card-foreground cursor-pointer border border-border/50 hover:border-primary/50 transition-all"
-                onClick={() => setSelectedUserType('business')}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-[#A89F91]/10 rounded-xl flex items-center justify-center mx-auto mb-6">
-                    <Building2 className="w-8 h-8 text-[#A89F91]" />
-                  </div>
-                  <h2 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
-                    Estate Services Businesses
-                  </h2>
-                  <p className="text-muted-foreground mb-8 leading-relaxed">
-                    Providing services to private estates
-                  </p>
-                  <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4">
-                    View Plans
-                  </Button>
-                </div>
-              </Card>
-
-              <Card 
-                className="p-12 bg-card text-card-foreground cursor-pointer border border-border/50 hover:border-primary/50 transition-all"
-                onClick={() => setSelectedUserType('agency')}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-[#A89F91]/10 rounded-xl flex items-center justify-center mx-auto mb-6">
-                    <Briefcase className="w-8 h-8 text-[#A89F91]" />
-                  </div>
-                  <h2 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
-                    Agencies
-                  </h2>
-                  <p className="text-muted-foreground mb-8 leading-relaxed">
-                    Placing professionals in estates
-                  </p>
-                  <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4">
-                    View Plans
-                  </Button>
-                </div>
-              </Card>
-
-              <Card 
-                className="p-12 bg-card text-card-foreground cursor-pointer border border-border/50 hover:border-primary/50 transition-all"
-                onClick={() => setSelectedUserType('estates')}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-[#A89F91]/10 rounded-xl flex items-center justify-center mx-auto mb-6">
-                    <Home className="w-8 h-8 text-[#A89F91]" />
-                  </div>
-                  <h2 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
-                    Estate Principals
-                  </h2>
-                  <p className="text-muted-foreground mb-8 leading-relaxed">
-                    Hiring for private estates
-                  </p>
-                  <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4">
-                    View Plans
-                  </Button>
-                </div>
-              </Card>
-            </div>
-
-            {/* Community-Only Card */}
-            <Card className="p-12 bg-muted border-border/50 max-w-3xl mx-auto">
+          {/* Advertisement Options */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+            <Card className="p-6 bg-card text-card-foreground border-[#A89F91]/30 hover:shadow-lg transition-shadow">
               <div className="text-center">
-                <h2 className="text-4xl font-heading font-medium text-foreground mb-6 tracking-tight">
-                  Just Join the Community
-                </h2>
-                <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-                  Not looking for placements or hiring? Join the community to connect with your local estate network.
-                </p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <div className="p-6 bg-card rounded-lg border border-border">
-                    <p className="text-sm text-muted-foreground mb-2">Professionals</p>
-                    <p className="text-3xl font-heading font-medium text-foreground mb-4">
-                      $1<span className="text-lg text-muted-foreground">/month</span>
-                    </p>
-                    <ul className="space-y-2 text-sm text-foreground text-left">
-                      <li className="flex items-start">
-                        <Check className="w-4 h-4 mr-2 mt-0.5 text-[#A89F91] flex-shrink-0" />
-                        <span>Community access only</span>
-                      </li>
-                      <li className="flex items-start">
-                        <Check className="w-4 h-4 mr-2 mt-0.5 text-[#A89F91] flex-shrink-0" />
-                        <span>No placements or interviews</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="p-6 bg-card rounded-lg border border-border">
-                    <p className="text-sm text-muted-foreground mb-2">Agencies & Principals</p>
-                    <p className="text-3xl font-heading font-medium text-foreground mb-4">
-                      $3.99<span className="text-lg text-muted-foreground">/month</span>
-                    </p>
-                    <ul className="space-y-2 text-sm text-foreground text-left">
-                      <li className="flex items-start">
-                        <Check className="w-4 h-4 mr-2 mt-0.5 text-[#A89F91] flex-shrink-0" />
-                        <span>Community access only</span>
-                      </li>
-                      <li className="flex items-start">
-                        <Check className="w-4 h-4 mr-2 mt-0.5 text-[#A89F91] flex-shrink-0" />
-                        <span>No hiring or messaging tools</span>
-                      </li>
-                    </ul>
-                  </div>
+                <div className="w-12 h-12 bg-[#A89F91]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Megaphone className="w-6 h-6 text-[#A89F91]" />
                 </div>
+                <h3 className="text-xl font-heading font-semibold text-foreground mb-2">
+                  Featured Listings
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  Get your services featured at the top of search results and category pages.
+                </p>
+                <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white">
+                  Learn More
+                </Button>
+              </div>
+            </Card>
 
-                <Button
-                  onClick={handleJoinCommunity}
-                  size="lg"
-                  className="bg-[#A89F91] hover:bg-[#8A8279] text-white px-12 py-4"
-                >
-                  Join Community
+            <Card className="p-6 bg-card text-card-foreground border-[#A89F91]/30 hover:shadow-lg transition-shadow">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-[#A89F91]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Target className="w-6 h-6 text-[#A89F91]" />
+                </div>
+                <h3 className="text-xl font-heading font-semibold text-foreground mb-2">
+                  Targeted Ads
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  Reach specific demographics and locations with our targeted advertising solutions.
+                </p>
+                <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white">
+                  Learn More
+                </Button>
+              </div>
+            </Card>
+
+            <Card className="p-6 bg-card text-card-foreground border-[#A89F91]/30 hover:shadow-lg transition-shadow">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-[#A89F91]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <TrendingUp className="w-6 h-6 text-[#A89F91]" />
+                </div>
+                <h3 className="text-xl font-heading font-semibold text-foreground mb-2">
+                  Sponsorships
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  Sponsor events, newsletters, and premium content to maximize your brand exposure.
+                </p>
+                <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white">
+                  Learn More
                 </Button>
               </div>
             </Card>
           </div>
-        </main>
 
-        <Footer />
-      </div>
-    );
-  }
+          {/* Contact Information Section */}
+          <div className="mb-12">
+            <h2 className="text-3xl font-heading font-bold text-foreground mb-8 text-center">
+              Get in Touch
+            </h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <Card className="p-8 bg-card text-card-foreground">
+                  <h2 className="text-2xl font-heading font-bold text-foreground mb-6">
+                    Send us a message
+                  </h2>
+                  <form className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName" className="text-foreground">First Name</Label>
+                        <Input
+                          id="firstName"
+                          placeholder="John"
+                          className="bg-background text-foreground border-border"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName" className="text-foreground">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          placeholder="Doe"
+                          className="bg-background text-foreground border-border"
+                        />
+                      </div>
+                    </div>
 
-  const plans = getPlansByUserType(selectedUserType);
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-foreground">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="john.doe@example.com"
+                        className="bg-background text-foreground border-border"
+                      />
+                    </div>
 
-  return (
-    <div className="min-h-screen bg-background">
-      <NavBar currentPage="pricing" />
-      
-      <main className="pt-48 pb-32">
-        <div className="container mx-auto px-12 max-w-7xl">
-          <Button
-            variant="ghost"
-            onClick={() => setSelectedUserType(null)}
-            className="mb-12 text-foreground"
-          >
-            ← Back to User Types
-          </Button>
+                    <div className="space-y-2">
+                      <Label htmlFor="subject" className="text-foreground">Subject</Label>
+                      <Input
+                        id="subject"
+                        placeholder="How can we help?"
+                        className="bg-background text-foreground border-border"
+                      />
+                    </div>
 
-          <div className="mb-16 text-center">
-            <h1 className="text-6xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
-              {getUserTypeLabel(selectedUserType)}
-            </h1>
-            <p className="text-xl text-muted-foreground leading-relaxed">
-              Select your participation level.
-            </p>
-          </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="message" className="text-foreground">Message</Label>
+                      <Textarea
+                        id="message"
+                        placeholder="Tell us more about your inquiry..."
+                        rows={6}
+                        className="bg-background text-foreground border-border"
+                      />
+                    </div>
 
-          <div className={`grid grid-cols-1 ${plans.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : plans.length === 3 ? 'md:grid-cols-3 max-w-6xl mx-auto' : plans.length === 4 ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-2 lg:grid-cols-3'} gap-8 mb-16`}>
-            {plans.map((plan) => (
-              <Card
-                key={plan.id}
-                className="p-8 bg-card text-card-foreground border border-border/50 hover:border-primary/50 transition-all"
-              >
-                <div className="text-center mb-8">
-                  <h3 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
-                    {plan.name}
-                  </h3>
-                  <div className="flex items-baseline justify-center mb-6">
-                    <span className="text-5xl font-heading font-medium text-foreground">
-                      {plan.price}
-                    </span>
-                    {plan.period && (
-                      <span className="text-muted-foreground ml-2">
-                        {plan.period}
-                      </span>
-                    )}
+                    <Button
+                      type="submit"
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      Send Message
+                    </Button>
+                  </form>
+                </Card>
+              </div>
+
+              <div className="space-y-6">
+                <Card className="p-6 bg-card text-card-foreground">
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 bg-primary/10 rounded-lg flex-shrink-0">
+                      <Mail className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-heading font-semibold text-foreground mb-1">
+                        Email
+                      </h3>
+                      <p className="text-muted-foreground break-all text-sm">summerlandestates@summerlandestates.com</p>
+                    </div>
                   </div>
-                </div>
+                </Card>
 
-                <ul className="space-y-4 mb-8 min-h-[240px]">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start text-foreground">
-                      <Check className="w-5 h-5 mr-3 mt-0.5 text-[#A89F91] flex-shrink-0" />
-                      <span className="text-sm leading-relaxed">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                <Card className="p-6 bg-card text-card-foreground">
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <MapPin className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-heading font-semibold text-foreground mb-1">
+                        Office
+                      </h3>
+                      <p className="text-muted-foreground">
+                        123 Estate Lane<br />
+                        Beverly Hills, CA 90210
+                      </p>
+                    </div>
+                  </div>
+                </Card>
 
-                <Button
-                  onClick={() => handleSelectTier(plan.id)}
-                  className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white px-8 py-4"
-                >
-                  Continue
-                </Button>
-              </Card>
-            ))}
+                <Card className="p-6 bg-gradient-to-r from-[#A89F91] to-[#8A8279] text-white">
+                  <h3 className="font-heading font-semibold mb-2">
+                    Business Hours
+                  </h3>
+                  <div className="space-y-1 text-sm">
+                    <p>Monday - Friday: 9:00 AM - 6:00 PM</p>
+                    <p>Saturday: 10:00 AM - 4:00 PM</p>
+                    <p>Sunday: Closed</p>
+                  </div>
+                </Card>
+              </div>
+            </div>
           </div>
 
-          <Card className="p-12 bg-muted border-border/50 max-w-4xl mx-auto">
-            <div className="text-center space-y-4">
-              <p className="text-lg text-foreground leading-relaxed">
-                Paid access provides tools, not placements.
-              </p>
-              <p className="text-base text-muted-foreground leading-relaxed">
-                Access varies by participation level. Features are unlocked according to your selected tier.
-              </p>
+          {/* Advertising Stats */}
+          <Card className="p-8 bg-gradient-to-r from-[#A89F91]/10 to-[#8A8279]/10 border-[#A89F91]/30">
+            <div className="text-center">
+              <Users className="w-16 h-16 text-[#A89F91] mx-auto mb-4" />
+              <h3 className="text-2xl font-heading font-semibold text-foreground mb-4">
+                Reach Our Exclusive Network
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+                <div>
+                  <div className="text-3xl font-bold text-[#A89F91] mb-2">10,000+</div>
+                  <p className="text-muted-foreground">Active Members</p>
+                </div>
+                <div>
+                  <div className="text-3xl font-bold text-[#A89F91] mb-2">500+</div>
+                  <p className="text-muted-foreground">Estate Professionals</p>
+                </div>
+                <div>
+                  <div className="text-3xl font-bold text-[#A89F91] mb-2">50+</div>
+                  <p className="text-muted-foreground">Premium Locations</p>
+                </div>
+              </div>
             </div>
           </Card>
         </div>

@@ -2,7 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import ListingCard from './ListingCard';
 import BlurredProfileCard from './BlurredProfileCard';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ChevronLeft, ChevronRight, MapPin, Star, BadgeCheck, Shield, Users } from 'lucide-react';
 import { shouldBlurProfile, canAccessProfile, getVisibilityRules } from '@/utils/profileVisibility';
 import type { Listing, PricingTier } from '../types';
 
@@ -64,8 +66,8 @@ export default function DirectoryGrid({
       <div
         className={
           viewMode === 'grid'
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8'
-            : 'flex flex-col gap-6'
+            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+            : 'space-y-4'
         }
       >
         {listings.map((listing, index) => {
@@ -76,18 +78,78 @@ export default function DirectoryGrid({
           }
 
           return (
-            <ListingCard
+            <Card
               key={listing.id}
-              listing={listing}
-              viewMode={viewMode}
+              className={`bg-card cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border relative ${
+                listing.priorityListing ? 'border-[#A89F91] border-2' : ''
+              }`}
               onClick={(e) => handleCardClick(listing.id, index, e)}
-              isSelected={selectedForComparison.includes(listing.id)}
-              onToggleSelection={onToggleSelection ? () => onToggleSelection(listing.id) : undefined}
-              showCheckbox={!!onToggleSelection}
-              canViewFullName={visibilityRules.canViewFullName}
-              canViewPhoto={visibilityRules.canViewPhoto}
-              canViewLocation={visibilityRules.canViewLocation}
-            />
+            >
+              {viewMode === 'grid' ? (
+                <div className="p-6">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="relative w-24 h-24 rounded-full bg-[#A89F91]/20 flex items-center justify-center mb-4 overflow-hidden">
+                      {listing.profilePhoto ? (
+                        <img src={listing.profilePhoto} alt={listing.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Users className="w-12 h-12 text-[#A89F91]" />
+                      )}
+                      {listing.isOnlineNow && (
+                        <div className="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 mb-1">
+                      <h3 className="font-heading font-semibold text-foreground">{listing.name}</h3>
+                      {listing.verified && (
+                        <BadgeCheck className="w-4 h-4 text-[#A89F91]" />
+                      )}
+                      {listing.backgroundCheckAvailable && (
+                        <Shield className="w-4 h-4 text-green-600" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-1">{listing.role}</p>
+                    <div className="flex items-center text-xs text-muted-foreground mb-2">
+                      <MapPin className="w-3 h-3 mr-1" />
+                      {listing.location}
+                    </div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center">
+                        <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 mr-1" />
+                        <span className="text-xs font-medium">{listing.rating}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <span className="text-xs text-muted-foreground">{listing.experienceYears} yrs exp</span>
+                    </div>
+                    {listing.availability && (
+                      <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">
+                        Available Now
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 flex items-center gap-4">
+                  <div className="relative w-16 h-16 rounded-full bg-[#A89F91]/20 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {listing.profilePhoto ? (
+                      <img src={listing.profilePhoto} alt={listing.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Users className="w-8 h-8 text-[#A89F91]" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <h3 className="font-heading font-semibold text-foreground truncate">{listing.name}</h3>
+                      {listing.verified && <BadgeCheck className="w-4 h-4 text-[#A89F91] flex-shrink-0" />}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{listing.role}</p>
+                    <div className="flex items-center text-xs text-muted-foreground mt-1">
+                      <MapPin className="w-3 h-3 mr-1" />
+                      {listing.location}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
           );
         })}
       </div>

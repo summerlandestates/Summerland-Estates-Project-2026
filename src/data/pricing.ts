@@ -23,7 +23,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'professional-pro',
     name: 'Pro Plan',
-    price: '$3.99',
+    price: '$1.99',
     period: '/month',
     features: [
       'Access to Jobs first',
@@ -64,7 +64,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'business-pro',
     name: 'Pro',
-    price: '$12.99',
+    price: '$9.99',
     period: '/month',
     features: [
       'One Location',
@@ -85,7 +85,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'business-enterprise',
     name: 'Enterprise / Multi-Location',
-    price: '$18.99',
+    price: '$14.99',
     period: '/month',
     features: [
       'Notifications',
@@ -136,7 +136,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'agency-hiring',
     name: 'Hiring',
-    price: '$39.99',
+    price: '$19.99',
     period: '/month',
     features: [
       'Unlimited view of candidates (limited info)',
@@ -152,7 +152,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'agency-pro',
     name: 'Pro',
-    price: '$59.99',
+    price: '$29.99',
     period: '/month',
     features: [
       'Unlimited view of candidates (limited info)',
@@ -184,7 +184,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'estates-basic',
     name: 'Basic',
-    price: '$19.99',
+    price: '$14.99',
     period: '/month',
     features: [
       'Unlimited view of candidates (limited info)',
@@ -199,7 +199,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'estates-hiring',
     name: 'Hiring',
-    price: '$49.99',
+    price: '$24.99',
     period: '/month',
     features: [
       'Unlimited view of candidates (limited info)',
@@ -215,7 +215,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'estates-pro',
     name: 'Pro',
-    price: '$59.99',
+    price: '$29.99',
     period: '/month',
     features: [
       'Unlimited view of candidates (limited info)',

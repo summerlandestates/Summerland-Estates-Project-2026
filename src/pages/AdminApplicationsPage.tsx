@@ -46,7 +46,9 @@ import {
   MapPin,
   Calendar,
   FileText,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,6 +67,8 @@ export default function AdminApplicationsPage() {
   const [decisionApplication, setDecisionApplication] = useState<MembershipApplication | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   useEffect(() => {
     if (authLoading) return;
@@ -140,6 +144,13 @@ export default function AdminApplicationsPage() {
     
     return matchesSearch && matchesStatus && matchesType;
   });
+
+  const totalPages = Math.ceil(filteredApplications.length / itemsPerPage);
+  const paginatedApplications = filteredApplications.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, typeFilter]);
 
   const getProfileTypeIcon = (type: string) => {
     switch (type) {
@@ -382,7 +393,8 @@ export default function AdminApplicationsPage() {
                 <p className="text-muted-foreground">Try adjusting your filters</p>
               </Card>
             ) : (
-              filteredApplications.map((application) => (
+              <>
+              {paginatedApplications.map((application) => (
                 <Card key={application.id} className="p-6 bg-card hover:shadow-md transition-shadow">
                   <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                     <div className="flex items-start gap-4">
@@ -459,7 +471,48 @@ export default function AdminApplicationsPage() {
                     </div>
                   </div>
                 </Card>
-              ))
+              ))}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-6">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="border-gray-300"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={currentPage === page ? 'bg-[#A89F91] text-white' : 'border-gray-300'}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="border-gray-300"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-gray-500 ml-2">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredApplications.length)} of {filteredApplications.length}
+                  </span>
+                </div>
+              )}
+              </>
             )}
           </div>
         </div>

@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, X, ArrowLeft, ArrowRight, Check, User, Building2, Briefcase, Home, Shield, FileText, Image as ImageIcon, Loader2, Sparkles } from 'lucide-react';
+import LocationAutocomplete from '@/components/LocationAutocomplete';
 import { getPlansByUserType } from '../data/pricing';
 import { submitMembershipApplication } from '@/lib/membershipApplication';
 import { isComplimentaryTier } from '@/lib/membership';
@@ -243,7 +244,7 @@ export default function AddListingPage() {
   const totalFormSteps = 3;
   const formRef = useRef<HTMLFormElement>(null);
   const sectionCardClassName = 'rounded-[32px] border border-border/60 bg-card/95 p-5 shadow-sm sm:p-6';
-  const sectionBodyClassName = 'space-y-4 md:space-y-5 xl:max-h-[calc(100vh-23rem)] xl:overflow-y-auto xl:pr-3';
+  const sectionBodyClassName = 'space-y-4 md:space-y-5 xl:max-h-[calc(100vh-12rem)] xl:overflow-y-auto xl:pr-3';
   const accountFormSteps = [
     { id: 1, title: 'Basic Information', description: 'Profile essentials', icon: User },
     { id: 2, title: 'Professional Details', description: 'Experience and preferences', icon: Briefcase },
@@ -1336,7 +1337,7 @@ export default function AddListingPage() {
                     <h3 className="text-3xl font-heading font-medium text-foreground mb-4 tracking-tight">
                       {plan.name}
                     </h3>
-                    <div className="flex items-baseline justify-center mb-6">
+                    <div className="flex items-baseline justify-center mb-2">
                       <span className="text-5xl font-heading font-medium text-foreground">
                         {plan.price}
                       </span>
@@ -1346,6 +1347,11 @@ export default function AddListingPage() {
                         </span>
                       )}
                     </div>
+                    {plan.price !== '$0' && (
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Cancel anytime
+                      </p>
+                    )}
                   </div>
 
                   <ul className="space-y-4 mb-8 min-h-[240px]">
@@ -2671,12 +2677,22 @@ export default function AddListingPage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="location" className="text-foreground text-sm">Location</Label>
-                      <Input
-                        id="location"
+                      <LocationAutocomplete
+                        onLocationSelect={(location) => {
+                          // Store the selected location in a hidden field for form submission
+                          const hiddenField = document.getElementById('hidden-location') as HTMLInputElement;
+                          if (hiddenField) {
+                            hiddenField.value = `${location.city}, ${location.state}`;
+                          }
+                        }}
+                        placeholder="Enter your city..."
+                        className="w-full"
+                      />
+                      <input
+                        type="hidden"
+                        id="hidden-location"
                         name="location"
-                        placeholder="City, State"
                         required
-                        className="bg-background text-foreground border-border"
                       />
                       {isCommunityOnly && (
                         <p className="text-xs text-muted-foreground">

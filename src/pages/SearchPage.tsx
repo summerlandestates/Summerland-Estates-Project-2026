@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
+import NativeAd from '../components/NativeAd';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,7 +103,6 @@ export default function SearchPage() {
     profileStatus: 'all',
     title: '',
     serviceType: '',
-    gender: '',
     language: '',
     workAvailability: '',
     hasBackgroundCheck: false,
@@ -183,11 +184,6 @@ export default function SearchPage() {
       filtered = filtered.filter((listing) => listing.hasCarAndInsurance);
     }
 
-    // Gender filter
-    if (filters.gender) {
-      filtered = filtered.filter((listing) => listing.gender === filters.gender.toLowerCase());
-    }
-
     // Language filter
     if (filters.language) {
       filtered = filtered.filter((listing) => 
@@ -253,7 +249,6 @@ export default function SearchPage() {
       profileStatus: 'all',
       title: '',
       serviceType: '',
-      gender: '',
       language: '',
       workAvailability: '',
       hasBackgroundCheck: false,
@@ -299,7 +294,6 @@ export default function SearchPage() {
     filters.hasBackgroundCheck,
     filters.willingDrugTest,
     filters.hasCar,
-    filters.gender,
     filters.language,
     filters.yearsExperience,
     (filters.certifications?.length || 0) > 0,
@@ -308,6 +302,11 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead
+        title="Find Estate Professionals - Summerland Estates"
+        description="Search and connect with verified estate professionals including private chefs, housekeepers, estate managers, and luxury service providers."
+        canonical="/search"
+      />
       <NavBar currentPage="search" />
       
       <main className="pt-32 pb-16">
@@ -513,26 +512,6 @@ export default function SearchPage() {
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* Gender */}
-                    <AccordionItem value="gender" className="border-b border-border">
-                      <AccordionTrigger className="text-sm font-medium">Gender</AccordionTrigger>
-                      <AccordionContent>
-                        <Select
-                          value={filters.gender || ''}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, gender: value }))}
-                        >
-                          <SelectTrigger className="bg-background">
-                            <SelectValue placeholder="Any Gender" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Any Gender</SelectItem>
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </AccordionContent>
-                    </AccordionItem>
-
                     {/* Language */}
                     <AccordionItem value="language" className="border-b border-border">
                       <AccordionTrigger className="text-sm font-medium">Language</AccordionTrigger>
@@ -620,6 +599,11 @@ export default function SearchPage() {
                     </AccordionItem>
                   </Accordion>
                 </Card>
+
+                {/* Sponsored Content */}
+                <div className="mt-6">
+                  <NativeAd position="sidebar" />
+                </div>
               </div>
             )}
 
@@ -648,14 +632,33 @@ export default function SearchPage() {
                     ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
                     : 'space-y-4'
                   }>
-                    {currentListings.map((listing) => (
-                      <Card
-                        key={listing.id}
-                        className={`bg-card cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border ${
-                          listing.priorityListing ? 'border-[#A89F91] border-2' : ''
-                        }`}
-                        onClick={() => navigate(`/profile/${listing.id}`)}
-                      >
+                    {currentListings.flatMap((listing, index) => {
+                      // Insert NativeAd after the first visible (non-blurred) listing
+                      const elements = [];
+                      
+                      // Add the listing card
+                      elements.push(
+                        <Card
+                          key={listing.id}
+                          className={`bg-card cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border relative ${
+                            listing.priorityListing ? 'border-[#A89F91] border-2' : ''
+                          } ${index >= 2 ? 'blur-[2px] pointer-events-none' : ''}`}
+                          onClick={() => index < 2 ? navigate(`/profile/${listing.id}`) : undefined}
+                        >
+                        {index >= 2 && (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-lg">
+                            <div className="text-center p-4">
+                              <p className="font-semibold text-foreground mb-2">Join to see more</p>
+                              <Button 
+                                size="sm" 
+                                className="rounded-full bg-[#A89F91] text-white hover:bg-[#948979]"
+                                onClick={() => navigate('/signup')}
+                              >
+                                Sign Up
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                         {viewMode === 'grid' ? (
                           <div className="p-6">
                             <div className="flex flex-col items-center text-center">
@@ -736,7 +739,15 @@ export default function SearchPage() {
                           </div>
                         )}
                       </Card>
-                    ))}
+                      );
+                      
+                      // Insert NativeAd after the 2nd listing in grid view (index 1)
+                      if (index === 1 && viewMode === 'grid') {
+                        elements.push(<NativeAd key="native-ad-1" position="search_results" />);
+                      }
+                      
+                      return elements;
+                    })}
                   </div>
 
                   {/* Pagination */}

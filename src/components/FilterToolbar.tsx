@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, Grid3x3, List, ChevronDown, SlidersHorizontal } from 'lucide-react';
-import { professionalTitles, genderOptions, languages, workAvailability, cookingExperience } from '../data/profileOptions';
+import { professionalTitles, languages, workAvailability, cookingExperience } from '../data/profileOptions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -224,25 +224,6 @@ export default function FilterToolbar({
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="gender" className="text-foreground">Gender</Label>
-                <Select
-                  value={filters.gender || ''}
-                  onValueChange={(value) => handleFilterUpdate('gender', value)}
-                >
-                  <SelectTrigger className="bg-background text-foreground border-border">
-                    <SelectValue placeholder="Any Gender" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover text-popover-foreground">
-                    <SelectItem value="" className="text-foreground cursor-pointer">Any Gender</SelectItem>
-                    {genderOptions.map((gender) => (
-                      <SelectItem key={gender} value={gender.toLowerCase()} className="text-foreground cursor-pointer">
-                        {gender}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="language" className="text-foreground">Language</Label>
