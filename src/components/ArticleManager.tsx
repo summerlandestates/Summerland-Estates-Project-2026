@@ -12,12 +12,16 @@ import { Plus, Edit, Trash2, Eye, Search, ArrowLeft, Calendar, User, Clock, X, L
 import { supabase } from "@/lib/supabase";
 import type { Article, ArticleFormData } from "../types/articles";
 import { ARTICLE_CATEGORIES } from "../types/articles";
+import { getTierLimits } from "@/utils/tierAccess";
+import type { PricingTier } from "../types";
+import UpgradePrompt from "./UpgradePrompt";
 
 interface ArticleManagerProps {
   userRole: "admin" | "user";
   userId: string;
   userName: string;
   userAvatar?: string;
+  userTier?: PricingTier;
 }
 
 type ViewMode = "list" | "create" | "edit" | "view";
@@ -66,13 +70,14 @@ function mapRow(row: Record<string, unknown>): Article {
   };
 }
 
-export default function ArticleManager({ userRole, userId, userName, userAvatar }: ArticleManagerProps) {
+export default function ArticleManager({ userRole, userId, userName, userAvatar, userTier }: ArticleManagerProps) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const limits = getTierLimits(userTier || 'professional-basic');
   const [viewingArticle, setViewingArticle] = useState<Article | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
@@ -177,6 +182,21 @@ export default function ArticleManager({ userRole, userId, userName, userAvatar 
     if (!title) { toast.error("Title is required"); return; }
     if (!content || content.replace(/<[^>]*>/g, "").trim() === "") { toast.error("Content is required"); return; }
     if (!formData.category) { toast.error("Category is required"); return; }
+
+    if (userRole === "user" && !limits.canAddArticles) {
+      toast.error("Article publishing is a Pro feature. Please upgrade to add articles.");
+      return;
+    }
+
+    if (
+      !editingArticle &&
+      userRole === "user" &&
+      typeof limits.articleLimit === "number" &&
+      articles.length >= limits.articleLimit
+    ) {
+      toast.error(`You have reached your ${limits.articleLimit}-article limit. Please upgrade for more articles.`);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -623,11 +643,24 @@ export default function ArticleManager({ userRole, userId, userName, userAvatar 
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Articles</h2>
-          <p className="text-gray-500 text-sm">{articles.length} total articles</p>
+          <p className="text-gray-500 text-sm">
+            {articles.length} total articles
+            {userRole === "user" && typeof limits.articleLimit === "number" && (
+              <span className="ml-2 text-xs text-muted-foreground">(Pro limit: {limits.articleLimit})</span>
+            )}
+          </p>
         </div>
-        <Button onClick={startCreate} className="bg-[#A89F91] hover:bg-[#948979] text-white">
-          <Plus className="h-4 w-4 mr-2" />New Article
-        </Button>
+        {userRole === "admin" || limits.canAddArticles ? (
+          <Button
+            onClick={startCreate}
+            disabled={userRole === "user" && typeof limits.articleLimit === "number" && articles.length >= limits.articleLimit}
+            className="bg-[#A89F91] hover:bg-[#948979] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="h-4 w-4 mr-2" />New Article
+          </Button>
+        ) : (
+          <UpgradePrompt feature="Add Articles" message="Publish up to 5 articles with the Pro plan." currentTier={userTier} />
+        )}
       </div>
 
       {/* Stats row */}

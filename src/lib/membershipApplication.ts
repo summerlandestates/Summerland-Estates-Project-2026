@@ -17,10 +17,69 @@ function generateFallbackPassword() {
     Math.floor(Math.random() * 1000)
   );
 }
+export async function validateAndRedeemPromoCode(code: string, userId: string): Promise<{
+  valid: boolean;
+  tier?: string;
+  promoCodeId?: string;
+  error?: string;
+}> {
+  if (!code || !userId) return { valid: false };
+
+  const { data: promo, error } = await supabase
+    .from('promo_codes')
+    .select('*')
+    .eq('code', code.trim())
+    .eq('is_active', true)
+    .single();
+
+  if (error || !promo) return { valid: false, error: 'Invalid promo code' };
+  if (promo.valid_until && new Date(promo.valid_until) < new Date()) return { valid: false, error: 'Promo code expired' };
+  if (promo.used_count >= promo.max_uses) return { valid: false, error: 'Promo code fully redeemed' };
+
+  const { data: existing } = await supabase
+    .from('user_promo_codes')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('promo_code_id', promo.id)
+    .single();
+
+  if (existing) return { valid: false, error: 'Promo code already used by this account' };
+
+  const expiresAt = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error: redeemError } = await supabase.from('user_promo_codes').insert({
+    user_id: userId,
+    promo_code_id: promo.id,
+    redeemed_at: new Date().toISOString(),
+    expires_at: expiresAt,
+  });
+
+  if (redeemError) return { valid: false, error: redeemError.message };
+
+  await supabase
+    .from('promo_codes')
+    .update({ used_count: (promo.used_count || 0) + 1 })
+    .eq('id', promo.id);
+
+  return { valid: true, tier: promo.tier || 'professional-pro', promoCodeId: promo.id };
+}
 
 export async function submitMembershipApplication(checkoutData: CheckoutData) {
   const dbRole = roleMapping[checkoutData.profileType] || 'professional';
-  const paymentStatus = isComplimentaryTier(checkoutData.selectedTier) ? 'not_required' : 'pending';
+  let promoResult: Awaited<ReturnType<typeof validateAndRedeemPromoCode>> | null = null;
+  let promoTier = checkoutData.selectedTier;
+  let promoExpiresAt: string | null = null;
+
+  if (checkoutData.promoCode) {
+    promoResult = {
+      valid: false,
+      error: 'Will validate after account creation',
+    } as any;
+  }
+
+  const paymentStatus = isComplimentaryTier(checkoutData.selectedTier) || (promoResult?.valid)
+    ? 'not_required'
+    : 'pending';
   const accountPassword = checkoutData.password || generateFallbackPassword();
   const profileApplicationData = {
     ...checkoutData.applicationData,
@@ -61,14 +120,34 @@ export async function submitMembershipApplication(checkoutData: CheckoutData) {
 
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
+  if (checkoutData.promoCode && authData.user) {
+    promoResult = await validateAndRedeemPromoCode(
+      checkoutData.promoCode,
+      authData.user.id
+    );
+    if (promoResult.valid) {
+      promoTier = promoResult.tier || promoTier;
+      promoExpiresAt = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+  }
+
+  const finalPaymentStatus = promoResult?.valid ? 'not_required' : paymentStatus;
+  const finalApplicationData = {
+    ...profileApplicationData,
+    payment_status: finalPaymentStatus,
+    selected_tier: promoResult?.valid ? promoTier : checkoutData.selectedTier,
+  };
+
   const profilePayload = {
     full_name: checkoutData.name,
     role: dbRole,
     phone: checkoutData.phone,
     location: checkoutData.location,
     profile_type: checkoutData.profileType,
-    tier: checkoutData.selectedTier,
-    application_data: profileApplicationData,
+    tier: promoResult?.valid ? promoTier : checkoutData.selectedTier,
+    subscription_status: promoResult?.valid ? 'active' : undefined,
+    subscription_expires_at: promoExpiresAt,
+    application_data: finalApplicationData,
   };
 
   const { error: profileError } = await supabase

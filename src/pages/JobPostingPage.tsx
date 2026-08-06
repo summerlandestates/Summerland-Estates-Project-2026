@@ -17,6 +17,7 @@ import { MapPin, DollarSign, Clock, Loader2, Briefcase, Users } from 'lucide-rea
 interface JobFormData {
   jobTitle: string;
   jobDescription: string;
+  jobCategory: string;
   location: string;
   salaryRange: string;
   employmentTypes: string[];
@@ -58,6 +59,7 @@ export default function JobPostingPage() {
   const [jobForm, setJobForm] = useState<JobFormData>({
     jobTitle: '',
     jobDescription: '',
+    jobCategory: '',
     location: '',
     salaryRange: '',
     employmentTypes: [],
@@ -146,6 +148,23 @@ export default function JobPostingPage() {
       });
 
       if (error) throw error;
+
+      // Notify paid users whose profiles match the new job
+      try {
+        await fetch('/api/notify-job-matches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            jobTitle: jobForm.jobTitle,
+            jobDescription: jobForm.jobDescription,
+            jobCategory: jobForm.jobCategory,
+            location: jobForm.location
+          })
+        });
+      } catch (err) {
+        console.error('Failed to notify job matches:', err);
+      }
 
       toast.success('Job Posted Successfully!', {
         description: 'Your job listing is now live and visible to candidates.',

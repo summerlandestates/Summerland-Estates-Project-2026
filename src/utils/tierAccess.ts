@@ -16,8 +16,13 @@ export interface TierLimits {
   canReceiveNotifications: boolean;
   canUseBookingTool: boolean;
   canBidOnRequests: boolean;
+  bidLimit?: number;
   canUseComparisons: boolean;
   canViewFullProfiles: boolean;
+  canApplyToRoles?: boolean;
+  applicationLimit?: number;
+  canAddArticles?: boolean;
+  articleLimit?: number;
   profilePhotoLimit: number;
   canUploadVideo: boolean;
   canAccessVerificationCredits: boolean;
@@ -27,6 +32,51 @@ export interface TierLimits {
 export function getTierLimits(tier: PricingTier): TierLimits {
   switch (tier) {
     // Professional Tiers
+    case 'professional-basic':
+      return {
+        canViewPlacements: true,
+        canMessage: true,
+        canInterview: true,
+        canPostRoles: false,
+        canPostServiceRequests: false,
+        canAccessCommunity: false,
+        canReceiveNotifications: false,
+        canUseBookingTool: false,
+        canBidOnRequests: true,
+        bidLimit: 2,
+        canUseComparisons: false,
+        canViewFullProfiles: false,
+        canApplyToRoles: true,
+        applicationLimit: 5,
+        canAddArticles: false,
+        profilePhotoLimit: 999,
+        canUploadVideo: true,
+        canAccessVerificationCredits: false,
+        multiLocationSupport: false
+      };
+
+    case 'professional-pro':
+      return {
+        canViewPlacements: true,
+        canMessage: true,
+        canInterview: true,
+        canPostRoles: false,
+        canPostServiceRequests: false,
+        canAccessCommunity: true,
+        canReceiveNotifications: true,
+        canUseBookingTool: true,
+        canBidOnRequests: true,
+        canUseComparisons: true,
+        canViewFullProfiles: true,
+        canApplyToRoles: true,
+        canAddArticles: true,
+        articleLimit: 5,
+        profilePhotoLimit: 999,
+        canUploadVideo: true,
+        canAccessVerificationCredits: false,
+        multiLocationSupport: false
+      };
+
     case 'professional-free':
       return {
         canViewPlacements: true,

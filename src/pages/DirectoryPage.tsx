@@ -10,8 +10,8 @@ import BannerAds from '../components/BannerAds';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, BriefcaseBusiness, Search, Sparkles } from 'lucide-react';
-import { listings } from '../data/listings';
+import { ArrowRight, BriefcaseBusiness, Search, Sparkles, Loader2 } from 'lucide-react';
+import { fetchListings } from '../utils/listings';
 import type { Listing, FilterState, PricingTier } from '../types';
 
 const homepageCollections = [
@@ -39,10 +39,12 @@ const homepageCollections = [
 
 export default function DirectoryPage() {
   const navigate = useNavigate();
-  const [filteredListings, setFilteredListings] = useState<Listing[]>(listings);
+  const [allListings, setAllListings] = useState<Listing[]>([]);
+  const [filteredListings, setFilteredListings] = useState<Listing[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
   const [isPublicView, setIsPublicView] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -54,10 +56,25 @@ export default function DirectoryPage() {
       const tier = localStorage.getItem('userTier') as PricingTier | undefined;
       setUserTier(tier);
     }
+
+    const loadListings = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchListings();
+        setAllListings(data);
+        setFilteredListings(data);
+      } catch (err: any) {
+        console.error('Failed to load listings:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadListings();
   }, []);
 
   const handleFilterChange = (filters: FilterState) => {
-    let filtered = [...listings];
+    let filtered = [...allListings];
 
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
@@ -97,32 +114,51 @@ export default function DirectoryPage() {
   };
 
   const handleResetFilters = () => {
-    setFilteredListings(listings);
+    setFilteredListings(allListings);
   };
 
-  const handleCardClick = (id: string, e?: React.MouseEvent) => {
+  const handleCardClick = (slug: string, e?: React.MouseEvent) => {
     if (e && (e.target as HTMLElement).closest('.comparison-checkbox')) {
       return;
     }
-    navigate(`/profile/${id}`);
+    navigate(`/profile/${slug}`);
   };
 
   const directoryPreview = filteredListings.slice(0, 4);
 
   const homepageSchema = {
     '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: 'Estate Professionals Directory',
-    description: 'A curated directory of verified estate professionals and service providers.',
-    url: 'https://summerlandestates.com',
-    numberOfItems: filteredListings.length,
-    itemListElement: directoryPreview.map((listing, i) => ({
-      '@type': 'ListItem',
-      position: i + 1,
-      name: listing.name,
-      description: listing.bio || listing.role,
-      url: `https://summerlandestates.com/profile/${listing.id}`,
-    })),
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        name: 'Summerland Estates',
+        url: 'https://summerlandestates.com',
+        description:
+          'A private network for trusted estate professionals and discreet households.',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: 'https://summerlandestates.com/search?q={search_term_string}',
+          },
+          'query-input': 'required name=search_term_string',
+        },
+      },
+      {
+        '@type': 'ItemList',
+        name: 'Featured Estate Professionals',
+        description: 'A curated selection of verified estate professionals and service providers.',
+        url: 'https://summerlandestates.com',
+        numberOfItems: directoryPreview.length,
+        itemListElement: directoryPreview.map((listing, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          name: listing.name,
+          description: listing.bio || listing.role,
+          url: `https://summerlandestates.com/profile/${listing.slug || listing.id}`,
+        })),
+      },
+    ],
   };
 
   return (
@@ -131,6 +167,7 @@ export default function DirectoryPage() {
         title="Summerland Estates - Where Luxury Meets Trust"
         description="A private network for trusted estate professionals and discreet households. Connect with verified private chefs, housekeepers, estate managers, and luxury service providers."
         canonical="/"
+        ogImage="https://summerlandestates.com/images/home-banner.jpg"
         schema={homepageSchema}
       />
       <NavBar currentPage="home" />
@@ -140,30 +177,32 @@ export default function DirectoryPage() {
           <div className="container mx-auto max-w-7xl px-5 md:px-10">
             <Card className="overflow-hidden rounded-[28px] border border-[#d7cdc0] bg-white px-3 pb-6 pt-3 shadow-[0_24px_80px_rgba(74,73,63,0.08)] sm:px-4 sm:pb-8 sm:pt-4">
               <div className="overflow-hidden rounded-[28px] border border-[#e8dfd3]">
-                <div className="relative h-[430px] sm:h-[480px] md:h-[520px]">
-                  <img
-                    src="/public/images/home-banner.jpg"
-                    alt="Summerland Estates"
-                    className="h-full w-full object-cover object-[18%_center] sm:object-[28%_center] md:object-center"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-b from-[#1d2018]/10 via-transparent to-[#1d2018]/35" />
-                  <div className="absolute inset-x-0 top-4 flex justify-center px-4 text-center sm:top-6">
+                <div className="relative h-[550px] sm:h-[480px] md:h-[520px]">
+                  <picture>
+                    <source
+                      media="(max-width: 767px)"
+                      srcSet="/public/images/mobile-home-banner.webp"
+                      type="image/webp"
+                    />
+                    <img
+                      src="/public/images/home-banner.jpg"
+                      alt="Summerland Estates"
+                      className="h-full w-full object-cover object-[center_42%] md:object-[center_25%]"
+                    />
+                  </picture>
+                  <div className="absolute inset-0 bg-gradient-to-b from-[#1d2018]/30 via-[#1d2018]/10 to-[#1d2018]/30" />
+                  <div className="absolute inset-x-0 top-4 flex justify-center px-4 text-center">
                     <div className="max-w-3xl">
-                      <Badge className="rounded-full border border-white/40 bg-white/10 px-4 py-2 text-[11px] tracking-[0.32em] text-white backdrop-blur-sm sm:text-xs">
+                      <Badge className="rounded-full border border-white/40 bg-[#1d2018]/40 px-4 py-2 text-[11px] tracking-[0.32em] text-white backdrop-blur-md sm:text-xs">
                         Curated Estate Network
                       </Badge>
-                      {/* <h1 className="font-heading text-5xl font-medium italic leading-[0.95] text-white drop-shadow-[0_18px_35px_rgba(0,0,0,0.25)] md:text-7xl">
-                        Summerland
-                        <span className="not-italic"> </span>
-                        Estates
-                      </h1> */}
                     </div>
                   </div>
                   <div className="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
                     <div className="flex w-full max-w-4xl flex-col gap-3 md:flex-row md:justify-center">
                       <Button
                         onClick={() => navigate('/add-listing')}
-                        className="min-h-12 min-w-[190px] rounded-full bg-[#a79f91] px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-[#948979]"
+                        className="min-h-12 w-full rounded-full bg-[#a79f91] px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-[#948979] md:w-auto md:min-w-[190px]"
                       >
                         Become a Provider
                       </Button>
@@ -175,13 +214,13 @@ export default function DirectoryPage() {
                             directorySection.scrollIntoView({ behavior: 'smooth' });
                           }
                         }}
-                        className="min-h-12 min-w-[190px] rounded-full border-white/75 bg-white/92 px-5 py-4 text-sm font-semibold text-white shadow-lg backdrop-blur-sm hover:bg-[#5f6756]"
+                        className="min-h-12 w-full rounded-full border-white/75 bg-white/92 px-5 py-4 text-sm font-semibold text-white shadow-lg backdrop-blur-sm hover:bg-[#5f6756] md:w-auto md:min-w-[190px]"
                       >
                         Find Professionals
                       </Button>
                       <Button
                         onClick={() => navigate('/open-roles')}
-                        className="min-h-12 min-w-[250px] rounded-full bg-[#6d7662] px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-[#5f6756]"
+                        className="min-h-12 w-full rounded-full bg-[#6d7662] px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-[#5f6756] md:w-auto md:min-w-[250px]"
                       >
                         View Open Roles & Requests
                       </Button>
@@ -294,16 +333,23 @@ export default function DirectoryPage() {
                 onViewModeChange={setViewMode}
               />
 
-              <DirectoryGrid
-                listings={directoryPreview}
-                viewMode={viewMode}
-                currentPage={1}
-                totalPages={1}
-                onPageChange={() => undefined}
-                onCardClick={handleCardClick}
-                userTier={userTier}
-                isPublicView={isPublicView}
-              />
+              {loading ? (
+                <div className="py-16 text-center">
+                  <Loader2 className="w-10 h-10 mx-auto text-[#A89F91] animate-spin mb-3" />
+                  <p className="text-muted-foreground">Loading featured profiles...</p>
+                </div>
+              ) : (
+                <DirectoryGrid
+                  listings={directoryPreview}
+                  viewMode={viewMode}
+                  currentPage={1}
+                  totalPages={1}
+                  onPageChange={() => undefined}
+                  onCardClick={handleCardClick}
+                  userTier={userTier}
+                  isPublicView={isPublicView}
+                />
+              )}
 
               <div className="mt-10 flex flex-col items-center justify-between gap-4 rounded-[24px] border border-[#ebe2d7] bg-[#fbf8f3] px-6 py-5 text-center md:flex-row md:text-left">
                 <div>

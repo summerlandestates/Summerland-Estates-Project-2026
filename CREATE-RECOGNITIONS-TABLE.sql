@@ -1,6 +1,8 @@
 -- Create recognitions table for Estate Services Recognition page
 CREATE TABLE IF NOT EXISTS recognitions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  submitter_id UUID REFERENCES auth.users(id),
+  submitter_email TEXT,
   name VARCHAR(255) NOT NULL,
   title VARCHAR(255) NOT NULL,
   location VARCHAR(255),
@@ -22,6 +24,12 @@ CREATE INDEX IF NOT EXISTS idx_recognitions_display_order ON recognitions(displa
 
 -- Enable RLS
 ALTER TABLE recognitions ENABLE ROW LEVEL SECURITY;
+
+-- Drop and recreate policies to avoid conflicts
+DROP POLICY IF EXISTS "Public can view published recognitions" ON recognitions;
+DROP POLICY IF EXISTS "Admin can manage recognitions" ON recognitions;
+DROP POLICY IF EXISTS "Users can view own recognitions" ON recognitions;
+DROP POLICY IF EXISTS "Users can delete own recognitions" ON recognitions;
 
 -- Allow public to view published recognitions
 CREATE POLICY "Public can view published recognitions"
@@ -46,6 +54,18 @@ CREATE POLICY "Admin can manage recognitions"
       AND profiles.role = 'admin'
     )
   );
+
+-- Users can view their own recognition submissions
+CREATE POLICY "Users can view own recognitions"
+  ON recognitions FOR SELECT
+  TO authenticated
+  USING (submitter_id = auth.uid());
+
+-- Users can delete their own recognitions (if pending)
+CREATE POLICY "Users can delete own recognitions"
+  ON recognitions FOR DELETE
+  TO authenticated
+  USING (submitter_id = auth.uid() AND status = 'draft');
 
 -- Insert sample data
 INSERT INTO recognitions (name, title, location, category, description, award_date, is_featured, display_order, status) VALUES

@@ -1,21 +1,21 @@
-import type { PricingPlan, UserType } from '../types';
+import type { PricingPlan, PricingTier, UserType } from '../types';
 
 export const pricingPlans: PricingPlan[] = [
   // Professional Plans
   {
     id: 'professional-basic',
     name: 'Basic Plan',
-    price: '$0',
-    period: '/month',
+    price: 'Complimentary',
+    period: '',
     features: [
-      'Limited Profile Visibility to Hiring Managers',
-      'Unlimited Open Role searches',
+      'Profile Visibility Limited',
+      'Unlimited Open Role Searches',
       'Unlimited Messaging',
       'Multiple Photos & Videos',
       'Calendar, Booking, Interviews',
       'Networking',
-      'Apply to 5 Open Roles a month',
-      'Bid on 2 Service Requests',
+      'Apply to 5 Open Roles/Month',
+      'Bid on 2 Service Requests/Month',
       'Optional Feature Add-Ons'
     ],
     userType: 'professional'
@@ -23,20 +23,18 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'professional-pro',
     name: 'Pro Plan',
-    price: '$1.99',
+    price: '$0.99',
     period: '/month',
     features: [
-      'Access to Jobs first',
-      'Apply to Jobs first',
-      'Get sent jobs that match your resume',
-      'Notifications',
-      'Analytics - who\'s viewed my profile',
+      'Access to Jobs First',
+      'Get Sent Jobs That Match Your Resume',
+      'Notifications Sent via Text or Email',
+      'Analytics - Who\'s Viewed My Profile',
       'Community Access',
-      'Add 1 Article',
-      'Unlimited Profile Visibility',
+      'Add 5 Articles',
+      'Unlimited Profile Visibility to Hiring Managers',
       'Unlimited Applications',
       'Unlimited Bidding',
-      'Download 4 Templates',
       'Optional Feature Add-Ons'
     ],
     userType: 'professional'

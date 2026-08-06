@@ -8,11 +8,23 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Bell, Mail, MessageSquare, Eye, MessageCircle, Save } from 'lucide-react';
+import { ArrowLeft, Bell, Mail, MessageSquare, Eye, MessageCircle, Save, Calendar, Briefcase } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { getTierLimits } from '@/utils/tierAccess';
 import type { NotificationPreferences } from '../types';
+import { supabase } from '@/lib/supabase';
 
 const defaultPreferences: NotificationPreferences = {
   newJobPostings: {
+    email: false,
+    sms: false
+  },
+  newServiceRequests: {
+    email: false,
+    sms: false
+  },
+  newEvents: {
     email: false,
     sms: false
   },
@@ -33,26 +45,61 @@ const defaultPreferences: NotificationPreferences = {
 
 export default function NotificationSettingsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [hasPhone, setHasPhone] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [userTier, setUserTier] = useState<string | null>(null);
+  const [isPaid, setIsPaid] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    // Load saved preferences
-    const savedPrefs = localStorage.getItem('notificationPreferences');
-    if (savedPrefs) {
-      setPreferences(JSON.parse(savedPrefs));
-    }
 
-    // Check if user has phone number on file
-    const userProfile = localStorage.getItem('userProfile');
-    if (userProfile) {
-      const profile = JSON.parse(userProfile);
-      setHasPhone(!!profile.phone);
-    }
-  }, []);
+    const loadPreferences = async () => {
+      let prefs: NotificationPreferences | null = null;
+
+      // Try loading from Supabase if authenticated
+      if (user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('notification_preferences, phone, tier')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!error && data?.notification_preferences) {
+          prefs = data.notification_preferences as NotificationPreferences;
+        }
+        setHasPhone(!!data?.phone);
+        const tier = data?.tier || localStorage.getItem('userTier');
+        if (tier) {
+          setUserTier(tier);
+          const limits = getTierLimits(tier as any);
+          setIsPaid(!!limits?.canReceiveNotifications);
+        }
+      } else {
+        // Fallback to localStorage
+        const savedPrefs = localStorage.getItem('notificationPreferences');
+        if (savedPrefs) {
+          prefs = JSON.parse(savedPrefs);
+        }
+        const userProfile = localStorage.getItem('userProfile');
+        if (userProfile) {
+          const profile = JSON.parse(userProfile);
+          setHasPhone(!!profile.phone);
+          const tier = profile.tier || profile.pricingTier;
+          setUserTier(tier);
+          if (tier) {
+            const limits = getTierLimits(tier as any);
+            setIsPaid(!!limits?.canReceiveNotifications);
+          }
+        }
+      }
+
+      if (prefs) setPreferences(prefs);
+    };
+
+    loadPreferences();
+  }, [user]);
 
   const handleToggle = (
     category: keyof Omit<NotificationPreferences, 'subscribedTopics'>,
@@ -68,8 +115,23 @@ export default function NotificationSettingsPage() {
     setSaved(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     localStorage.setItem('notificationPreferences', JSON.stringify(preferences));
+
+    if (user) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notification_preferences: preferences })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Failed to save notification preferences:', error);
+        toast.error('Failed to save preferences to the server.');
+      } else {
+        toast.success('Notification preferences saved.');
+      }
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -177,9 +239,9 @@ export default function NotificationSettingsPage() {
           <Card className="p-8 bg-card text-card-foreground mb-6">
             <div className="space-y-6">
               <NotificationRow
-                title="New Job Postings or Service Requests"
-                description="Get notified when new opportunities are posted in your area or saved locations"
-                icon={Bell}
+                title="New Open Roles Added"
+                description="Get notified when new open roles are posted"
+                icon={Briefcase}
                 category="newJobPostings"
                 emailEnabled={preferences.newJobPostings.email}
                 smsEnabled={preferences.newJobPostings.sms}
@@ -188,7 +250,29 @@ export default function NotificationSettingsPage() {
               <Separator className="bg-border" />
 
               <NotificationRow
-                title="Message Received"
+                title="New Service Requests Added"
+                description="Get notified when new service requests are posted"
+                icon={MessageSquare}
+                category="newServiceRequests"
+                emailEnabled={preferences.newServiceRequests.email}
+                smsEnabled={preferences.newServiceRequests.sms}
+              />
+
+              <Separator className="bg-border" />
+
+              <NotificationRow
+                title="New Events Added"
+                description="Get notified when new events are added to the community"
+                icon={Calendar}
+                category="newEvents"
+                emailEnabled={preferences.newEvents.email}
+                smsEnabled={preferences.newEvents.sms}
+              />
+
+              <Separator className="bg-border" />
+
+              <NotificationRow
+                title="New Message Received"
                 description="Get notified when you receive a new direct message, bid, or response"
                 icon={MessageCircle}
                 category="messageReceived"
@@ -219,6 +303,14 @@ export default function NotificationSettingsPage() {
               />
             </div>
           </Card>
+
+          {!isPaid && (
+            <Card className="p-6 bg-muted border-border mb-6">
+              <p className="text-sm text-muted-foreground">
+                <strong>Paid feature:</strong> Full notification control is available for Pro users. Basic users can receive messages only.
+              </p>
+            </Card>
+          )}
 
           {/* Subscribed Topics */}
           {preferences.subscribedTopics.length > 0 && (

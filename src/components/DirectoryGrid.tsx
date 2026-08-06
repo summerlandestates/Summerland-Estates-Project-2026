@@ -1,11 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import ListingCard from './ListingCard';
 import BlurredProfileCard from './BlurredProfileCard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, MapPin, Star, BadgeCheck, Shield, Users } from 'lucide-react';
-import { shouldBlurProfile, canAccessProfile, getVisibilityRules } from '@/utils/profileVisibility';
+import { shouldBlurProfile, canAccessProfile } from '@/utils/profileVisibility';
 import type { Listing, PricingTier } from '../types';
 
 interface DirectoryGridProps {
@@ -14,8 +13,6 @@ interface DirectoryGridProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  selectedForComparison?: string[];
-  onToggleSelection?: (id: string) => void;
   onCardClick?: (id: string, e?: React.MouseEvent) => void;
   userTier?: PricingTier;
   isPublicView?: boolean;
@@ -27,8 +24,6 @@ export default function DirectoryGrid({
   currentPage,
   totalPages,
   onPageChange,
-  selectedForComparison = [],
-  onToggleSelection,
   onCardClick,
   userTier,
   isPublicView = false
@@ -42,14 +37,15 @@ export default function DirectoryGrid({
       return;
     }
 
+    const targetListing = listings.find(l => l.id === id);
+    const slug = targetListing?.slug || id;
+
     if (onCardClick) {
-      onCardClick(id, e);
+      onCardClick(slug, e);
     } else {
-      navigate(`/profile/${id}`);
+      navigate(`/profile/${slug}`);
     }
   };
-
-  const visibilityRules = getVisibilityRules(userTier, isPublicView);
 
   if (listings.length === 0) {
     return (

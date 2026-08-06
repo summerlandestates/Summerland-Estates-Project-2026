@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS event_registrations;
 CREATE TABLE event_registrations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id),
   full_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   phone VARCHAR(50),

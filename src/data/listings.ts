@@ -13,6 +13,7 @@ export const listings: Listing[] = [
     category: 'Staff',
     availability: true,
     verified: true,
+    email: 'margaret.thompson@summerlandestates.demo',
     bio: 'Experienced estate manager with over 15 years managing luxury properties. Specializing in staff coordination, property maintenance oversight, and household operations. Known for discretion and exceptional organizational skills.',
     skills: ['Staff Management', 'Budget Planning', 'Event Coordination', 'Vendor Relations', 'Property Maintenance'],
     experience: [

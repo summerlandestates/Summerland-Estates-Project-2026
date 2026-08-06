@@ -14,7 +14,8 @@ import {
   Award,
   Calendar,
   Handshake,
-  Send
+  Send,
+  Gift
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -50,6 +51,7 @@ export default function AdminSidebar({ onLogout }: AdminSidebarProps) {
     { path: '/admin/events', icon: Calendar, label: 'Events' },
     { path: '/admin/recognition', icon: Award, label: 'Recognition' },
     { path: '/admin/sponsorships', icon: Handshake, label: 'Sponsorships' },
+    { path: '/admin/promo-codes', icon: Gift, label: 'Promo Codes' },
     { path: '/admin/email-blasts', icon: Send, label: 'Email Blasts' },
     { path: '/admin/newsletter', icon: Mail, label: 'Newsletter' },
     { path: '/admin/settings', icon: Settings, label: 'Settings' },

@@ -32,20 +32,39 @@ export function shouldSendNotification(
   }
 }
 
-export function sendNotification(
+export async function sendNotification(
   payload: NotificationPayload,
   preferences: NotificationPreferences,
   userEmail: string,
   userPhone?: string
-): void {
-  // Check if email notification should be sent
-  if (shouldSendNotification(preferences, payload.type, 'email')) {
-    sendEmailNotification(payload, userEmail);
-  }
+): Promise<void> {
+  // Determine which channels to use
+  const useEmail = shouldSendNotification(preferences, payload.type, 'email');
+  const useSms = !!userPhone && shouldSendNotification(preferences, payload.type, 'sms');
 
-  // Check if SMS notification should be sent
-  if (userPhone && shouldSendNotification(preferences, payload.type, 'sms')) {
-    sendSMSNotification(payload, userPhone);
+  if (useEmail) await sendEmailNotification(payload, userEmail);
+  if (useSms) await sendSMSNotification(payload, userPhone);
+}
+
+export async function sendBackendNotification(
+  userId: string,
+  type: NotificationPayload['type'],
+  title: string,
+  body: string,
+  link?: string
+): Promise<void> {
+  try {
+    const response = await fetch('/api/send-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, type, title, body, link })
+    });
+
+    if (!response.ok) {
+      console.warn('Backend notification failed:', await response.text());
+    }
+  } catch (error) {
+    console.error('Failed to send backend notification:', error);
   }
 }
 

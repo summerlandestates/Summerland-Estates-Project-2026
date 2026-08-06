@@ -200,7 +200,7 @@ export default function SavedProfilesPage() {
                     <Button
                       variant="outline"
                       className="flex-1 border-border text-foreground hover:bg-muted"
-                      onClick={() => navigate(`/profile/${profile.id}`)}
+                      onClick={() => navigate(`/profile/${profile.slug || profile.id}`)}
                     >
                       View Profile
                     </Button>

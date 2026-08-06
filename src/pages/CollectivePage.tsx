@@ -4,6 +4,9 @@ import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import FAQSection from '../components/FAQSection';
+import UpgradePrompt from '../components/UpgradePrompt';
+import { getTierLimits } from '@/utils/tierAccess';
+import type { PricingTier } from '../types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -278,6 +281,8 @@ export default function CollectivePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userCity, setUserCity] = useState('');
   const [userState, setUserState] = useState('');
+  const [userTier, setUserTier] = useState<PricingTier | null>(null);
+  const [canAccessCommunity, setCanAccessCommunity] = useState(false);
   const [canStartCommunity, setCanStartCommunity] = useState(false);
   const [showCreateCommunityModal, setShowCreateCommunityModal] = useState(false);
   const [showCreateTopicModal, setShowCreateTopicModal] = useState(false);
@@ -290,23 +295,28 @@ export default function CollectivePage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    // Check if user is logged in and get their profile location
+
+    // Check if user is logged in and get their profile location and tier
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
     setIsLoggedIn(loggedIn);
-    
+
+    const tier = (localStorage.getItem('userTier') || 'professional-basic') as PricingTier;
+    setUserTier(tier);
+    const limits = getTierLimits(tier);
+    setCanAccessCommunity(!!limits.canAccessCommunity);
+
     if (loggedIn) {
       const profileLocation = localStorage.getItem('userLocation') || '';
       if (profileLocation) {
         const [city, state] = profileLocation.split(',').map(s => s.trim());
         setUserCity(city);
         setUserState(state);
-        
+
         // Check if community already exists for user's location
         const communityExists = communities.some(
           c => c.city === city && c.state === state
         );
-        setCanStartCommunity(!communityExists);
+        setCanStartCommunity(!communityExists && limits.canAccessCommunity);
       }
     }
   }, [communities]);
@@ -483,9 +493,19 @@ export default function CollectivePage() {
         canonical="/collective"
       />
       <NavBar currentPage="collective" />
-      
+
       <main className="pt-32 pb-16">
         <div className="container mx-auto px-8 max-w-7xl">
+          {!canAccessCommunity && (
+            <div className="mb-12">
+              <UpgradePrompt
+                feature="Community Access"
+                message="Join The Collective and connect with local estate professionals. Community access is included with the Pro plan."
+                currentTier={userTier || undefined}
+              />
+            </div>
+          )}
+
           {/* Header */}
           <div className="mb-12">
             <div className="flex items-center justify-between mb-6">
@@ -502,7 +522,7 @@ export default function CollectivePage() {
                 size="lg"
                 className="bg-primary text-primary-foreground px-8 py-4"
               >
-                Join Communities
+                {canAccessCommunity ? 'Join Communities' : 'Upgrade to Pro'}
               </Button>
             </div>
 
@@ -514,6 +534,7 @@ export default function CollectivePage() {
           </div>
 
           {/* Active Communities */}
+          {canAccessCommunity && (
           <div className="mb-12">
             <h2 className="text-3xl font-heading font-medium text-foreground mb-6 tracking-tight">
               Active Communities
@@ -566,9 +587,10 @@ export default function CollectivePage() {
               ))}
             </div>
           </div>
+          )}
 
           {/* Forum Topics by Community */}
-          {Object.entries(topicsByCommunity).map(([communityName, communityTopics]) => {
+          {canAccessCommunity && Object.entries(topicsByCommunity).map(([communityName, communityTopics]) => {
             const [city, state] = communityName.split(',').map(s => s.trim());
             const isUserCommunity = city === userCity && state === userState;
             const hasJoined = localStorage.getItem(`joined_${city}_${state}`) === 'true';
@@ -680,30 +702,42 @@ export default function CollectivePage() {
               {isLoggedIn ? (
                 <>
                   <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-                    {canStartCommunity 
-                      ? `Create a community for your city and be the first member.`
-                      : `A community already exists for ${userCity}, ${userState}. Join it to connect with your neighbors!`}
+                    {canAccessCommunity
+                      ? (canStartCommunity
+                        ? `Create a community for your city and be the first member.`
+                        : `A community already exists for ${userCity}, ${userState}. Join it to connect with your neighbors!`)
+                      : `Community access is included with the Pro plan. Upgrade to connect with your local estate community.`}
                   </p>
-                  
-                  {canStartCommunity ? (
-                    <Button
-                      onClick={handleStartCommunityClick}
-                      size="lg"
-                      className="bg-primary text-primary-foreground px-12 py-4"
-                    >
-                      <Plus className="w-5 h-5 mr-2" />
-                      Start a Community
-                    </Button>
+
+                  {canAccessCommunity ? (
+                    canStartCommunity ? (
+                      <Button
+                        onClick={handleStartCommunityClick}
+                        size="lg"
+                        className="bg-primary text-primary-foreground px-12 py-4"
+                      >
+                        <Plus className="w-5 h-5 mr-2" />
+                        Start a Community
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => navigate('/pricing')}
+                        size="lg"
+                        className="bg-primary text-primary-foreground px-12 py-4"
+                      >
+                        Join {userCity} Community
+                      </Button>
+                    )
                   ) : (
                     <Button
                       onClick={() => navigate('/pricing')}
                       size="lg"
                       className="bg-primary text-primary-foreground px-12 py-4"
                     >
-                      Join {userCity} Community
+                      Upgrade to Pro
                     </Button>
                   )}
-                  
+
                   <p className="text-sm text-muted-foreground mt-6">
                     You can only start a community that matches your profile location
                   </p>

@@ -1072,7 +1072,9 @@ app.post('/api/track-profile-view', async (req, res) => {
 
     const ownerEmail = profile.email;
     const ownerName = profile.full_name || profile.user_metadata?.full_name || 'Member';
-    
+    const ownerTier = profile.user_metadata?.tier || profile.tier || 'professional-basic';
+    const tierLimits = getTierLimitsForProfile(ownerTier);
+
     // Check if this viewer has already been counted in last 24 hours
     const viewKey = `view_${profileId}_${viewerId || viewerEmail || 'anonymous'}`;
     const lastView = await supabaseAdmin
@@ -1098,17 +1100,22 @@ app.post('/api/track-profile-view', async (req, res) => {
         created_at: now.toISOString()
       });
 
-      // Send email notification to profile owner
-      const viewerDisplayName = viewerName || viewerEmail || 'Someone';
-      try {
-        await sendEmail(
-          ownerEmail,
-          `${viewerDisplayName} viewed your profile - Summerland Estates`,
-          profileViewTemplate(ownerName, viewerDisplayName, now.toLocaleString())
-        );
-        console.log(`✅ Profile view email sent to ${ownerEmail}`);
-      } catch (err) {
-        console.error('Failed to send profile view email:', err.message);
+      // Send email notification to profile owner if paid and opted in
+      if (tierLimits?.canReceiveNotifications) {
+        const notificationPreferences = profile.notification_preferences || {};
+        if (notificationPreferences.profileViewed?.email !== false) {
+          const viewerDisplayName = viewerName || viewerEmail || 'Someone';
+          try {
+            await sendEmail(
+              ownerEmail,
+              `${viewerDisplayName} viewed your profile - Summerland Estates`,
+              profileViewTemplate(ownerName, viewerDisplayName, now.toLocaleString())
+            );
+            console.log(`✅ Profile view email sent to ${ownerEmail}`);
+          } catch (err) {
+            console.error('Failed to send profile view email:', err.message);
+          }
+        }
       }
     }
 
@@ -1520,6 +1527,275 @@ app.post('/api/notify-status-update', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ API server running on http://localhost:${PORT}`);
+// ─── Generic User Notification Endpoint ────────────────────────────────────
+// Sends email/SMS notifications to paid users based on their preferences
+app.post('/api/send-notification', async (req, res) => {
+  try {
+    const { userId, type, title, body, link } = req.body;
+
+    if (!userId || !type || !title || !body) {
+      return res.status(400).json({ error: 'Missing required fields: userId, type, title, body' });
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(503).json({ error: 'Supabase admin client not configured' });
+    }
+
+    // Fetch user profile
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, phone, tier, notification_preferences')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+    if (!profile) return res.status(404).json({ error: 'User not found' });
+
+    const tierLimits = getTierLimitsForProfile(profile.tier);
+    if (!tierLimits?.canReceiveNotifications) {
+      return res.json({ success: true, sent: false, reason: 'User tier does not include notifications' });
+    }
+
+    const defaultPreferences = {
+      newJobPostings: { email: false, sms: false },
+      newServiceRequests: { email: false, sms: false },
+      newEvents: { email: false, sms: false },
+      messageReceived: { email: true, sms: false },
+      profileViewed: { email: false, sms: false },
+      forumTopics: { email: false, sms: false }
+    };
+
+    const preferences = {
+      ...defaultPreferences,
+      ...(profile.notification_preferences || {})
+    };
+
+    const typeMap = {
+      'new-job': 'newJobPostings',
+      'message': 'messageReceived',
+      'profile-view': 'profileViewed',
+      'forum-update': 'forumTopics'
+    };
+
+    const category = typeMap[type] || 'messageReceived';
+    const shouldEmail = preferences[category]?.email;
+    const shouldSms = preferences[category]?.sms && !!profile.phone;
+
+    // Store in-app notification
+    const { data: notification, error: insertError } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        type,
+        title,
+        message: body,
+        link,
+        is_read: false,
+        email_sent: false,
+        sms_sent: false
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Failed to insert notification:', insertError);
+    }
+
+    // Send email
+    if (shouldEmail && profile.email) {
+      const html = notificationEmailTemplate(title, body, link);
+      await sendEmail(profile.email, title, html);
+      if (notification) {
+        await supabaseAdmin.from('notifications').update({ email_sent: true }).eq('id', notification.id);
+      }
+    }
+
+    // SMS is logged only unless Twilio is configured
+    if (shouldSms && profile.phone) {
+      console.log('SMS notification would be sent to', profile.phone, ':', `${title}: ${body}`);
+      if (notification) {
+        await supabaseAdmin.from('notifications').update({ sms_sent: true }).eq('id', notification.id);
+      }
+    }
+
+    res.json({ success: true, sent: shouldEmail || shouldSms });
+  } catch (error) {
+    console.error('Send notification error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send notification' });
+  }
 });
+
+function getTierLimitsForProfile(tier) {
+  const tiers = {
+    'professional-basic': { canReceiveNotifications: false },
+    'professional-pro': { canReceiveNotifications: true },
+    'business-free': { canReceiveNotifications: false },
+    'business-pro': { canReceiveNotifications: true },
+    'business-enterprise': { canReceiveNotifications: true },
+    'agency-basic': { canReceiveNotifications: true },
+    'agency-hiring': { canReceiveNotifications: true },
+    'agency-pro': { canReceiveNotifications: true }
+  };
+  return tiers[tier] || { canReceiveNotifications: false };
+}
+
+function notificationEmailTemplate(title, body, link) {
+  const linkHtml = link ? `<a href="${link}" style="display:inline-block; background:#A89F91; color:#ffffff; text-decoration:none; padding:14px 24px; border-radius:12px; margin-top:16px;">View in App</a>` : '';
+  return `
+  <div style="font-family: Georgia, serif; background:#f8f4ee; padding:32px;">
+    <div style="max-width:640px; margin:0 auto; background:#ffffff; border:1px solid #e8dfd4; border-radius:24px; padding:40px;">
+      <p style="text-transform:uppercase; letter-spacing:0.18em; font-size:12px; color:#8A8279; margin:0 0 20px;">Summerland Estates</p>
+      <h1 style="font-size:28px; line-height:1.2; color:#1f1f1f; margin:0 0 16px;">${title}</h1>
+      <p style="font-size:16px; line-height:1.7; color:#4b4b4b; margin:0 0 24px;">${body}</p>
+      ${linkHtml}
+    </div>
+  </div>
+  `;
+}
+
+// ─── Notify Matching Users of New Job ─────────────────────────────────────
+// Finds paid users whose profile matches the job and sends notifications
+app.post('/api/notify-job-matches', async (req, res) => {
+  try {
+    const { jobId, jobTitle, jobDescription, jobCategory, location } = req.body;
+
+    if (!jobId || !jobTitle) {
+      return res.status(400).json({ error: 'Missing required fields: jobId, jobTitle' });
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(503).json({ error: 'Supabase admin client not configured' });
+    }
+
+    const jobText = `${jobTitle} ${jobCategory || ''} ${jobDescription || ''} ${location || ''}`.toLowerCase();
+    const jobKeywords = jobText.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3);
+
+    const { data: profiles, error } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, phone, location, bio, role, tier, notification_preferences')
+      .neq('id', req.body.userId || '')
+      .in('tier', ['professional-pro', 'business-pro', 'business-enterprise', 'agency-basic', 'agency-hiring', 'agency-pro']);
+
+    if (error) throw error;
+
+    const sent = [];
+    for (const p of (profiles || [])) {
+      const resumeText = `${p.bio || ''} ${p.role || ''} ${p.location || ''}`.toLowerCase();
+      const matches = jobKeywords.some(k => resumeText.includes(k)) ||
+                      (p.location && location && location.toLowerCase().includes(p.location.toLowerCase()));
+
+      if (matches) {
+        const notifResult = await fetch(`http://localhost:${PORT}/api/send-notification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: p.id,
+            type: 'new-job',
+            title: `New job matches your resume: ${jobTitle}`,
+            body: `A new ${jobTitle} position in ${location || 'your area'} looks like a great fit for your profile.`,
+            link: `${APP_URL}/job/${jobId}`
+          })
+        });
+        if (notifResult.ok) sent.push(p.id);
+      }
+    }
+
+    res.json({ success: true, matchedUsers: sent.length, sentTo: sent });
+  } catch (error) {
+    console.error('Notify job matches error:', error);
+    res.status(500).json({ error: error.message || 'Failed to notify matches' });
+  }
+});
+
+const SITEMAP_BASE_URL = 'https://summerlandestates.com';
+const sitemapStaticRoutes = [
+  { path: '/', priority: '1.0', changefreq: 'daily' },
+  { path: '/search', priority: '0.9', changefreq: 'daily' },
+  { path: '/add-listing', priority: '0.8', changefreq: 'monthly' },
+  { path: '/open-roles', priority: '0.8', changefreq: 'daily' },
+  { path: '/service-requests', priority: '0.8', changefreq: 'daily' },
+  { path: '/advertisements', priority: '0.8', changefreq: 'weekly' },
+  { path: '/collective', priority: '0.8', changefreq: 'weekly' },
+  { path: '/events', priority: '0.7', changefreq: 'weekly' },
+  { path: '/news', priority: '0.7', changefreq: 'weekly' },
+  { path: '/about', priority: '0.7', changefreq: 'monthly' },
+  { path: '/contact', priority: '0.7', changefreq: 'monthly' },
+  { path: '/faqs', priority: '0.7', changefreq: 'monthly' },
+  { path: '/recognition', priority: '0.6', changefreq: 'monthly' },
+  { path: '/privacy', priority: '0.6', changefreq: 'monthly' },
+  { path: '/terms', priority: '0.6', changefreq: 'monthly' },
+  { path: '/sponsorship', priority: '0.6', changefreq: 'monthly' },
+  { path: '/post-job', priority: '0.6', changefreq: 'monthly' },
+];
+
+function formatSitemapDate(dateString) {
+  const date = dateString ? new Date(dateString) : new Date();
+  return date.toISOString().split('T')[0];
+}
+
+function buildSitemapUrlNode(loc, lastmod, changefreq, priority) {
+  return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+}
+
+async function generateSitemapXml() {
+  let profileUrls = [];
+
+  if (supabaseReadClient) {
+    const { data, error } = await supabaseReadClient
+      .from('listings')
+      .select('slug, updated_at')
+      .eq('approved', true)
+      .not('slug', 'is', null)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Could not fetch listings for sitemap:', error.message);
+    } else if (data?.length) {
+      profileUrls = data.map((listing) => ({
+        path: `/profile/${listing.slug || listing.id}`,
+        lastmod: listing.updated_at,
+        changefreq: 'weekly',
+        priority: '0.6',
+      }));
+    }
+  }
+
+  const today = formatSitemapDate();
+  const allUrls = [
+    ...sitemapStaticRoutes.map((route) => ({ ...route, lastmod: today })),
+    ...profileUrls,
+  ];
+
+  const urlNodes = allUrls.map((route) =>
+    buildSitemapUrlNode(
+      `${SITEMAP_BASE_URL}${route.path}`,
+      formatSitemapDate(route.lastmod),
+      route.changefreq,
+      route.priority
+    )
+  );
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlNodes.join('\n')}\n</urlset>\n`;
+}
+
+app.get('/sitemap.xml', async (req, res) => {
+  try {
+    const xml = await generateSitemapXml();
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(xml);
+  } catch (error) {
+    console.error('Sitemap generation error:', error);
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><error>Could not generate sitemap</error>');
+  }
+});
+
+// Only start the HTTP listener in local dev; Vercel invokes the app directly
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`✅ API server running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

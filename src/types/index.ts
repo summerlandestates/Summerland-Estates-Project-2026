@@ -189,6 +189,8 @@ export interface PricingPlan {
 
 export interface Listing {
   id: string;
+  slug: string;
+  userId?: string;
   profilePhoto: string;
   name: string;
   role: string;
@@ -203,14 +205,13 @@ export interface Listing {
   bio: string;
   skills?: string[];
   experience?: string[];
-  
+
   profileStatus?: ProfileStatus;
   hideDetailedInfo?: boolean;
-  
+
   isOnlineNow?: boolean;
   lastOnline?: string;
 
-  
   hourlyRate?: string;
   languages?: string[];
   
@@ -249,6 +250,7 @@ export interface Listing {
   
   reviews?: Review[];
   
+  email?: string;
   businessWebsite?: string;
   businessEmail?: string;
   businessPhone?: string;
@@ -328,6 +330,14 @@ export interface FilterState {
 
 export interface NotificationPreferences {
   newJobPostings: {
+    email: boolean;
+    sms: boolean;
+  };
+  newServiceRequests: {
+    email: boolean;
+    sms: boolean;
+  };
+  newEvents: {
     email: boolean;
     sms: boolean;
   };
@@ -420,4 +430,7 @@ export interface CheckoutData {
   planName: string;
   planPrice: string;
   applicationData: SerializedApplicationData;
+  promoCode?: string;
+  promoCodeId?: string;
+  promoExpiresAt?: string;
 }

@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import SEOHead from '@/components/SEOHead';
 import ArticleManager from '@/components/ArticleManager';
 import ProfileAnalytics from '@/components/ProfileAnalytics';
+import MatchedJobs from '@/components/MatchedJobs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -150,6 +151,7 @@ export default function UserDashboard() {
   const [myRecognitions, setMyRecognitions] = useState<MyRecognition[]>([]);
   const [myPlans, setMyPlans] = useState<MyPlan[]>([]);
   const [profileData, setProfileData] = useState<any>(null);
+  const [userTier, setUserTier] = useState<string>(localStorage.getItem('userTier') || 'professional-basic');
   
   const { user, signOut, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -217,6 +219,9 @@ export default function UserDashboard() {
       
       if (error) throw error;
       setProfileData(data);
+      const tier = data?.tier || localStorage.getItem('userTier') || 'professional-basic';
+      setUserTier(tier);
+      localStorage.setItem('userTier', tier);
     } catch (error) {
       console.error('Failed to load profile:', error);
     }
@@ -653,9 +658,18 @@ export default function UserDashboard() {
 
               {/* Profile Analytics */}
               <div className="mb-8">
-                <ProfileAnalytics 
-                  userId={user?.id || ''} 
+                <ProfileAnalytics
+                  userId={user?.id || ''}
                   isPremium={user?.user_metadata?.tier?.includes('premium') || false}
+                />
+              </div>
+
+              {/* Matched Jobs */}
+              <div className="mb-8">
+                <MatchedJobs
+                  userId={user?.id || ''}
+                  userTier={userTier as any}
+                  maxResults={5}
                 />
               </div>
 
@@ -1249,13 +1263,20 @@ export default function UserDashboard() {
                   <MessageSquare className="w-5 h-5 text-[#A89F91]" />
                   Messages
                 </CardTitle>
-                <CardDescription>Your inbox and conversations</CardDescription>
+                <CardDescription>Your inbox and conversations (unlimited on all paid professional plans)</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-12">
                   <MessageSquare className="w-16 h-16 text-[#A89F91]/30 mx-auto mb-4" />
-                  <p className="text-[#6b665f] text-lg">No messages yet</p>
-                  <p className="text-sm text-[#6b665f]/70 mt-1">Connect with other professionals</p>
+                  <p className="text-[#6b665f] text-lg">Open your messaging inbox</p>
+                  <p className="text-sm text-[#6b665f]/70 mt-1 mb-6">Connect with other professionals. Basic and Pro plans include unlimited messaging.</p>
+                  <Button
+                    onClick={() => navigate('/messaging')}
+                    className="bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    View Messages
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -1341,6 +1362,7 @@ export default function UserDashboard() {
                   userId={user?.id || ''}
                   userName={getUserDisplayName()}
                   userAvatar={getProfileImage()}
+                  userTier={userTier as any}
                 />
               </CardContent>
             </Card>

@@ -1,6 +1,7 @@
 -- Sponsorships Table
 CREATE TABLE IF NOT EXISTS sponsorships (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),
   company_name TEXT NOT NULL,
   contact_name TEXT NOT NULL,
   email TEXT NOT NULL,
@@ -17,6 +18,8 @@ CREATE TABLE IF NOT EXISTS sponsorships (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_sponsorships_user_id ON sponsorships(user_id);
 
 -- Enable RLS
 ALTER TABLE sponsorships ENABLE ROW LEVEL SECURITY;

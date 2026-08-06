@@ -23,23 +23,21 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import DirectoryGrid from '../components/DirectoryGrid';
 import { 
   Search, 
-  MapPin, 
   Filter, 
   Grid, 
   List, 
   X, 
   ChevronLeft, 
   ChevronRight,
-  BadgeCheck,
-  Shield,
-  Star,
-  Users
+  Users,
+  Loader2
 } from 'lucide-react';
-import { listings } from '../data/listings';
-import { professionalTitles, languages, certifications, serviceTypes } from '../data/profileOptions';
-import type { Listing, FilterState } from '../types';
+import { fetchListings } from '../utils/listings';
+import { professionalTitles, languages } from '../data/profileOptions';
+import type { Listing, FilterState, PricingTier } from '../types';
 
 const locationOptions = [
   'Beverly Hills, CA',
@@ -87,10 +85,15 @@ const comfortWithOptions = [
 export default function SearchPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredListings, setFilteredListings] = useState<Listing[]>(listings);
+  const [allListings, setAllListings] = useState<Listing[]>([]);
+  const [filteredListings, setFilteredListings] = useState<Listing[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
+  const [isPublicView, setIsPublicView] = useState(true);
   const itemsPerPage = 12;
 
   // Filter states
@@ -117,14 +120,37 @@ export default function SearchPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+
+    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    setIsPublicView(!loggedIn);
+    if (loggedIn) {
+      const tier = localStorage.getItem('userTier') as PricingTier | undefined;
+      setUserTier(tier);
+    }
+
+    const loadListings = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchListings();
+        setAllListings(data);
+        setFilteredListings(data);
+      } catch (err: any) {
+        console.error('Failed to load listings:', err);
+        setError(err.message || 'Failed to load profiles');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadListings();
   }, []);
 
   useEffect(() => {
     applyFilters();
-  }, [filters, searchQuery]);
+  }, [filters, searchQuery, allListings]);
 
   const applyFilters = () => {
-    let filtered = [...listings];
+    let filtered = [...allListings];
 
     // Search query
     if (searchQuery) {
@@ -306,6 +332,24 @@ export default function SearchPage() {
         title="Find Estate Professionals - Summerland Estates"
         description="Search and connect with verified estate professionals including private chefs, housekeepers, estate managers, and luxury service providers."
         canonical="/search"
+        ogImage="https://summerlandestates.com/images/home-banner.jpg"
+        schema={{
+          '@context': 'https://schema.org',
+          '@type': 'CollectionPage',
+          name: 'Find Estate Professionals',
+          description: 'Search and connect with verified estate professionals.',
+          url: 'https://summerlandestates.com/search',
+          mainEntity: {
+            '@type': 'ItemList',
+            itemListElement: currentListings.slice(0, 10).map((listing, i) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              name: listing.name,
+              description: listing.bio || listing.role,
+              url: `https://summerlandestates.com/profile/${listing.slug || listing.id}`,
+            })),
+          },
+        }}
       />
       <NavBar currentPage="search" />
       
@@ -419,8 +463,10 @@ export default function SearchPage() {
                           <SelectContent>
                             <SelectItem value="all">All Categories</SelectItem>
                             <SelectItem value="staff">Professionals</SelectItem>
+                            <SelectItem value="vendor">Vendors</SelectItem>
                             <SelectItem value="business">Service Providers</SelectItem>
                             <SelectItem value="agency">Agencies</SelectItem>
+                            <SelectItem value="estates">Estates</SelectItem>
                           </SelectContent>
                         </Select>
                       </AccordionContent>
@@ -609,7 +655,20 @@ export default function SearchPage() {
 
             {/* Results Grid */}
             <div className="flex-1">
-              {currentListings.length === 0 ? (
+              {loading ? (
+                <Card className="p-12 text-center">
+                  <Loader2 className="w-12 h-12 mx-auto text-[#A89F91] animate-spin mb-4" />
+                  <h3 className="text-lg font-medium">Loading profiles...</h3>
+                </Card>
+              ) : error ? (
+                <Card className="p-12 text-center">
+                  <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-heading font-semibold text-foreground mb-2">
+                    Could not load profiles
+                  </h3>
+                  <p className="text-muted-foreground mb-4">{error}</p>
+                </Card>
+              ) : currentListings.length === 0 ? (
                 <Card className="p-12 text-center">
                   <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-xl font-heading font-semibold text-foreground mb-2">
@@ -627,162 +686,15 @@ export default function SearchPage() {
                   </Button>
                 </Card>
               ) : (
-                <>
-                  <div className={viewMode === 'grid' 
-                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
-                    : 'space-y-4'
-                  }>
-                    {currentListings.flatMap((listing, index) => {
-                      // Insert NativeAd after the first visible (non-blurred) listing
-                      const elements = [];
-                      
-                      // Add the listing card
-                      elements.push(
-                        <Card
-                          key={listing.id}
-                          className={`bg-card cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border relative ${
-                            listing.priorityListing ? 'border-[#A89F91] border-2' : ''
-                          } ${index >= 2 ? 'blur-[2px] pointer-events-none' : ''}`}
-                          onClick={() => index < 2 ? navigate(`/profile/${listing.id}`) : undefined}
-                        >
-                        {index >= 2 && (
-                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-lg">
-                            <div className="text-center p-4">
-                              <p className="font-semibold text-foreground mb-2">Join to see more</p>
-                              <Button 
-                                size="sm" 
-                                className="rounded-full bg-[#A89F91] text-white hover:bg-[#948979]"
-                                onClick={() => navigate('/signup')}
-                              >
-                                Sign Up
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                        {viewMode === 'grid' ? (
-                          <div className="p-6">
-                            <div className="flex flex-col items-center text-center">
-                              <div className="relative w-24 h-24 rounded-full bg-[#A89F91]/20 flex items-center justify-center mb-4 overflow-hidden">
-                                {listing.profilePhoto ? (
-                                  <img src={listing.profilePhoto} alt={listing.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <Users className="w-12 h-12 text-[#A89F91]" />
-                                )}
-                                {listing.isOnlineNow && (
-                                  <div className="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1 mb-1">
-                                <h3 className="font-heading font-semibold text-foreground">{listing.name}</h3>
-                                {listing.verified && (
-                                  <BadgeCheck className="w-4 h-4 text-[#A89F91]" />
-                                )}
-                                {listing.backgroundCheckAvailable && (
-                                  <Shield className="w-4 h-4 text-green-600" />
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-1">{listing.role}</p>
-                              <div className="flex items-center text-xs text-muted-foreground mb-2">
-                                <MapPin className="w-3 h-3 mr-1" />
-                                {listing.location}
-                              </div>
-                              <div className="flex items-center gap-2 mb-3">
-                                <div className="flex items-center">
-                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 mr-1" />
-                                  <span className="text-xs font-medium">{listing.rating}</span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">•</span>
-                                <span className="text-xs text-muted-foreground">{listing.experienceYears} yrs exp</span>
-                              </div>
-                              {listing.availability && (
-                                <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">
-                                  Available Now
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="p-4 flex items-center gap-4">
-                            <div className="relative w-16 h-16 rounded-full bg-[#A89F91]/20 flex items-center justify-center overflow-hidden flex-shrink-0">
-                              {listing.profilePhoto ? (
-                                <img src={listing.profilePhoto} alt={listing.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <Users className="w-8 h-8 text-[#A89F91]" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1">
-                                <h3 className="font-heading font-semibold text-foreground truncate">{listing.name}</h3>
-                                {listing.verified && <BadgeCheck className="w-4 h-4 text-[#A89F91] flex-shrink-0" />}
-                                {listing.backgroundCheckAvailable && <Shield className="w-4 h-4 text-green-600 flex-shrink-0" />}
-                              </div>
-                              <p className="text-sm text-muted-foreground">{listing.role}</p>
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className="text-xs text-muted-foreground flex items-center">
-                                  <MapPin className="w-3 h-3 mr-1" />
-                                  {listing.location}
-                                </span>
-                                <span className="text-xs text-muted-foreground flex items-center">
-                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 mr-1" />
-                                  {listing.rating}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              {listing.availability && (
-                                <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">
-                                  Available
-                                </Badge>
-                              )}
-                              <span className="text-xs text-muted-foreground">{listing.experienceYears} yrs exp</span>
-                            </div>
-                          </div>
-                        )}
-                      </Card>
-                      );
-                      
-                      // Insert NativeAd after the 2nd listing in grid view (index 1)
-                      if (index === 1 && viewMode === 'grid') {
-                        elements.push(<NativeAd key="native-ad-1" position="search_results" />);
-                      }
-                      
-                      return elements;
-                    })}
-                  </div>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 mt-8">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setCurrentPage(page)}
-                          className={currentPage === page ? 'bg-[#A89F91] text-white' : ''}
-                        >
-                          {page}
-                        </Button>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </>
+                <DirectoryGrid
+                  listings={currentListings}
+                  viewMode={viewMode}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  userTier={userTier}
+                  isPublicView={isPublicView}
+                />
               )}
             </div>
           </div>

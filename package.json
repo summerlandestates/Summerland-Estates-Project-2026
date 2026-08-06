@@ -8,7 +8,8 @@
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:api\"",
     "dev:vite": "vite",
     "dev:api": "node dev-server.js",
-    "build": "vite build"
+    "sitemap": "node scripts/generate-sitemap.js",
+    "build": "npm run sitemap && vite build"
   },
   "dependencies": {
     "@netlify/functions": "^5.1.2",

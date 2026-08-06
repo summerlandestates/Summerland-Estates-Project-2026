@@ -63,6 +63,21 @@ VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
+## ▲ Vercel Deployment
+
+1. **Connect your GitHub repo** to a Vercel project.
+2. **Framework preset**: Vercel will auto-detect Vite.
+3. **Environment variables**: Add every variable from `.env.example` in the Vercel dashboard (Project → Settings → Environment Variables). Make sure they are also exposed to **Production**.
+4. **Build command**: leave as `npm run build`.
+5. **Output directory**: `dist`.
+
+### Important Vercel behavior
+- `vercel.json` at the repo root handles routing:
+  - `/sitemap.xml` is served by the serverless function at `/api/sitemap.xml`
+  - All other `/api/*` routes are handled by the Express app exposed through `api/[...route].ts`
+  - All non-API/non-static routes fall back to `index.html` for the React SPA
+- A static `dist/sitemap.xml` is intentionally **not** produced, so the dynamic sitemap function always runs.
+
 ## 🏗 Build for Production
 
 ```bash

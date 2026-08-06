@@ -6,6 +6,13 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { getTierLimits } from '@/utils/tierAccess';
+import { sendBackendNotification } from '@/utils/notifications';
 import { 
   ArrowLeft,
   Users, 
@@ -14,8 +21,9 @@ import {
   Calendar,
   Clock,
   FileText,
-  Mail,
-  Loader2
+  Loader2,
+  Send,
+  CheckCircle
 } from 'lucide-react';
 
 interface ServiceRequest {
@@ -35,15 +43,128 @@ interface ServiceRequest {
 export default function ServiceRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [service, setService] = useState<ServiceRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bidding, setBidding] = useState(false);
+  const [hasBid, setHasBid] = useState(false);
+  const [bidForm, setBidForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    amount: '',
+    message: ''
+  });
 
   useEffect(() => {
     window.scrollTo(0, 0);
     if (id) {
       fetchService();
+      checkExistingBid();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (user && service) {
+      checkExistingBid();
+    }
+  }, [user, service]);
+
+  const checkExistingBid = async () => {
+    if (!user || !id) return;
+    const { data } = await supabase
+      .from('service_bids')
+      .select('id')
+      .eq('service_request_id', id)
+      .eq('bidder_id', user.id)
+      .single();
+    setHasBid(!!data);
+  };
+
+  const getMonthlyBidCount = async () => {
+    if (!user) return 0;
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const { count } = await supabase
+      .from('service_bids')
+      .select('*', { count: 'exact', head: true })
+      .eq('bidder_id', user.id)
+      .gte('created_at', startOfMonth.toISOString());
+    return count || 0;
+  };
+
+  const handleBid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error('Please sign in to submit a bid');
+      navigate('/login');
+      return;
+    }
+    if (!service) return;
+    if (!bidForm.name.trim() || !bidForm.email.trim()) {
+      toast.error('Please fill in your name and email');
+      return;
+    }
+    const quoteAmount = parseFloat(bidForm.amount);
+    if (!bidForm.amount.trim() || isNaN(quoteAmount) || quoteAmount <= 0) {
+      toast.error('Please enter a valid quote amount');
+      return;
+    }
+
+    setBidding(true);
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .single();
+
+      const limits = getTierLimits(profile?.tier || 'professional-basic');
+      if (!limits.canBidOnRequests) {
+        toast.error('Bidding is not available on your current plan');
+        return;
+      }
+      if (limits.bidLimit) {
+        const count = await getMonthlyBidCount();
+        if (count >= limits.bidLimit) {
+          toast.error(`You have reached your limit of ${limits.bidLimit} bids this month. Upgrade to Pro for unlimited bidding.`);
+          return;
+        }
+      }
+
+      const { error } = await supabase.from('service_bids').insert({
+        service_request_id: service.id,
+        bidder_id: user.id,
+        bidder_name: bidForm.name,
+        bidder_email: bidForm.email,
+        bidder_phone: bidForm.phone || null,
+        quote_amount: quoteAmount,
+        message: bidForm.message || null,
+      });
+
+      if (error) throw error;
+
+      // Notify service request owner
+      if (service?.user_id) {
+        await sendBackendNotification(
+          service.user_id,
+          'message',
+          `New bid for ${service.service_needed}`,
+          `${bidForm.name} submitted a $${quoteAmount.toFixed(2)} bid for your ${service.service_needed} request.`,
+          `/service-request/${service.id}`
+        );
+      }
+
+      setHasBid(true);
+      toast.success('Bid submitted successfully');
+      setBidForm({ name: '', email: '', phone: '', amount: '', message: '' });
+    } catch (error: any) {
+      toast.error('Failed to submit bid', { description: error.message });
+    } finally {
+      setBidding(false);
+    }
+  };
 
   const fetchService = async () => {
     setLoading(true);
@@ -187,19 +308,90 @@ export default function ServiceRequestDetailPage() {
                   <h3 className="text-lg font-heading font-bold text-foreground mb-4">
                     Interested in this Request?
                   </h3>
-                  <Button 
-                    className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white mb-4"
-                    onClick={() => {
-                      const subject = encodeURIComponent(`Bid for Service: ${service.service_needed}`);
-                      const body = encodeURIComponent(`Hello,\n\nI am interested in providing services for your request: ${service.service_needed}\n\nLocation: ${service.location}\nDate Needed: ${formatDate(service.date_needed)}\n\nMy proposed quote: [Enter your quote]\n\nDetails about my services:\n[Describe your experience and how you can help]\n\nBest regards,\n[Your Name]`);
-                      window.location.href = `mailto:support@summerlandestates.com?subject=${subject}&body=${body}`;
-                    }}
-                  >
-                    <Mail className="w-4 h-4 mr-2" />
-                    Submit a Bid
-                  </Button>
-                  <p className="text-sm text-muted-foreground text-center">
-                    Contact the requester to discuss details and pricing.
+                  
+                  {hasBid ? (
+                    <div className="text-center py-4">
+                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                      <p className="font-medium text-foreground">Bid Submitted</p>
+                      <p className="text-sm text-muted-foreground mt-1">The requester will review your bid.</p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleBid} className="space-y-4">
+                      {!user && (
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Please sign in to submit a bid.
+                        </p>
+                      )}
+                      <div>
+                        <Label htmlFor="bid-name" className="text-sm">Your Name</Label>
+                        <Input
+                          id="bid-name"
+                          value={bidForm.name}
+                          onChange={(e) => setBidForm({ ...bidForm, name: e.target.value })}
+                          placeholder="Full name"
+                          required
+                          disabled={!user || bidding}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bid-email" className="text-sm">Email</Label>
+                        <Input
+                          id="bid-email"
+                          type="email"
+                          value={bidForm.email}
+                          onChange={(e) => setBidForm({ ...bidForm, email: e.target.value })}
+                          placeholder="you@email.com"
+                          required
+                          disabled={!user || bidding}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bid-phone" className="text-sm">Phone</Label>
+                        <Input
+                          id="bid-phone"
+                          value={bidForm.phone}
+                          onChange={(e) => setBidForm({ ...bidForm, phone: e.target.value })}
+                          placeholder="(optional)"
+                          disabled={!user || bidding}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bid-amount" className="text-sm">Quote Amount ($)</Label>
+                        <Input
+                          id="bid-amount"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={bidForm.amount}
+                          onChange={(e) => setBidForm({ ...bidForm, amount: e.target.value })}
+                          placeholder="e.g., 150"
+                          required
+                          disabled={!user || bidding}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bid-message" className="text-sm">Message</Label>
+                        <Textarea
+                          id="bid-message"
+                          value={bidForm.message}
+                          onChange={(e) => setBidForm({ ...bidForm, message: e.target.value })}
+                          placeholder="Describe your experience and how you can help..."
+                          rows={4}
+                          disabled={!user || bidding}
+                        />
+                      </div>
+                      <Button 
+                        type="submit"
+                        className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                        disabled={!user || bidding}
+                      >
+                        {bidding ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                        {bidding ? 'Submitting...' : 'Submit a Bid'}
+                      </Button>
+                    </form>
+                  )}
+                  <p className="text-sm text-muted-foreground text-center mt-4">
+                    The requester will be notified and can contact you.
                   </p>
                 </Card>
 

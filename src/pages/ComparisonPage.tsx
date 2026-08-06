@@ -127,7 +127,7 @@ export default function ComparisonPage() {
                   <Button
                     variant="outline"
                     className="w-full border-border text-foreground hover:bg-muted"
-                    onClick={() => navigate(`/profile/${profile.id}`)}
+                    onClick={() => navigate(`/profile/${profile.slug || profile.id}`)}
                   >
                     View Full Profile
                   </Button>

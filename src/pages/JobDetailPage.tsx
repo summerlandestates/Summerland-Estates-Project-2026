@@ -6,6 +6,13 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { getTierLimits } from '@/utils/tierAccess';
+import { sendBackendNotification } from '@/utils/notifications';
 import { 
   ArrowLeft,
   Briefcase, 
@@ -16,7 +23,9 @@ import {
   Phone,
   User,
   Building2,
-  Loader2
+  Loader2,
+  Send,
+  CheckCircle
 } from 'lucide-react';
 
 interface JobPosting {
@@ -62,15 +71,121 @@ interface JobPosting {
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [job, setJob] = useState<JobPosting | null>(null);
   const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [applicationForm, setApplicationForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    coverMessage: ''
+  });
 
   useEffect(() => {
     window.scrollTo(0, 0);
     if (id) {
       fetchJob();
+      checkExistingApplication();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (user && job) {
+      checkExistingApplication();
+    }
+  }, [user, job]);
+
+  const checkExistingApplication = async () => {
+    if (!user || !id) return;
+    const { data } = await supabase
+      .from('job_applications')
+      .select('id')
+      .eq('job_posting_id', id)
+      .eq('applicant_id', user.id)
+      .single();
+    setHasApplied(!!data);
+  };
+
+  const getMonthlyApplicationCount = async () => {
+    if (!user) return 0;
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const { count } = await supabase
+      .from('job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('applicant_id', user.id)
+      .gte('created_at', startOfMonth.toISOString());
+    return count || 0;
+  };
+
+  const handleApply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error('Please sign in to apply');
+      navigate('/login');
+      return;
+    }
+    if (!job) return;
+    if (!applicationForm.name.trim() || !applicationForm.email.trim()) {
+      toast.error('Please fill in your name and email');
+      return;
+    }
+
+    setApplying(true);
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .single();
+
+      const limits = getTierLimits(profile?.tier || 'professional-basic');
+      if (!limits.canApplyToRoles) {
+        toast.error('Applications are not available on your current plan');
+        return;
+      }
+      if (limits.applicationLimit) {
+        const count = await getMonthlyApplicationCount();
+        if (count >= limits.applicationLimit) {
+          toast.error(`You have reached your limit of ${limits.applicationLimit} applications this month. Upgrade to Pro for unlimited applications.`);
+          return;
+        }
+      }
+
+      const { error } = await supabase.from('job_applications').insert({
+        job_posting_id: job.id,
+        applicant_id: user.id,
+        applicant_name: applicationForm.name,
+        applicant_email: applicationForm.email,
+        applicant_phone: applicationForm.phone || null,
+        cover_letter: applicationForm.coverMessage || null,
+      });
+
+      if (error) throw error;
+
+      // Notify job owner
+      if (job?.user_id) {
+        await sendBackendNotification(
+          job.user_id,
+          'message',
+          `New application for ${job.job_title}`,
+          `${applicationForm.name} has applied for ${job.job_title}.`,
+          `/admin/applications`
+        );
+      }
+
+      setHasApplied(true);
+      toast.success('Application submitted successfully');
+      setApplicationForm({ name: '', email: '', phone: '', coverMessage: '' });
+    } catch (error: any) {
+      toast.error('Failed to submit application', { description: error.message });
+    } finally {
+      setApplying(false);
+    }
+  };
 
   const fetchJob = async () => {
     setLoading(true);
@@ -373,20 +488,77 @@ export default function JobDetailPage() {
                   <h3 className="text-lg font-heading font-bold text-foreground mb-4">
                     Apply for this Position
                   </h3>
-                  <Button 
-                    className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white mb-4"
-                    onClick={() => {
-                      const subject = encodeURIComponent(`Application for ${job.job_title}`);
-                      const body = encodeURIComponent(`Dear ${job.contact_name},\n\nI am writing to express my interest in the ${job.job_title} position at ${job.location}.\n\n[Please include your relevant experience and qualifications here]\n\nThank you for considering my application.\n\nBest regards,\n[Your Name]`);
-                      window.location.href = `mailto:${job.contact_email}?subject=${subject}&body=${body}`;
-                    }}
-                  >
-                    <Mail className="w-4 h-4 mr-2" />
-                    Apply Now
-                  </Button>
+                  
+                  {hasApplied ? (
+                    <div className="text-center py-4">
+                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                      <p className="font-medium text-foreground">Application Submitted</p>
+                      <p className="text-sm text-muted-foreground mt-1">The employer will review your application.</p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleApply} className="space-y-4">
+                      {!user && (
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Please sign in to apply.
+                        </p>
+                      )}
+                      <div>
+                        <Label htmlFor="apply-name" className="text-sm">Your Name</Label>
+                        <Input
+                          id="apply-name"
+                          value={applicationForm.name}
+                          onChange={(e) => setApplicationForm({ ...applicationForm, name: e.target.value })}
+                          placeholder="Full name"
+                          required
+                          disabled={!user || applying}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="apply-email" className="text-sm">Email</Label>
+                        <Input
+                          id="apply-email"
+                          type="email"
+                          value={applicationForm.email}
+                          onChange={(e) => setApplicationForm({ ...applicationForm, email: e.target.value })}
+                          placeholder="you@email.com"
+                          required
+                          disabled={!user || applying}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="apply-phone" className="text-sm">Phone</Label>
+                        <Input
+                          id="apply-phone"
+                          value={applicationForm.phone}
+                          onChange={(e) => setApplicationForm({ ...applicationForm, phone: e.target.value })}
+                          placeholder="(optional)"
+                          disabled={!user || applying}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="apply-message" className="text-sm">Cover Message</Label>
+                        <Textarea
+                          id="apply-message"
+                          value={applicationForm.coverMessage}
+                          onChange={(e) => setApplicationForm({ ...applicationForm, coverMessage: e.target.value })}
+                          placeholder="Briefly explain why you're a good fit..."
+                          rows={4}
+                          disabled={!user || applying}
+                        />
+                      </div>
+                      <Button 
+                        type="submit"
+                        className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                        disabled={!user || applying}
+                      >
+                        {applying ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                        {applying ? 'Submitting...' : 'Apply Now'}
+                      </Button>
+                    </form>
+                  )}
                   
                   {job.application_deadline && (
-                    <p className="text-sm text-muted-foreground text-center">
+                    <p className="text-sm text-muted-foreground text-center mt-4">
                       Application deadline: {formatDate(job.application_deadline)}
                     </p>
                   )}

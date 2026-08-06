@@ -51,12 +51,14 @@ import AdminEventDetailPage from './pages/AdminEventDetailPage';
 import EventSubmissionPage from './pages/EventSubmissionPage';
 import EventDetailPage from './pages/EventDetailPage';
 import UserDashboard from './pages/UserDashboard';
+import ConversationsPage from './pages/ConversationsPage';
 import RegistrationPendingPage from './pages/RegistrationPendingPage';
 import ArticlePage from './pages/ArticlePage';
 import SponsorshipPage from './pages/SponsorshipPage';
 import EmailBlastPage from './pages/EmailBlastPage';
 import AdminSponsorshipsPage from './pages/AdminSponsorshipsPage';
 import AdminEmailBlastsPage from './pages/AdminEmailBlastsPage';
+import AdminPromoCodesPage from './pages/AdminPromoCodesPage';
 import CookieConsent from './components/CookieConsent';
 
 function AppRoutes() {
@@ -80,7 +82,7 @@ function AppRoutes() {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/content" element={<AdminContentPage />} />
           <Route path="/admin/settings" element={<AdminSettingsPage />} />
-          <Route path="/profile/:id" element={<ProfilePage />} />
+          <Route path="/profile/:slug" element={<ProfilePage />} />
           <Route path="/add-listing" element={<AddListingPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -88,8 +90,9 @@ function AppRoutes() {
           <Route path="/collective" element={<CollectivePage />} />
           <Route path="/post-job" element={<JobPostingPage />} />
           <Route path="/service-requests" element={<ServiceRequestsPage />} />
-          <Route path="/messaging" element={<Navigate to="/collective" replace />} />
-          <Route path="/conversation/:id" element={<Navigate to="/collective" replace />} />
+          <Route path="/messaging" element={<ConversationsPage />} />
+          <Route path="/messaging/:id" element={<ConversationsPage />} />
+          <Route path="/conversation/:id" element={<ConversationsPage />} />
           <Route path="/notification-settings" element={<NotificationSettingsPage />} />
           <Route path="/saved-profiles" element={<SavedProfilesPage />} />
           <Route path="/compare" element={<ComparisonPage />} />
@@ -124,6 +127,7 @@ function AppRoutes() {
           <Route path="/email-blast" element={<EmailBlastPage />} />
           <Route path="/admin/sponsorships" element={<AdminSponsorshipsPage />} />
           <Route path="/admin/email-blasts" element={<AdminEmailBlastsPage />} />
+          <Route path="/admin/promo-codes" element={<AdminPromoCodesPage />} />
         </Routes>
       </PageTransition>
     );

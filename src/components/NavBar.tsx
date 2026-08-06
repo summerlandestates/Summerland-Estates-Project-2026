@@ -154,7 +154,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                         : 'text-gray-700'
                     }`}
                   >
-                    Find Professionals
+                    Search Professionals
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
@@ -170,21 +170,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
                     }`}
                   >
                     Apply
-                  </Link>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <Link
-                    to="/pricing"
-                    className={`text-base font-normal transition-all duration-300 cursor-pointer hover:text-[#A89F91] relative pb-1 ${
-                      currentPage === 'advertisements'
-                        ? 'text-[#A89F91] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#A89F91] after:rounded-full'
-                        : 'text-gray-700'
-                    }`}
-                  >
-                    Advertisements
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
@@ -321,7 +306,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   <button
                     type="button"
                     className={`inline-flex items-center gap-1 text-base font-normal transition-colors cursor-pointer hover:text-primary ${
-                      ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing'].includes(currentPage)
+                      ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing', 'advertisements'].includes(currentPage)
                         ? 'text-primary font-semibold'
                         : 'text-foreground'
                     }`}
@@ -381,6 +366,13 @@ export default function NavBar({ currentPage }: NavBarProps) {
                       >
                         <div className="text-sm font-medium leading-none">Participation Levels</div>
                         <p className="mt-1 text-sm leading-snug text-muted-foreground">Review participation options</p>
+                      </Link>
+                      <Link
+                        to="/advertisements"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">Advertisements</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Promote your services</p>
                       </Link>
                     </div>
                   </div>
@@ -558,7 +550,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   : 'text-foreground hover:bg-muted'
               }`}
             >
-              Find Professionals
+              Search Professionals
             </button>
 
             <button
@@ -653,6 +645,12 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
               >
                 Participation Levels
+              </button>
+              <button
+                onClick={() => handleNavigation('/advertisements')}
+                className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
+              >
+                Advertisements
               </button>
             </div>
 

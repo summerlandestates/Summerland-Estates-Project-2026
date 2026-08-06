@@ -19,6 +19,7 @@ CREATE TABLE public.profiles (
 CREATE TABLE public.listings (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  slug TEXT UNIQUE,
   profile_photo TEXT,
   name TEXT NOT NULL,
   gender TEXT CHECK (gender IN ('male', 'female', 'other')),
@@ -337,9 +338,30 @@ CREATE INDEX idx_listings_user_id ON public.listings(user_id);
 CREATE INDEX idx_listings_category ON public.listings(category);
 CREATE INDEX idx_listings_approved ON public.listings(approved);
 CREATE INDEX idx_listings_location ON public.listings(location);
+CREATE INDEX idx_listings_slug ON public.listings(slug);
 CREATE INDEX idx_skills_listing_id ON public.skills(listing_id);
 CREATE INDEX idx_work_history_listing_id ON public.work_history(listing_id);
 CREATE INDEX idx_reviews_listing_id ON public.reviews(listing_id);
 CREATE INDEX idx_messages_conversation_id ON public.messages(conversation_id);
 CREATE INDEX idx_conversation_participants_user_id ON public.conversation_participants(user_id);
 CREATE INDEX idx_saved_profiles_user_id ON public.saved_profiles(user_id);
+
+-- Auto-generate slug for listings
+CREATE OR REPLACE FUNCTION public.generate_listing_slug()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.slug IS NULL OR NEW.slug = '' THEN
+    NEW.slug := LOWER(REGEXP_REPLACE(
+      COALESCE(NEW.name, 'listing') || '-' || NEW.id::text,
+      '[^a-z0-9-]+', '-', 'g'
+    ));
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_listing_slug ON public.listings;
+CREATE TRIGGER set_listing_slug
+  BEFORE INSERT ON public.listings
+  FOR EACH ROW
+  EXECUTE FUNCTION public.generate_listing_slug();

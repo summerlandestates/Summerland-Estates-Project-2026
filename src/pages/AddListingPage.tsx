@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -228,6 +229,10 @@ export default function AddListingPage() {
   const [estatesSubType, setEstatesSubType] = useState<EstatesSubType>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTier, setSelectedTier] = useState<PricingTier | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoCodeInfo, setPromoCodeInfo] = useState<{ id: string; tier: string; code: string } | null>(null);
+  const [promoCodeLoading, setPromoCodeLoading] = useState(false);
+  const [promoCodeError, setPromoCodeError] = useState('');
   const [showPricing, setShowPricing] = useState(false);
   const [formData, setFormData] = useState<Partial<ApplicationFormData>>({});
   const [isCommunityOnly, setIsCommunityOnly] = useState(false);
@@ -788,6 +793,51 @@ export default function AddListingPage() {
     });
   }, [profileType, currentStep, showPricing, formStep, personalityDialogOpen, resumeParserState]);
 
+  const validatePromoCode = async (code: string) => {
+    if (!code.trim()) {
+      setPromoCodeError('');
+      setPromoCodeInfo(null);
+      return;
+    }
+    setPromoCodeLoading(true);
+    setPromoCodeError('');
+    try {
+      const { data, error } = await supabase
+        .from('promo_codes')
+        .select('id, code, tier, max_uses, used_count, valid_until, is_active')
+        .eq('code', code.trim())
+        .eq('is_active', true)
+        .single();
+
+      if (error || !data) {
+        setPromoCodeError('Invalid promo code');
+        setPromoCodeInfo(null);
+        return;
+      }
+      if (data.valid_until && new Date(data.valid_until) < new Date()) {
+        setPromoCodeError('Promo code expired');
+        setPromoCodeInfo(null);
+        return;
+      }
+      if (data.used_count >= data.max_uses) {
+        setPromoCodeError('Promo code fully redeemed');
+        setPromoCodeInfo(null);
+        return;
+      }
+      setPromoCodeInfo({ id: data.id, tier: data.tier, code: data.code });
+      toast.success('Promo code applied');
+    } catch (err) {
+      setPromoCodeError('Failed to validate promo code');
+      setPromoCodeInfo(null);
+    } finally {
+      setPromoCodeLoading(false);
+    }
+  };
+
+  const handleApplyPromoCode = () => {
+    validatePromoCode(promoCode);
+  };
+
   const getSteps = (): OnboardingStep[] => {
     if (profileType === 'professional') return professionalSteps;
     if (profileType === 'service-provider') return serviceProviderSteps;
@@ -889,10 +939,13 @@ export default function AddListingPage() {
         role: typeof applicationData.role === 'string' ? applicationData.role : undefined,
         bio: typeof applicationData.bio === 'string' ? applicationData.bio : '',
         profileType: profileType!,
-        selectedTier: selectedTier,
-        planName: selectedPlan?.name || '',
-        planPrice: selectedPlan?.price || '',
+        selectedTier: promoCodeInfo ? (promoCodeInfo.tier as PricingTier) : selectedTier,
+        planName: promoCodeInfo ? 'Free Pro Profile (6 months)' : (selectedPlan?.name || ''),
+        planPrice: promoCodeInfo ? '$0' : (selectedPlan?.price || ''),
         applicationData,
+        promoCode: promoCodeInfo?.code,
+        promoCodeId: promoCodeInfo?.id,
+        promoExpiresAt: promoCodeInfo ? new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,
       };
 
       setFormData(applicationData);
@@ -906,8 +959,9 @@ export default function AddListingPage() {
       await submitMembershipApplication(checkoutData);
       sessionStorage.removeItem('checkoutDataDraft');
 
+      const isPromoApplied = !!promoCodeInfo;
       toast.success('Application submitted', {
-        description: isComplimentaryTier(selectedTier)
+        description: isPromoApplied || isComplimentaryTier(selectedTier)
           ? 'Your account has been created and is now pending admin review.'
           : 'Your application is pending admin review. Payment will be requested after approval.',
       });
@@ -916,7 +970,7 @@ export default function AddListingPage() {
         state: {
           name: checkoutData.name,
           email: checkoutData.email,
-          requiresPayment: !isComplimentaryTier(selectedTier),
+          requiresPayment: !isPromoApplied && !isComplimentaryTier(selectedTier),
         },
       });
     } catch (error: any) {
@@ -1347,7 +1401,7 @@ export default function AddListingPage() {
                         </span>
                       )}
                     </div>
-                    {plan.price !== '$0' && (
+                    {plan.price !== '$0' && plan.price !== 'Complimentary' && (
                       <p className="text-sm text-muted-foreground mb-4">
                         Cancel anytime
                       </p>
@@ -1372,6 +1426,35 @@ export default function AddListingPage() {
                   )}
                 </Card>
               ))}
+            </div>
+
+            <div className="max-w-md mx-auto mb-12">
+              <div className="bg-card border border-border rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-3">Have a promo code?</h3>
+                <div className="flex gap-2">
+                  <Input
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    placeholder="Enter code (e.g., PRO-XXXXX)"
+                    disabled={promoCodeLoading}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleApplyPromoCode}
+                    disabled={promoCodeLoading || !promoCode.trim()}
+                    variant="outline"
+                    className="border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91]/10"
+                  >
+                    {promoCodeLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
+                  </Button>
+                </div>
+                {promoCodeError && <p className="text-sm text-red-500 mt-2">{promoCodeError}</p>}
+                {promoCodeInfo && (
+                  <p className="text-sm text-green-600 mt-2">
+                    Promo applied: Free {promoCodeInfo.tier} for 6 months
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-center">

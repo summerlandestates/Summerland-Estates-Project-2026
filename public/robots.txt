@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 
 # Sitemap location
-Sitemap: https://summerlandestates.com/api/sitemap.xml
+Sitemap: https://summerlandestates.com/sitemap.xml
 
 # Disallow admin and private routes
 Disallow: /admin

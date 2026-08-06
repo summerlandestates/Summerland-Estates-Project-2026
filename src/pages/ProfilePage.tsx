@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle, BadgeCheck, Shield } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle, BadgeCheck, Shield, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,14 +12,18 @@ import UpgradePrompt from '../components/UpgradePrompt';
 import ProfileAnalytics, { useProfileViewTracker } from '../components/ProfileAnalytics';
 import ServiceCalendar from '../components/ServiceCalendar';
 import NativeAd from '../components/NativeAd';
-import { listings } from '../data/listings';
+import { fetchListingBySlug, fetchListingById } from '../utils/listings';
 import { getVisibilityRules, formatNameForDisplay, canAccessProfile } from '@/utils/profileVisibility';
-import type { PricingTier, Review } from '../types';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import type { Listing, PricingTier, Review } from '../types';
 
 export default function ProfilePage() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const navigate = useNavigate();
-  const listing = listings.find((l) => l.id === id);
+  const { user } = useAuth();
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -32,7 +36,7 @@ export default function ProfilePage() {
   const [serviceType, setServiceType] = useState('');
   const [serviceLocation, setServiceLocation] = useState('');
   const [serviceMessage, setServiceMessage] = useState('');
-  const [reviews, setReviews] = useState<Review[]>(listing?.reviews || []);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
@@ -45,51 +49,59 @@ export default function ProfilePage() {
   const [currentUserId] = useState(localStorage.getItem('userId') || '');
 
   // Track profile views
-  useProfileViewTracker(currentUserId, id || '');
+  useProfileViewTracker(currentUserId, listing?.id || slug || '');
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    // Check user tier
+
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
     setIsPublicView(!loggedIn);
-    
+
     if (loggedIn) {
       const tier = localStorage.getItem('userTier') as PricingTier | undefined;
       setUserTier(tier);
     }
+  }, []);
 
-    // Get profile index for access control
-    if (id) {
-      const index = listings.findIndex(l => l.id === id);
-      setProfileIndex(index);
-    }
-    
+  useEffect(() => {
+    if (!slug) return;
+
+    const loadListing = async () => {
+      try {
+        setLoading(true);
+        let data = await fetchListingBySlug(slug);
+        if (!data) {
+          // Fallback: if slug is actually a legacy id, try loading by id
+          data = await fetchListingById(slug);
+        }
+        setListing(data);
+        setReviews(data?.reviews || []);
+      } catch (err: any) {
+        console.error('Error loading profile:', err);
+        toast.error('Failed to load profile', { description: err.message });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadListing();
+  }, [slug]);
+
+  useEffect(() => {
+    if (!listing) return;
+
     const saved = localStorage.getItem('savedProfiles');
-    if (saved && id) {
+    if (saved) {
       const savedIds = JSON.parse(saved);
-      setIsSaved(savedIds.includes(id));
+      setIsSaved(savedIds.includes(listing.id) || savedIds.includes(listing.slug));
     }
 
     const connections = localStorage.getItem('connections');
-    if (connections && id) {
+    if (connections) {
       const connectedIds = JSON.parse(connections);
-      setIsConnected(connectedIds.includes(id));
+      setIsConnected(connectedIds.includes(listing.id));
     }
-
-    if (id) {
-      const storedReviews = localStorage.getItem(`profile_reviews_${id}`);
-      if (storedReviews) {
-        try {
-          setReviews(JSON.parse(storedReviews));
-        } catch {
-          setReviews(listing?.reviews || []);
-        }
-      } else {
-        setReviews(listing?.reviews || []);
-      }
-    }
-  }, [id]);
+  }, [listing]);
 
   // Check if user can access this profile
   const canAccess = canAccessProfile(userTier, profileIndex, isPublicView);
@@ -116,37 +128,101 @@ export default function ProfilePage() {
     window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
+  const handleSendMessage = async () => {
+    if (!user) {
+      toast.error('Please sign in to send a message');
+      navigate('/login');
+      return;
+    }
+
+    const recipientId = listing?.userId;
+    if (!recipientId || recipientId === user.id) {
+      toast.error('Cannot message this profile');
+      return;
+    }
+
+    try {
+      // Check for existing conversation
+      const { data: existingParticipants, error: searchError } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      if (searchError) throw searchError;
+
+      const myConversations = (existingParticipants || []).map(p => p.conversation_id);
+      let conversationId: string | null = null;
+
+      if (myConversations.length > 0) {
+        const { data: match, error: matchError } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', recipientId)
+          .in('conversation_id', myConversations)
+          .maybeSingle();
+
+        if (matchError) throw matchError;
+        if (match) conversationId = match.conversation_id;
+      }
+
+      if (!conversationId) {
+        const { data: conversation, error: convError } = await supabase
+          .from('conversations')
+          .insert({})
+          .select('id')
+          .single();
+
+        if (convError) throw convError;
+        conversationId = conversation.id;
+
+        const { error: partError } = await supabase
+          .from('conversation_participants')
+          .insert([
+            { conversation_id: conversationId, user_id: user.id },
+            { conversation_id: conversationId, user_id: recipientId }
+          ]);
+
+        if (partError) throw partError;
+      }
+
+      navigate(`/messaging/${conversationId}`);
+    } catch (error: any) {
+      console.error('Send message error:', error);
+      toast.error('Failed to start conversation', { description: error.message });
+    }
+  };
+
   const handleToggleSave = () => {
-    if (!id) return;
-    
+    if (!listing) return;
+
     const saved = localStorage.getItem('savedProfiles');
     let savedIds = saved ? JSON.parse(saved) : [];
-    
+
     if (isSaved) {
-      savedIds = savedIds.filter((savedId: string) => savedId !== id);
+      savedIds = savedIds.filter((savedId: string) => savedId !== listing.id);
       setIsSaved(false);
     } else {
-      savedIds.push(id);
+      savedIds.push(listing.id);
       setIsSaved(true);
     }
-    
+
     localStorage.setItem('savedProfiles', JSON.stringify(savedIds));
   };
 
   const handleToggleConnect = () => {
-    if (!id) return;
-    
+    if (!listing) return;
+
     const connections = localStorage.getItem('connections');
     let connectedIds = connections ? JSON.parse(connections) : [];
-    
+
     if (isConnected) {
-      connectedIds = connectedIds.filter((connectedId: string) => connectedId !== id);
+      connectedIds = connectedIds.filter((connectedId: string) => connectedId !== listing.id);
       setIsConnected(false);
     } else {
-      connectedIds.push(id);
+      connectedIds.push(listing.id);
       setIsConnected(true);
     }
-    
+
     localStorage.setItem('connections', JSON.stringify(connectedIds));
   };
 
@@ -175,6 +251,23 @@ export default function ProfilePage() {
         return 'bg-muted text-muted-foreground';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <NavBar currentPage="" />
+        <main className="pt-32 pb-16">
+          <div className="container mx-auto px-8 max-w-4xl text-center">
+            <Loader2 className="w-12 h-12 mx-auto text-[#A89F91] animate-spin mb-4" />
+            <h1 className="text-2xl font-heading font-medium text-foreground">
+              Loading profile...
+            </h1>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!listing) {
     return (
@@ -265,23 +358,23 @@ export default function ProfilePage() {
   };
 
   const handleSubmitReview = () => {
-    if (!id || reviewRating === 0) return;
+    if (!listing || reviewRating === 0) return;
 
     setReviewSubmitting(true);
 
     const nextReview: Review = {
-      id: `${id}-${Date.now()}`,
+      id: `${listing.id}-${Date.now()}`,
       reviewerName: 'Community Member',
       reviewerRole: 'Verified Member',
       rating: reviewRating,
-      date: new Date().toISOString().split('T')[0],
-      comment: reviewComment.trim() || 'No written feedback provided.',
-      verified: true,
+      date: new Date().toISOString(),
+      comment: reviewComment,
+      verified: true
     };
 
     const nextReviews = [nextReview, ...reviews];
     setReviews(nextReviews);
-    persistCollection(`profile_reviews_${id}`, nextReviews);
+    persistCollection(`profile_reviews_${listing.id}`, nextReviews);
 
     toast.success('Review submitted', {
       description: 'Your feedback has been added to this profile.',
@@ -291,14 +384,14 @@ export default function ProfilePage() {
   };
 
   const handleSubmitInterviewRequest = () => {
-    if (!id || !selectedDate || !selectedTime) return;
+    if (!listing || !selectedDate || !selectedTime) return;
 
     setBookingSubmitting(true);
 
     const existing = JSON.parse(localStorage.getItem('profile_interview_requests') || '[]');
     const nextRequest = {
-      id: `${id}-${Date.now()}`,
-      profileId: id,
+      id: `${listing.id}-${Date.now()}`,
+      profileId: listing.id,
       profileName: listing.name,
       requestedDate: selectedDate,
       requestedTime: selectedTime,
@@ -318,14 +411,14 @@ export default function ProfilePage() {
   };
 
   const handleSubmitServiceRequest = () => {
-    if (!id || !selectedDate || !selectedTime) return;
+    if (!listing || !selectedDate || !selectedTime) return;
 
     setServiceSubmitting(true);
 
     const existing = JSON.parse(localStorage.getItem('profile_service_requests') || '[]');
     const nextRequest = {
-      id: `${id}-${Date.now()}`,
-      profileId: id,
+      id: `${listing.id}-${Date.now()}`,
+      profileId: listing.id,
       profileName: listing.name,
       requestedDate: selectedDate,
       requestedTime: selectedTime,
@@ -357,7 +450,7 @@ export default function ProfilePage() {
       addressLocality: listing.location,
       addressCountry: 'US',
     },
-    url: `https://summerlandestates.com/profile/${listing.id}`,
+    url: `https://summerlandestates.com/profile/${listing.slug || listing.id}`,
   } : undefined;
 
   return (
@@ -365,7 +458,7 @@ export default function ProfilePage() {
       <SEOHead
         title={listing ? `${listing.name} - ${listing.role} | Summerland Estates` : 'Profile | Summerland Estates'}
         description={listing ? `${listing.name} is a ${listing.role} based in ${listing.location}. ${listing.bio || ''}`.slice(0, 160) : ''}
-        canonical={`/profile/${id}`}
+        canonical={`/profile/${listing.slug || slug}`}
         ogImage={listing?.profilePhoto}
         schema={profileSchema}
       />
@@ -487,7 +580,10 @@ export default function ProfilePage() {
                 <div className="mt-8 space-y-3">
                   {/* Professionals can message for free, others need to upgrade */}
                   {(userTier === 'professional-free' || visibilityRules.canSendMessage) ? (
-                    <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Button
+                      onClick={handleSendMessage}
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
                       <Mail className="w-5 h-5 mr-2" />
                       Send Message
                     </Button>
@@ -502,7 +598,7 @@ export default function ProfilePage() {
                     </Button>
                   )}
                   
-                  {/* Book Interview button for Professionals */}
+                  {/* Request Interview button for Professionals */}
                   {listing.category === 'Staff' && (
                     <Button
                       variant="outline"
@@ -510,13 +606,19 @@ export default function ProfilePage() {
                       onClick={() => {
                         if (!visibilityRules.canViewFullProfile) {
                           navigate('/pricing');
-                        } else {
-                          setShowBookingModal(true);
+                          return;
                         }
+                        const professionalEmail = listing.email || listing.businessEmail || '';
+                        const eventTitle = encodeURIComponent(`Interview with ${listing.name}`);
+                        const eventDetails = encodeURIComponent(`Interview requested via Summerland Estates for ${listing.name}.\n\nProfile: ${window.location.href}\n\nPlease use Google Meet for the video call.`);
+                        const addParam = professionalEmail ? `&add=${encodeURIComponent(professionalEmail)}` : '';
+                        const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&details=${eventDetails}&location=Video Call${addParam}`;
+                        window.open(calendarUrl, '_blank', 'noopener,noreferrer');
+                        toast.success('Google Calendar opened', { description: 'Book a 30-minute slot and add a Google Meet link.' });
                       }}
                     >
                       <Calendar className="w-5 h-5 mr-2" />
-                      Book Interview
+                      Request Interview
                     </Button>
                   )}
 
@@ -687,18 +789,18 @@ export default function ProfilePage() {
                   )}
 
                   {/* Profile Analytics - Show for own profile or premium users */}
-                  {(currentUserId === id || (userTier as string) === 'premium' || (userTier as string) === 'platinum') && (
-                    <ProfileAnalytics 
+                  {(currentUserId === listing.userId || (userTier as string) === 'premium' || (userTier as string) === 'platinum') && (
+                    <ProfileAnalytics
                       isPremium={(userTier as string) === 'premium' || (userTier as string) === 'platinum'}
-                      userId={id || ''}
+                      userId={listing.id || ''}
                     />
                   )}
 
                   {/* Service Calendar - Show for Service Provider accounts */}
                   {listing?.category === 'Business' && (
-                    <ServiceCalendar 
-                      userId={id || ''}
-                      isOwner={currentUserId === id}
+                    <ServiceCalendar
+                      userId={listing.id || ''}
+                      isOwner={currentUserId === listing.userId}
                     />
                   )}
 

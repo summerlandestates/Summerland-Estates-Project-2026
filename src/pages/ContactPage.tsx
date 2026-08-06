@@ -114,16 +114,6 @@ export default function ContactPage() {
                 </div>
               </Card>
 
-              <Card className="p-6 bg-gradient-to-r from-[#A89F91] to-[#8A8279] text-white">
-                <h3 className="font-heading font-semibold mb-2">
-                  Business Hours
-                </h3>
-                <div className="space-y-1 text-sm">
-                  <p>Monday - Friday: 9:00 AM - 6:00 PM</p>
-                  <p>Saturday: 10:00 AM - 4:00 PM</p>
-                  <p>Sunday: Closed</p>
-                </div>
-              </Card>
             </div>
           </div>
 

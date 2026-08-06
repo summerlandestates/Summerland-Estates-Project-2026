@@ -18,6 +18,7 @@ import {
   getPaymentStatus,
   requiresMembershipPayment,
 } from '@/lib/membership';
+import { validateAndRedeemPromoCode } from '@/lib/membershipApplication';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -130,16 +131,31 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
-      const isFree = checkoutData.selectedTier.includes('free') || checkoutData.selectedTier.includes('community');
+      const isFree = checkoutData.selectedTier.includes('free') || checkoutData.selectedTier.includes('community') || checkoutData.planPrice === '$0' || !!checkoutData.promoCode;
 
       if (isFree) {
         sessionStorage.removeItem('checkoutData');
         sessionStorage.removeItem('checkoutDataDraft');
 
         if (user) {
-          toast.success('No payment required', {
-            description: 'Your current membership selection does not require checkout.',
-          });
+          if (checkoutData.promoCode) {
+            const promoResult = await validateAndRedeemPromoCode(checkoutData.promoCode, user.id);
+            if (promoResult.valid) {
+              const expiresAt = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toISOString();
+              await supabase.from('profiles').update({
+                tier: promoResult.tier || checkoutData.selectedTier,
+                subscription_status: 'active',
+                subscription_expires_at: expiresAt,
+              }).eq('id', user.id);
+              toast.success('Promo code applied', { description: 'Your profile has been upgraded to Pro for 6 months.' });
+            } else {
+              toast.error('Promo code failed', { description: promoResult.error || 'Could not apply promo code' });
+            }
+          } else {
+            toast.success('No payment required', {
+              description: 'Your current membership selection does not require checkout.',
+            });
+          }
           navigate('/dashboard');
           return;
         }
