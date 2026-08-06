@@ -17,22 +17,22 @@ import type { Listing, FilterState, PricingTier } from '../types';
 const homepageCollections = [
   {
     title: 'Private Chef',
-    image: '/public/images/private-chef.jpg',
+    image: '/images/private-chef.jpg',
     tags: ['Household Staff', 'Estate Managers', 'Housekeepers', 'Private Chefs', 'Butlers'],
   },
   {
     title: 'Housekeeping',
-    image: '/public/images/housekeeping.jpg',
+    image: '/images/housekeeping.jpg',
     tags: ['Lifestyle & Personal', 'Personal Assistants', 'Nannies', 'Companions'],
   },
   {
     title: 'Masseuse',
-    image: '/public/images/Masseuse.jpg',
+    image: '/images/Masseuse.jpg',
     tags: ['Specialty', 'Yacht Crew', 'Equestrian Staff', 'Stylists', 'Travel Companions'],
   },
   {
     title: 'Security',
-    image: '/public/images/security.jpg',
+    image: '/images/security.jpg',
     tags: ['Operations & Property', 'Property Managers', 'Maintenance Specialists', 'Security'],
   },
 ];
@@ -181,11 +181,11 @@ export default function DirectoryPage() {
                   <picture>
                     <source
                       media="(max-width: 767px)"
-                      srcSet="/public/images/mobile-home-banner.webp"
+                      srcSet="/images/mobile-home-banner.webp"
                       type="image/webp"
                     />
                     <img
-                      src="/public/images/home-banner.jpg"
+                      src="/images/home-banner.jpg"
                       alt="Summerland Estates"
                       className="h-full w-full object-cover object-[center_42%] md:object-[center_25%]"
                     />
