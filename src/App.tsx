@@ -59,6 +59,7 @@ import EmailBlastPage from './pages/EmailBlastPage';
 import AdminSponsorshipsPage from './pages/AdminSponsorshipsPage';
 import AdminEmailBlastsPage from './pages/AdminEmailBlastsPage';
 import AdminPromoCodesPage from './pages/AdminPromoCodesPage';
+import HowItWorksPage from './pages/HowItWorksPage';
 import CookieConsent from './components/CookieConsent';
 
 function AppRoutes() {
@@ -100,6 +101,7 @@ function AppRoutes() {
           <Route path="/faqs" element={<FAQsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/pricing" element={<Navigate to="/advertisements" replace />} />
           <Route path="/account" element={<AccountManagementPage />} />
           <Route path="/payment-success" element={<PaymentSuccessPage />} />

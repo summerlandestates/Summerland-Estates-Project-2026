@@ -237,3 +237,14 @@ export function getPlansByUserType(userType: UserType): PricingPlan[] {
 export function getPlanById(planId: PricingTier): PricingPlan | undefined {
   return pricingPlans.find(plan => plan.id === planId);
 }
+
+export const freeTierByUserType: Record<UserType, PricingTier> = {
+  professional: 'professional-basic',
+  business: 'business-free',
+  agency: 'agency-free',
+  estates: 'estates-free',
+};
+
+export function getFreeTierForUserType(userType: UserType): PricingTier {
+  return freeTierByUserType[userType] || `${userType}-free` as PricingTier;
+}

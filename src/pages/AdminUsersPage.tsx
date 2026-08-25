@@ -38,7 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Users, Trash2, MoreVertical, CheckCircle, XCircle, Loader2, Search, UserCog, Clock3, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Trash2, MoreVertical, CheckCircle, XCircle, Loader2, Search, UserCog, Clock3, ChevronLeft, ChevronRight, Award } from 'lucide-react';
 
 const parseApiResponse = async (response: Response) => {
   const responseText = await response.text();
@@ -66,6 +66,8 @@ interface Profile {
   location: string | null;
   phone: string | null;
   tier: string | null;
+  honorary_until: string | null;
+  honorary_tier: string | null;
   application_data: Record<string, unknown> | null;
   created_at: string;
 }
@@ -216,6 +218,32 @@ export default function AdminUsersPage() {
         description: `User role changed to ${newRole}`,
       });
       fetchUsers();
+    }
+  };
+
+  const handleGrantHonorary = async (profile: Profile) => {
+    if (!window.confirm(`Grant honorary Pro membership to ${profile.full_name || profile.email} for one year?`)) return;
+
+    try {
+      const response = await fetch('/api/admin-grant-honorary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: profile.id }),
+      });
+      const result = await parseApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to grant honorary membership');
+      }
+
+      toast.success('Honorary membership granted', {
+        description: `${profile.full_name || profile.email} has Pro access for 1 year.`,
+      });
+      fetchUsers();
+    } catch (error: any) {
+      toast.error('Failed to grant honorary membership', {
+        description: error.message || 'Please try again.',
+      });
     }
   };
 
@@ -425,6 +453,11 @@ export default function AdminUsersPage() {
                           <p className="text-xs text-gray-500">
                             {profile.tier ? profile.tier.replace(/-/g, ' ') : 'No plan selected'}
                           </p>
+                          {profile.honorary_until && new Date(profile.honorary_until) > new Date() && (
+                            <Badge className="mt-1 bg-purple-100 text-purple-700 hover:bg-purple-100">
+                              Honorary Pro until {new Date(profile.honorary_until).toLocaleDateString()}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-gray-600">
@@ -455,6 +488,13 @@ export default function AdminUsersPage() {
                               {profile.role === 'admin'
                                 ? 'Remove Admin'
                                 : 'Make Admin'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleGrantHonorary(profile)}
+                              className="cursor-pointer hover:bg-purple-50 hover:text-purple-700"
+                            >
+                              <Award className="w-4 h-4 mr-2" />
+                              Grant Honorary Pro
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => openDialog('delete', profile)}

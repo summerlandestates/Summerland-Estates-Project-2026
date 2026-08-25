@@ -241,6 +241,29 @@ export default function AddListingPage() {
   const [formStep, setFormStep] = useState(1);
   const [filePreviews, setFilePreviews] = useState<Record<string, UploadPreviewItem[]>>({});
   const [resumeParserState, setResumeParserState] = useState<ResumeParserState>('idle');
+  const [existingProfile, setExistingProfile] = useState<{ id: string; status: string; tier: string | null } | null | undefined>(undefined);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      setExistingProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+
+    supabase
+      .from('profiles')
+      .select('id, status, tier')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load existing profile:', error);
+        }
+        setExistingProfile(data || null);
+        setProfileLoading(false);
+      });
+  }, [user]);
   const [resumeParserMessage, setResumeParserMessage] = useState<string | null>(null);
   const [resumeInsights, setResumeInsights] = useState<ResumeParseResult | null>(null);
   const [resumeAutofilledFields, setResumeAutofilledFields] = useState<string[]>([]);
@@ -982,8 +1005,16 @@ export default function AddListingPage() {
     }
   };
 
-  // If user is logged in and hasn't selected a profile type, show upgrade options
-  if (user && profileType === null) {
+  if (profileLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background page-transition">
+        <Loader2 className="w-8 h-8 animate-spin text-[#A89F91]" />
+      </div>
+    );
+  }
+
+  // If user is logged in and already has a profile, show upgrade options
+  if (user && existingProfile && profileType === null) {
     return (
       <div className="min-h-screen bg-background page-transition">
         <NavBar currentPage="add-listing" />

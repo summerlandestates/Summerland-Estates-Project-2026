@@ -306,7 +306,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   <button
                     type="button"
                     className={`inline-flex items-center gap-1 text-base font-normal transition-colors cursor-pointer hover:text-primary ${
-                      ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing', 'advertisements'].includes(currentPage)
+                      ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing', 'advertisements', 'how-it-works'].includes(currentPage)
                         ? 'text-primary font-semibold'
                         : 'text-foreground'
                     }`}
@@ -325,6 +325,13 @@ export default function NavBar({ currentPage }: NavBarProps) {
                     }`}
                   >
                     <div className="grid gap-2">
+                      <Link
+                        to="/how-it-works"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">How It Works</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Learn how the platform connects you</p>
+                      </Link>
                       <Link
                         to="/contact"
                         className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
@@ -610,6 +617,12 @@ export default function NavBar({ currentPage }: NavBarProps) {
               <div className="px-4 py-2 text-sm font-semibold text-[#A89F91]">
                 Resources
               </div>
+              <button
+                onClick={() => handleNavigation('/how-it-works')}
+                className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
+              >
+                How It Works
+              </button>
               <button
                 onClick={() => handleNavigation('/contact')}
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"

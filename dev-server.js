@@ -454,6 +454,8 @@ const normalizeApplicationRecord = (authUser, profileMap) => {
     location: applicationData.location || null,
     phone: applicationData.phone || authUser.user_metadata?.phone || null,
     tier: authUser.user_metadata?.tier || applicationData.selected_tier || null,
+    honorary_until: profile.honorary_until || null,
+    honorary_tier: profile.honorary_tier || null,
     application_data: applicationData,
   };
 };
@@ -482,6 +484,8 @@ const normalizeProfileApplicationRecord = (profile) => {
     location: profile.location || applicationData.location || null,
     phone: profile.phone || applicationData.phone || null,
     tier: profile.tier || applicationData.selected_tier || null,
+    honorary_until: profile.honorary_until || null,
+    honorary_tier: profile.honorary_tier || null,
     application_data: applicationData,
   };
 };
@@ -496,7 +500,7 @@ const listProfileApplications = async () => {
   const { data, error } = await supabaseReadClient
     .from('profiles')
     .select(
-      'id, email, full_name, avatar_url, role, created_at, phone, location, tier, profile_type, application_data'
+      'id, email, full_name, avatar_url, role, created_at, phone, location, tier, profile_type, honorary_until, honorary_tier, application_data'
     )
     .order('created_at', { ascending: false });
 
@@ -524,7 +528,7 @@ const getMembershipApplications = async () => {
   const { data: profiles, error: profilesError } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, email, full_name, avatar_url, role, created_at, phone, location, tier, profile_type, application_data'
+      'id, email, full_name, avatar_url, role, created_at, phone, location, tier, profile_type, honorary_until, honorary_tier, application_data'
     )
     .in('id', authUserIds);
 
@@ -817,6 +821,80 @@ app.post('/api/admin-delete-user', async (req, res) => {
   } catch (error) {
     console.error('Admin delete error:', error);
     res.status(500).json({ error: error.message || 'Failed to delete user' });
+  }
+});
+
+const honoraryProTierByUserType = {
+  professional: 'professional-pro',
+  business: 'business-pro',
+  agency: 'agency-pro',
+  estates: 'estates-pro',
+};
+
+app.post('/api/admin-grant-honorary', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Missing Supabase service role configuration' });
+  }
+
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('profile_type, tier, application_data')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    let proTier = honoraryProTierByUserType[profile.profile_type];
+
+    if (!proTier && String(profile.tier || '').endsWith('-pro')) {
+      proTier = profile.tier;
+    }
+
+    if (!proTier) {
+      return res.status(400).json({
+        error: `Could not determine Pro tier for profile type: ${profile.profile_type || 'unknown'}`,
+      });
+    }
+
+    const honoraryUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    const applicationData = profile.application_data || {};
+
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        tier: proTier,
+        honorary_until: honoraryUntil,
+        honorary_tier: proTier,
+        status: 'approved',
+        payment_status: 'not_required',
+        subscription_status: 'active',
+        application_data: {
+          ...applicationData,
+          honorary_until: honoraryUntil,
+          honorary_tier: proTier,
+          payment_status: 'not_required',
+          account_status: 'approved',
+        },
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    res.json({ success: true, tier: proTier, honorary_until: honoraryUntil });
+  } catch (error) {
+    console.error('Grant honorary error:', error);
+    res.status(500).json({ error: error.message || 'Failed to grant honorary membership' });
   }
 });
 

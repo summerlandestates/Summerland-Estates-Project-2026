@@ -11,13 +11,25 @@ type ProfileLike = {
   profile_type?: string | null;
   tier?: string | null;
   status?: string | null;
+  honorary_until?: string | null;
+  honorary_tier?: string | null;
   application_data?: Record<string, unknown> | null;
 };
 
 export type MembershipPaymentStatus = 'pending' | 'paid' | 'not_required';
 
 export function isComplimentaryTier(tier?: string | null) {
-  return Boolean(tier && (tier.includes('free') || tier.includes('community')));
+  return Boolean(tier && (tier.includes('free') || tier.includes('community') || tier === 'professional-basic'));
+}
+
+export function isHonoraryMember(profile?: ProfileLike | null) {
+  const until =
+    profile?.honorary_until ||
+    (typeof profile?.application_data?.honorary_until === 'string'
+      ? profile.application_data.honorary_until
+      : null);
+  if (!until) return false;
+  return new Date(until) > new Date();
 }
 
 export function getMergedApplicationData(profile?: ProfileLike | null, authUser?: User | null) {
@@ -58,6 +70,10 @@ export function getPaymentStatus(profile?: ProfileLike | null, authUser?: User |
     return explicitStatus;
   }
 
+  if (isHonoraryMember(profile)) {
+    return 'not_required';
+  }
+
   if (isComplimentaryTier(selectedTier)) {
     return 'not_required';
   }
@@ -66,6 +82,7 @@ export function getPaymentStatus(profile?: ProfileLike | null, authUser?: User |
 }
 
 export function requiresMembershipPayment(profile?: ProfileLike | null, authUser?: User | null) {
+  if (isHonoraryMember(profile)) return false;
   const selectedTier = getSelectedTier(profile, authUser);
   return Boolean(selectedTier && !isComplimentaryTier(selectedTier) && getPaymentStatus(profile, authUser) !== 'paid');
 }
