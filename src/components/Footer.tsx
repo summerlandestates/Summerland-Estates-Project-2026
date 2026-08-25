@@ -185,19 +185,19 @@ export default function Footer() {
               <h4 className="text-white font-semibold text-lg mb-1">Stay in the Know</h4>
               <p className="text-gray-400 text-sm">Get the latest news, placements, and member updates delivered to your inbox.</p>
             </div>
-            <form onSubmit={handleNewsletterSubmit} className="flex gap-3 w-full md:w-auto">
+            <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <input
                 type="email"
                 value={newsletterEmail}
                 onChange={(e) => setNewsletterEmail(e.target.value)}
                 placeholder="Enter your email address"
                 required
-                className="flex-1 md:w-72 px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-[#A89F91] text-sm"
+                className="w-full sm:flex-1 md:w-72 px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-[#A89F91] text-sm"
               />
               <button
                 type="submit"
                 disabled={newsletterLoading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-[#A89F91] hover:bg-[#8A8279] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-[#A89F91] hover:bg-[#8A8279] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
                 {newsletterLoading ? 'Subscribing...' : 'Subscribe'}

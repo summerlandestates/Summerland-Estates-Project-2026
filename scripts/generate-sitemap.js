@@ -3,7 +3,7 @@
 
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
@@ -12,13 +12,59 @@ const __dirname = dirname(__filename);
 
 const BASE_URL = 'https://summerlandestates.com';
 const OUTPUT_PATH = resolve(__dirname, '../public/sitemap-static.xml');
+const APP_PATH = resolve(__dirname, '../src/App.tsx');
 
 const supabaseUrl =
   process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const supabaseAnonKey =
   process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 
-const staticRoutes = [
+const NO_INDEX_PATHS = new Set([
+  '/login',
+  '/signup',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
+  '/my-profile',
+  '/my-profile/edit',
+  '/settings',
+  '/notification-settings',
+  '/saved-profiles',
+  '/account',
+  '/dashboard',
+  '/messaging',
+  '/messaging/:id',
+  '/conversation/:id',
+  '/checkout',
+  '/payment-success',
+  '/compare',
+  '/registration-pending',
+  '/email-blast',
+  '/pricing',
+]);
+
+const ROUTE_OVERRIDES = {
+  '/': { priority: '1.0', changefreq: 'daily' },
+  '/search': { priority: '0.9', changefreq: 'daily' },
+  '/open-roles': { priority: '0.8', changefreq: 'daily' },
+  '/service-requests': { priority: '0.8', changefreq: 'daily' },
+  '/advertisements': { priority: '0.8', changefreq: 'weekly' },
+  '/collective': { priority: '0.8', changefreq: 'weekly' },
+  '/events': { priority: '0.7', changefreq: 'weekly' },
+  '/news': { priority: '0.7', changefreq: 'weekly' },
+  '/add-listing': { priority: '0.8', changefreq: 'monthly' },
+  '/post-job': { priority: '0.6', changefreq: 'monthly' },
+  '/about': { priority: '0.7', changefreq: 'monthly' },
+  '/contact': { priority: '0.7', changefreq: 'monthly' },
+  '/faqs': { priority: '0.7', changefreq: 'monthly' },
+  '/how-it-works': { priority: '0.7', changefreq: 'monthly' },
+  '/privacy': { priority: '0.6', changefreq: 'monthly' },
+  '/terms': { priority: '0.6', changefreq: 'monthly' },
+  '/sponsorship': { priority: '0.6', changefreq: 'monthly' },
+  '/recognition': { priority: '0.6', changefreq: 'monthly' },
+};
+
+const FALLBACK_STATIC_ROUTES = [
   { path: '/', priority: '1.0', changefreq: 'daily' },
   { path: '/search', priority: '0.9', changefreq: 'daily' },
   { path: '/add-listing', priority: '0.8', changefreq: 'monthly' },
@@ -37,6 +83,48 @@ const staticRoutes = [
   { path: '/sponsorship', priority: '0.6', changefreq: 'monthly' },
   { path: '/post-job', priority: '0.6', changefreq: 'monthly' },
 ];
+
+function discoverStaticRoutes() {
+  if (!existsSync(APP_PATH)) {
+    console.warn(`⚠️ ${APP_PATH} not found. Using fallback static routes.`);
+    return FALLBACK_STATIC_ROUTES;
+  }
+
+  const appSource = readFileSync(APP_PATH, 'utf-8');
+  const routes = new Set();
+
+  // Match <Route path="..." ... /> declarations from react-router
+  const routeRegex = /<Route\s+[^>]*?path="([^"]+)"[^>]*?\/?>/g;
+  let match;
+  while ((match = routeRegex.exec(appSource)) !== null) {
+    const fullMatch = match[0];
+    const path = match[1];
+
+    // Skip dynamic routes, admin routes, redirects, and known private/no-index paths
+    const isDynamic = path.includes(':');
+    const isAdmin = path.startsWith('/admin');
+    const isRedirect = fullMatch.includes('Navigate');
+    const isNoIndex = NO_INDEX_PATHS.has(path);
+
+    if (isDynamic || isAdmin || isRedirect || isNoIndex) continue;
+
+    routes.add(path);
+  }
+
+  const discovered = Array.from(routes)
+    .sort()
+    .map((path) => ({
+      path,
+      ...(ROUTE_OVERRIDES[path] || { priority: '0.7', changefreq: 'weekly' }),
+    }));
+
+  if (discovered.length === 0) {
+    console.warn('⚠️ No public routes discovered in App.tsx. Using fallback.');
+    return FALLBACK_STATIC_ROUTES;
+  }
+
+  return discovered;
+}
 
 function formatDate(dateString) {
   const date = dateString ? new Date(dateString) : new Date();
@@ -77,6 +165,7 @@ async function main() {
   }
 
   const today = formatDate();
+  const staticRoutes = discoverStaticRoutes();
 
   const allUrls = [
     ...staticRoutes.map((route) => ({
