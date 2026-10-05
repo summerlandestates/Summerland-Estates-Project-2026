@@ -44,26 +44,83 @@ async function generateSitemapXml(): Promise<string> {
   const supabaseAnonKey =
     process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 
-  let profileUrls: { path: string; lastmod: string; changefreq: string; priority: string }[] = [];
+  type UrlEntry = { path: string; lastmod: string; changefreq: string; priority: string };
+  let dynamicUrls: UrlEntry[] = [];
 
   if (supabaseUrl && supabaseAnonKey) {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const { data, error } = await supabase
-      .from('listings')
-      .select('slug, updated_at')
-      .eq('approved', true)
-      .not('slug', 'is', null)
-      .order('updated_at', { ascending: false });
 
-    if (error) {
-      console.error('Could not fetch listings for sitemap:', error.message);
-    } else if (data?.length) {
-      profileUrls = data.map((listing: any) => ({
-        path: `/profile/${listing.slug || listing.id}`,
-        lastmod: listing.updated_at,
+    const sources = [
+      {
+        table: 'listings',
+        select: 'slug, updated_at',
+        apply: (q: any) => q.eq('approved', true).not('slug', 'is', null),
+        toUrl: (row: any) => `/profile/${row.slug || row.id}`,
         changefreq: 'weekly',
         priority: '0.6',
-      }));
+      },
+      {
+        table: 'job_postings',
+        select: 'id, updated_at',
+        apply: (q: any) => q.eq('status', 'active'),
+        toUrl: (row: any) => `/job/${row.id}`,
+        changefreq: 'daily',
+        priority: '0.7',
+      },
+      {
+        table: 'events',
+        select: 'id, updated_at',
+        apply: (q: any) => q.in('status', ['approved', 'published']),
+        toUrl: (row: any) => `/event/${row.id}`,
+        changefreq: 'weekly',
+        priority: '0.6',
+      },
+      {
+        table: 'service_requests',
+        select: 'id, created_at',
+        apply: (q: any) => q.eq('status', 'open'),
+        toUrl: (row: any) => `/service-request/${row.id}`,
+        changefreq: 'daily',
+        priority: '0.6',
+      },
+      {
+        table: 'articles',
+        select: 'slug, updated_at',
+        apply: (q: any) => q.eq('status', 'published'),
+        toUrl: (row: any) => `/articles/${row.slug || row.id}`,
+        changefreq: 'weekly',
+        priority: '0.6',
+      },
+      {
+        table: 'site_content_pages',
+        select: 'slug, updated_at',
+        apply: (q: any) => q.eq('is_published', true),
+        toUrl: (row: any) => `/pages/${row.slug}`,
+        changefreq: 'monthly',
+        priority: '0.5',
+      },
+    ];
+
+    for (const source of sources) {
+      try {
+        const { data, error } = await source.apply(
+          supabase.from(source.table).select(source.select)
+        );
+        if (error) {
+          console.error(`Could not fetch ${source.table} for sitemap:`, error.message);
+          continue;
+        }
+        dynamicUrls.push(
+          ...(data || []).map((row: any) => ({
+            path: source.toUrl(row),
+            lastmod: row.updated_at || row.created_at,
+            changefreq: source.changefreq,
+            priority: source.priority,
+          }))
+        );
+      } catch (err: any) {
+        console.error(`Skipping ${source.table} for sitemap:`, err.message);
+      }
     }
   }
 
@@ -71,7 +128,7 @@ async function generateSitemapXml(): Promise<string> {
 
   const allUrls = [
     ...staticRoutes.map((route) => ({ ...route, lastmod: today })),
-    ...profileUrls,
+    ...dynamicUrls,
   ];
 
   const urlNodes = allUrls.map((route) =>

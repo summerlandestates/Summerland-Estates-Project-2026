@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import AdminSidebar from '@/components/AdminSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { loadSessionJson, saveSessionJson } from '@/lib/adminSession';
@@ -308,10 +307,8 @@ export default function AdminApplicationDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <AdminSidebar />
-
-      <main className="flex-1 p-8">
+    <div>
+      <main>
         <div className="mx-auto max-w-7xl">
           <Button
             variant="ghost"

@@ -18,8 +18,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MapPin, Calendar, DollarSign, Send, Plus, Loader2 } from 'lucide-react';
-import type { ServiceRequest } from '../types';
+import { MapPin, Calendar, DollarSign, Send, Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import { getTierLimits } from '@/utils/tierAccess';
+import type { PricingTier, ServiceRequest } from '../types';
 
 // Mock data - in a real app, this would come from an API
 const mockServiceRequests: ServiceRequest[] = [
@@ -73,6 +75,8 @@ export default function ServiceRequestsPage() {
   const { user } = useAuth();
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(mockServiceRequests);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
+  const [editingRequest, setEditingRequest] = useState<ServiceRequest | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showBidModal, setShowBidModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -98,7 +102,7 @@ export default function ServiceRequestsPage() {
 
       const { data, error } = await supabase
         .from('service_requests')
-        .select('id, service_needed, location, date_needed, details, special_requests, status, created_at')
+        .select('id, user_id, service_needed, location, date_needed, details, special_requests, status, created_at, budget_min, budget_max')
         .eq('status', 'open')
         .order('created_at', { ascending: false });
 
@@ -120,11 +124,14 @@ export default function ServiceRequestsPage() {
 
       const mappedRequests: ServiceRequest[] = (data || []).map((request: any) => ({
         id: request.id,
+        userId: request.user_id,
         serviceNeeded: request.service_needed,
         location: request.location,
         dateNeeded: request.date_needed,
         details: request.details,
         specialRequests: request.special_requests || undefined,
+        budgetMin: request.budget_min ?? undefined,
+        budgetMax: request.budget_max ?? undefined,
         postedBy: 'Summerland Estates Member',
         postedDate: request.created_at,
         status: request.status === 'open' ? 'active' : 'filled',
@@ -206,7 +213,51 @@ export default function ServiceRequestsPage() {
       navigate('/add-listing');
       return;
     }
+    setEditingRequest(null);
+    setServiceForm({
+      serviceNeeded: '',
+      location: '',
+      dateNeeded: '',
+      details: '',
+      specialRequests: '',
+      budgetMin: '',
+      budgetMax: '',
+    });
     setShowCreateModal(true);
+  };
+
+  const handleEditRequest = (request: ServiceRequest) => {
+    setEditingRequest(request);
+    setServiceForm({
+      serviceNeeded: request.serviceNeeded,
+      location: request.location,
+      dateNeeded: request.dateNeeded?.split('T')[0] || '',
+      details: request.details,
+      specialRequests: request.specialRequests || '',
+      budgetMin: request.budgetMin?.toString() || '',
+      budgetMax: request.budgetMax?.toString() || '',
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleDeleteRequest = async (request: ServiceRequest) => {
+    if (!user || request.userId !== user.id) return;
+    if (!window.confirm('Delete this service request? This cannot be undone.')) return;
+
+    setDeletingId(request.id);
+    const { error } = await supabase
+      .from('service_requests')
+      .delete()
+      .eq('id', request.id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      toast.error('Failed to delete service request', { description: error.message });
+    } else {
+      setServiceRequests((current) => current.filter((r) => r.id !== request.id));
+      toast.success('Service request deleted');
+    }
+    setDeletingId(null);
   };
 
   const handleSubmitServiceRequest = async (e: React.FormEvent) => {
@@ -221,26 +272,133 @@ export default function ServiceRequestsPage() {
     setSubmitting(true);
 
     try {
-      const { error } = await supabase.from('service_requests').insert({
-        user_id: user.id,
-        service_needed: serviceForm.serviceNeeded,
-        location: serviceForm.location,
-        date_needed: serviceForm.dateNeeded,
-        details: serviceForm.details,
-        special_requests: serviceForm.specialRequests || null,
-        budget_min: serviceForm.budgetMin ? parseFloat(serviceForm.budgetMin) : null,
-        budget_max: serviceForm.budgetMax ? parseFloat(serviceForm.budgetMax) : null,
-        status: 'open',
-      });
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
+      if (!editingRequest && !limits.canPostServiceRequests) {
+        toast.error('Posting service requests is not available on your current plan', {
+          description: 'Upgrade to post service requests.',
+        });
+        setSubmitting(false);
+        navigate('/upgrade');
+        return;
+      }
+      if (!editingRequest && limits.serviceRequestLimit) {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const { count } = await supabase
+          .from('service_requests')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .gte('created_at', startOfMonth.toISOString());
+        if ((count || 0) >= limits.serviceRequestLimit) {
+          toast.error(`You have reached your limit of ${limits.serviceRequestLimit} service request${limits.serviceRequestLimit === 1 ? '' : 's'} this month.`, {
+            description: 'Upgrade for more service requests.',
+          });
+          setSubmitting(false);
+          navigate('/upgrade');
+          return;
+        }
+      }
+
+      if (editingRequest) {
+        const { error } = await supabase
+          .from('service_requests')
+          .update({
+            service_needed: serviceForm.serviceNeeded,
+            location: serviceForm.location,
+            date_needed: serviceForm.dateNeeded,
+            details: serviceForm.details,
+            special_requests: serviceForm.specialRequests || null,
+            budget_min: serviceForm.budgetMin ? parseFloat(serviceForm.budgetMin) : null,
+            budget_max: serviceForm.budgetMax ? parseFloat(serviceForm.budgetMax) : null,
+          })
+          .eq('id', editingRequest.id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        setServiceRequests((current) =>
+          current.map((r) =>
+            r.id === editingRequest.id
+              ? {
+                  ...r,
+                  serviceNeeded: serviceForm.serviceNeeded,
+                  location: serviceForm.location,
+                  dateNeeded: serviceForm.dateNeeded,
+                  details: serviceForm.details,
+                  specialRequests: serviceForm.specialRequests || undefined,
+                  budgetMin: serviceForm.budgetMin ? parseFloat(serviceForm.budgetMin) : undefined,
+                  budgetMax: serviceForm.budgetMax ? parseFloat(serviceForm.budgetMax) : undefined,
+                }
+              : r
+          )
+        );
+
+        toast.success('Service request updated');
+        setShowCreateModal(false);
+        setEditingRequest(null);
+        setServiceForm({
+          serviceNeeded: '',
+          location: '',
+          dateNeeded: '',
+          details: '',
+          specialRequests: '',
+          budgetMin: '',
+          budgetMax: '',
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      const { data: insertedRequest, error } = await supabase
+        .from('service_requests')
+        .insert({
+          user_id: user.id,
+          service_needed: serviceForm.serviceNeeded,
+          location: serviceForm.location,
+          date_needed: serviceForm.dateNeeded,
+          details: serviceForm.details,
+          special_requests: serviceForm.specialRequests || null,
+          budget_min: serviceForm.budgetMin ? parseFloat(serviceForm.budgetMin) : null,
+          budget_max: serviceForm.budgetMax ? parseFloat(serviceForm.budgetMax) : null,
+          status: 'open',
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Notify users within a radius of the service request location
+      try {
+        await fetch('/api/notify-job-matches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            serviceId: insertedRequest?.id,
+            itemType: 'service',
+            jobTitle: serviceForm.serviceNeeded,
+            jobDescription: serviceForm.details,
+            location: serviceForm.location,
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to notify nearby users:', err);
+      }
 
       toast.success('Service Request Posted!', {
         description: 'Service providers can now submit bids for your request.',
       });
 
       const nextRequest: ServiceRequest = {
-        id: crypto.randomUUID(),
+        id: insertedRequest?.id || crypto.randomUUID(),
+        userId: user.id,
         serviceNeeded: serviceForm.serviceNeeded,
         location: serviceForm.location,
         dateNeeded: serviceForm.dateNeeded,
@@ -375,6 +533,34 @@ export default function ServiceRequestsPage() {
                     >
                       Submit Bid
                     </Button>
+
+                    {user && request.userId === user.id && (
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditRequest(request)}
+                          className="flex-1"
+                        >
+                          <Pencil className="w-4 h-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteRequest(request)}
+                          disabled={deletingId === request.id}
+                          className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                          {deletingId === request.id ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 mr-1" />
+                          )}
+                          Delete
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               ))}
@@ -484,10 +670,12 @@ export default function ServiceRequestsPage() {
         <DialogContent className="bg-card text-card-foreground max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-heading font-bold text-foreground">
-              Create Service Request
+              {editingRequest ? 'Edit Service Request' : 'Create Service Request'}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Request short-term or one-time services for your estate. Service providers will be able to submit private bids.
+              {editingRequest
+                ? 'Update the details of your service request.'
+                : 'Request short-term or one-time services for your estate. Service providers will be able to submit private bids.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -506,17 +694,17 @@ export default function ServiceRequestsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="serviceLocation" className="text-foreground">Location *</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="serviceLocation"
-                  placeholder="City, neighborhood, or estate location"
-                  required
-                  value={serviceForm.location}
-                  onChange={(e) => setServiceForm(prev => ({ ...prev, location: e.target.value }))}
-                  className="pl-10 bg-background text-foreground border-border"
-                />
-              </div>
+              <LocationAutocomplete
+                placeholder="City, neighborhood, or estate location"
+                defaultValue={serviceForm.location}
+                onLocationSelect={(loc) =>
+                  setServiceForm(prev => ({
+                    ...prev,
+                    location: [loc.city, loc.state].filter(Boolean).join(', ') || loc.formattedAddress,
+                  }))
+                }
+                onTextChange={(text) => setServiceForm(prev => ({ ...prev, location: text }))}
+              />
             </div>
 
             <div className="space-y-2">
@@ -591,7 +779,7 @@ export default function ServiceRequestsPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => { setShowCreateModal(false); setEditingRequest(null); }}
                 className="flex-1 border-border text-foreground hover:bg-muted"
               >
                 Cancel
@@ -604,10 +792,10 @@ export default function ServiceRequestsPage() {
                 {submitting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Posting...
+                    {editingRequest ? 'Saving...' : 'Posting...'}
                   </>
                 ) : (
-                  'Post Service Request'
+                  editingRequest ? 'Save Changes' : 'Post Service Request'
                 )}
               </Button>
             </div>

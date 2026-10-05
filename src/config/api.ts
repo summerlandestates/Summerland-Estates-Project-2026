@@ -1,6 +1,5 @@
 // API Configuration - Google API key is stored securely in backend
 export const API_CONFIG = {
-  GOOGLE_PLACES_API_KEY: 'AIzaSyDs7HeqA1nDjpjnVtELrUZ7Lw15t6Q8Xp8',
   GOOGLE_PLACES_API_URL: 'https://maps.googleapis.com/maps/api/place',
 };
 

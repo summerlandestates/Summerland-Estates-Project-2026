@@ -27,6 +27,10 @@ export interface TierLimits {
   canUploadVideo: boolean;
   canAccessVerificationCredits: boolean;
   multiLocationSupport: boolean;
+  serviceLocationLimit?: number;
+  messageLimitMonthly?: number;
+  profileViewLimitMonthly?: number;
+  newConversationLimitMonthly?: number;
 }
 
 export function getTierLimits(tier: PricingTier): TierLimits {
@@ -143,60 +147,72 @@ export function getTierLimits(tier: PricingTier): TierLimits {
         canViewPlacements: true,
         placementViewLimit: 1,
         canMessage: true,
-        messageLimit: 1,
-        messageLimitPerProfile: 2,
+        messageLimitMonthly: 15,
         canInterview: false,
         canPostRoles: false,
         canPostServiceRequests: false,
         canAccessCommunity: false,
         canReceiveNotifications: false,
-        canUseBookingTool: false,
-        canBidOnRequests: false,
+        canUseBookingTool: true,
+        canBidOnRequests: true,
+        bidLimit: 2,
         canUseComparisons: false,
         canViewFullProfiles: false,
         profilePhotoLimit: 1,
         canUploadVideo: false,
         canAccessVerificationCredits: false,
-        multiLocationSupport: false
+        multiLocationSupport: false,
+        serviceLocationLimit: 1
       };
 
     case 'business-pro':
       return {
         canViewPlacements: true,
         canMessage: true,
-        canInterview: false,
-        canPostRoles: false,
+        canInterview: true,
+        canPostRoles: true,
+        rolePostLimit: 1,
         canPostServiceRequests: false,
         canAccessCommunity: true,
         canReceiveNotifications: true,
         canUseBookingTool: true,
         canBidOnRequests: true,
+        bidLimit: 4,
         canUseComparisons: false,
         canViewFullProfiles: true,
+        canAddArticles: true,
+        articleLimit: 1,
         profilePhotoLimit: 999,
         canUploadVideo: true,
         canAccessVerificationCredits: false,
-        multiLocationSupport: false
+        multiLocationSupport: false,
+        serviceLocationLimit: 1
       };
 
-    case 'business-multi':
+    case 'business-enterprise':
       return {
         canViewPlacements: true,
         canMessage: true,
-        canInterview: false,
-        canPostRoles: false,
+        canInterview: true,
+        canPostRoles: true,
         canPostServiceRequests: false,
         canAccessCommunity: true,
         canReceiveNotifications: true,
         canUseBookingTool: true,
         canBidOnRequests: true,
-        canUseComparisons: false,
+        canUseComparisons: true,
         canViewFullProfiles: true,
+        canAddArticles: true,
+        articleLimit: 1,
         profilePhotoLimit: 999,
         canUploadVideo: true,
-        canAccessVerificationCredits: false,
-        multiLocationSupport: true
+        canAccessVerificationCredits: true,
+        multiLocationSupport: true,
+        serviceLocationLimit: 3
       };
+
+    case 'business-multi':
+      return getTierLimits('business-enterprise');
 
     // Agency Tiers
     case 'agency-free':
@@ -212,23 +228,24 @@ export function getTierLimits(tier: PricingTier): TierLimits {
         canBidOnRequests: false,
         canUseComparisons: false,
         canViewFullProfiles: false,
+        profileViewLimitMonthly: 3,
         profilePhotoLimit: 1,
         canUploadVideo: false,
         canAccessVerificationCredits: false,
-        multiLocationSupport: false
+        multiLocationSupport: false,
+        serviceLocationLimit: 1
       };
 
     case 'agency-basic':
       return {
         canViewPlacements: true,
-        placementViewLimit: 6,
         canMessage: true,
-        messageLimit: 3,
+        newConversationLimitMonthly: 5,
         canInterview: true,
-        interviewLimit: 3,
         canPostRoles: true,
         rolePostLimit: 1,
-        canPostServiceRequests: false,
+        canPostServiceRequests: true,
+        serviceRequestLimit: 1,
         canAccessCommunity: false,
         canReceiveNotifications: false,
         canUseBookingTool: false,
@@ -238,19 +255,20 @@ export function getTierLimits(tier: PricingTier): TierLimits {
         profilePhotoLimit: 999,
         canUploadVideo: false,
         canAccessVerificationCredits: false,
-        multiLocationSupport: false
+        multiLocationSupport: false,
+        serviceLocationLimit: 1
       };
 
     case 'agency-hiring':
       return {
         canViewPlacements: true,
         canMessage: true,
-        messageLimit: 12,
+        newConversationLimitMonthly: 25,
         canInterview: true,
-        interviewLimit: 12,
         canPostRoles: true,
-        rolePostLimit: 4,
-        canPostServiceRequests: false,
+        rolePostLimit: 8,
+        canPostServiceRequests: true,
+        serviceRequestLimit: 5,
         canAccessCommunity: true,
         canReceiveNotifications: true,
         canUseBookingTool: false,
@@ -260,7 +278,8 @@ export function getTierLimits(tier: PricingTier): TierLimits {
         profilePhotoLimit: 999,
         canUploadVideo: true,
         canAccessVerificationCredits: false,
-        multiLocationSupport: false
+        multiLocationSupport: false,
+        serviceLocationLimit: 4
       };
 
     case 'agency-pro':
@@ -269,7 +288,7 @@ export function getTierLimits(tier: PricingTier): TierLimits {
         canMessage: true,
         canInterview: true,
         canPostRoles: true,
-        canPostServiceRequests: false,
+        canPostServiceRequests: true,
         canAccessCommunity: true,
         canReceiveNotifications: true,
         canUseBookingTool: false,
@@ -279,7 +298,8 @@ export function getTierLimits(tier: PricingTier): TierLimits {
         profilePhotoLimit: 999,
         canUploadVideo: true,
         canAccessVerificationCredits: true,
-        multiLocationSupport: false
+        multiLocationSupport: true,
+        serviceLocationLimit: 999
       };
 
     // Estates Tiers
@@ -296,6 +316,7 @@ export function getTierLimits(tier: PricingTier): TierLimits {
         canBidOnRequests: false,
         canUseComparisons: false,
         canViewFullProfiles: false,
+        profileViewLimitMonthly: 3,
         profilePhotoLimit: 1,
         canUploadVideo: false,
         canAccessVerificationCredits: false,
@@ -306,9 +327,8 @@ export function getTierLimits(tier: PricingTier): TierLimits {
       return {
         canViewPlacements: true,
         canMessage: true,
-        messageLimit: 3,
+        newConversationLimitMonthly: 5,
         canInterview: true,
-        interviewLimit: 3,
         canPostRoles: true,
         rolePostLimit: 1,
         canPostServiceRequests: true,
@@ -329,13 +349,12 @@ export function getTierLimits(tier: PricingTier): TierLimits {
       return {
         canViewPlacements: true,
         canMessage: true,
-        messageLimit: 12,
+        newConversationLimitMonthly: 25,
         canInterview: true,
-        interviewLimit: 12,
         canPostRoles: true,
-        rolePostLimit: 4,
+        rolePostLimit: 10,
         canPostServiceRequests: true,
-        serviceRequestLimit: 4,
+        serviceRequestLimit: 5,
         canAccessCommunity: true,
         canReceiveNotifications: true,
         canUseBookingTool: false,

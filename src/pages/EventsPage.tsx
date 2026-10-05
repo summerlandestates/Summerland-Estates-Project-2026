@@ -4,6 +4,7 @@ import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import FAQSection from '../components/FAQSection';
+import MapLocationLink from '../components/MapLocationLink';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -157,7 +158,11 @@ export default function EventsPage() {
                       ) : (
                         <MapPin className="w-5 h-5 text-amber-400" />
                       )}
-                      <span>{featuredEvent.location}</span>
+                      {featuredEvent.is_online ? (
+                        <span>{featuredEvent.location}</span>
+                      ) : (
+                        <MapLocationLink location={featuredEvent.location} iconClassName="hidden" className="text-white/80" />
+                      )}
                     </div>
                     <Button 
                       className="bg-white text-[#A89F91] hover:bg-white/90 font-semibold"
@@ -278,7 +283,11 @@ export default function EventsPage() {
                       ) : (
                         <MapPin className="w-4 h-4 text-[#A89F91]" />
                       )}
-                      <span>{event.location}</span>
+                      {event.is_online ? (
+                        <span>{event.location}</span>
+                      ) : (
+                        <MapLocationLink location={event.location} iconClassName="hidden" className="text-muted-foreground" />
+                      )}
                     </div>
                     {event.capacity && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">

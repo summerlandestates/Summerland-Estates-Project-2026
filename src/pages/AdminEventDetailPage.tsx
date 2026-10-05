@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import AdminSidebar from '../components/AdminSidebar';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -231,43 +230,39 @@ export default function AdminEventDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
-        <AdminSidebar />
-        <main className="flex-1 p-8 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-[#A89F91] mx-auto mb-4" />
-            <p className="text-gray-600">Loading event details...</p>
-          </div>
-        </main>
-      </div>
+      <div className="space-y-6">
+
+  <div className="text-center">
+    <Loader2 className="w-12 h-12 animate-spin text-[#A89F91] mx-auto mb-4" />
+    <p className="text-gray-600">Loading event details...</p>
+  </div>
+
+</div>
     );
   }
 
   if (!event) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
-        <AdminSidebar />
-        <main className="flex-1 p-8">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Event Not Found</h1>
-            <p className="text-gray-600 mb-6">The event you're looking for doesn't exist or has been removed.</p>
-            <Button onClick={() => navigate('/admin/events')} className="bg-[#A89F91] hover:bg-[#8A8279]">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Events
-            </Button>
-          </div>
-        </main>
-      </div>
+      <div className="space-y-6">
+
+  <div className="max-w-4xl mx-auto text-center">
+    <h1 className="text-2xl font-bold text-gray-900 mb-4">Event Not Found</h1>
+    <p className="text-gray-600 mb-6">The event you're looking for doesn't exist or has been removed.</p>
+    <Button onClick={() => navigate('/admin/events')} className="bg-[#A89F91] hover:bg-[#8A8279]">
+      <ArrowLeft className="w-4 h-4 mr-2" />
+      Back to Events
+    </Button>
+  </div>
+
+</div>
     );
   }
 
   const spotsLeft = event.capacity ? event.capacity - registrations.length : null;
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
-
-      <main className="flex-1 p-8">
+    <div>
+      <main>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-8">

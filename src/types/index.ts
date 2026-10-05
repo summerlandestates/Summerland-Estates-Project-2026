@@ -41,35 +41,12 @@ export interface BusinessHours {
   closed?: boolean;
 }
 
-export type HireStatus = 'none' | 'pending-confirmation' | 'confirmed' | 'not-hired' | 'disputed';
-
-export interface HireConfirmation {
-  id: string;
-  conversationId: string;
-  initiatedBy: string;
-  initiatedDate: string;
-  hireOccurred: boolean;
-  hiredProfileId?: string;
-  startDate?: string;
-  status: HireStatus;
-  secondPartyResponse?: {
-    respondedBy: string;
-    respondedDate: string;
-    confirmed: boolean;
-    disputed: boolean;
-    disputeReason?: string;
-  };
-}
-
 export interface Conversation {
   id: string;
   participants: string[];
   messages: ConversationMessage[];
   createdDate: string;
   lastMessageDate: string;
-  hireStatus: HireStatus;
-  hireConfirmation?: HireConfirmation;
-  hasWorkIntent: boolean;
 }
 
 export interface ConversationMessage {
@@ -101,6 +78,9 @@ export interface ServiceRequest {
   postedBy: string;
   postedDate: string;
   status: 'active' | 'expired' | 'filled';
+  userId?: string;
+  budgetMin?: number;
+  budgetMax?: number;
 }
 
 export interface Bid {
@@ -236,7 +216,6 @@ export interface Listing {
   willingToStayOvernight?: boolean;
   willingToLiveOnSite?: boolean;
   hasValidDriversLicense?: boolean;
-  willingToBackgroundCheck?: boolean;
   willingToDrugTest?: boolean;
   
   benefitExpectations?: string[];
@@ -286,7 +265,6 @@ export interface Listing {
   gender?: 'male' | 'female' | 'other';
   
   // Additional features (add-ons)
-  backgroundCheckAvailable?: boolean;
   priorityListing?: boolean;
   featuredOnHomepage?: boolean;
   
@@ -297,12 +275,16 @@ export interface Listing {
 
 export interface Review {
   id: string;
+  reviewerId?: string;
   reviewerName: string;
   reviewerRole: string;
   rating: number;
   date: string;
   comment: string;
   verified: boolean;
+  response?: string;
+  responseAt?: string;
+  flagged?: boolean;
 }
 
 export interface FilterState {
@@ -314,11 +296,12 @@ export interface FilterState {
   profileStatus: string;
   // Advanced filters from requirements
   title?: string;
+  /** Multi-select service categories (the 167-service catalog + customs) */
+  titles?: string[];
   serviceType?: string;
   gender?: string;
   language?: string;
   workAvailability?: string;
-  hasBackgroundCheck?: boolean;
   willingDrugTest?: boolean;
   certifications?: string[];
   comfortWith?: string[];

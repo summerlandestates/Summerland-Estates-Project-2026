@@ -1,12 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, MapPin, Shield, Users, Award, Lock, Send } from 'lucide-react';
+import { Mail, Shield, Users, Award, Lock, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { contentManager } from '@/lib/contentManagement';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [extraLegalLinks, setExtraLegalLinks] = useState<{ name: string; href: string }[]>([]);
+
+  useEffect(() => {
+    contentManager.init().then(() => {
+      const extraPages = contentManager
+        .getContent()
+        .pages.filter(
+          (p) => p.isPublished && !['privacy', 'terms', 'cookies'].includes(p.slug)
+        )
+        .map((p) => ({ name: p.title, href: `/pages/${p.slug}` }));
+      setExtraLegalLinks(extraPages);
+    });
+  }, []);
 
   const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +47,7 @@ export default function Footer() {
 
   const quickLinks = [
     { name: 'Home', href: '/' },
-    { name: 'Find Professionals', href: '/providers' },
+    { name: 'Search Professionals', href: '/search' },
     { name: 'Post a Job', href: '/post-job' },
     { name: 'About Us', href: '/about' },
     { name: 'Contact', href: '/contact' },
@@ -44,6 +58,7 @@ export default function Footer() {
     { name: 'Privacy Policy', href: '/privacy' },
     { name: 'Terms of Service', href: '/terms' },
     { name: 'Cookie Policy', href: '/cookies' },
+    ...extraLegalLinks,
   ];
 
   const standards = [
@@ -62,36 +77,58 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="lg:col-span-1">
             <Link to="/" className="flex items-center gap-3 mb-5 group">
-              <div className="w-12 h-12 bg-[#A89F91] rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
-                <span className="text-white font-serif font-bold text-xl">SE</span>
-              </div>
-              <div>
-                <h3 className="font-serif text-xl font-bold text-white group-hover:text-[#A89F91] transition-colors duration-300">
-                  Summerland Estates
-                </h3>
-                <p className="text-xs text-gray-500">Private Staffing Network</p>
-              </div>
+              <svg
+                viewBox="0 0 48 48"
+                className="w-12 h-12 text-[#C9BFAE] group-hover:text-[#A89F91] transition-colors duration-300"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <circle cx="24" cy="24" r="14" />
+                <circle cx="24" cy="24" r="5" />
+                <line x1="24" y1="2" x2="24" y2="10" />
+                <line x1="24" y1="38" x2="24" y2="46" />
+                <line x1="2" y1="24" x2="10" y2="24" />
+                <line x1="38" y1="24" x2="46" y2="24" />
+                <line x1="8.5" y1="8.5" x2="14" y2="14" />
+                <line x1="34" y1="34" x2="39.5" y2="39.5" />
+                <line x1="39.5" y1="8.5" x2="34" y2="14" />
+                <line x1="14" y1="34" x2="8.5" y2="39.5" />
+              </svg>
+              <img
+                src="/images/logo.png"
+                alt="Summerland Estates"
+                className="h-8 w-auto brightness-0 invert opacity-90 group-hover:opacity-100 transition-opacity duration-300"
+              />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
               A private network connecting trusted estate professionals with discerning households. Excellence in domestic staffing since 2018.
             </p>
             <div className="flex gap-3">
-              <a 
-                href="#" 
+              <a
+                href="https://www.linkedin.com/company/summerland-estates/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-9 h-9 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-[#A89F91] hover:text-white transition-all duration-300 hover:scale-110"
                 aria-label="LinkedIn"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
               </a>
-              <a 
-                href="#" 
+              <a
+                href="https://www.instagram.com/summerlandestates/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-9 h-9 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-[#A89F91] hover:text-white transition-all duration-300 hover:scale-110"
                 aria-label="Instagram"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
               </a>
-              <a 
-                href="#" 
+              <a
+                href="https://www.facebook.com/summerlandestates/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-9 h-9 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-[#A89F91] hover:text-white transition-all duration-300 hover:scale-110"
                 aria-label="Facebook"
               >
@@ -163,15 +200,7 @@ export default function Footer() {
                   </div>
                 </a>
               </li>
-              <li className="flex items-start gap-3 text-gray-400">
-                <div className="w-9 h-9 bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-4 h-4 text-[#A89F91]" />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Office</p>
-                  <p className="text-sm">123 Estate Lane<br />Beverly Hills, CA 90210</p>
-                </div>
-              </li>
+
             </ul>
           </div>
         </div>

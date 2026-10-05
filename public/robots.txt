@@ -15,11 +15,19 @@ Disallow: /settings
 Disallow: /my-profile
 Disallow: /edit-profile
 Disallow: /messaging
+Disallow: /messages
+Disallow: /conversations
 Disallow: /saved-profiles
 Disallow: /account-management
 Disallow: /compare
 Disallow: /verify-email
 Disallow: /registration-pending
+Disallow: /my-articles
+Disallow: /checkout
+Disallow: /payment-success
+Disallow: /notification-settings
+Disallow: /upgrade
+Disallow: /notifications
 
 # Allow public pages
 Allow: /

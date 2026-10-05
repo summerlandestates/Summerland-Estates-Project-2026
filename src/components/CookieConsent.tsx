@@ -18,21 +18,24 @@ export default function CookieConsent() {
   const [consentGiven, setConsentGiven] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     // Load config from content manager
-    const cookieConfig = contentManager.getCookieConfig();
-    setConfig(cookieConfig);
+    contentManager.init().then(() => {
+      if (cancelled) return;
+      const cookieConfig = contentManager.getCookieConfig();
+      setConfig(cookieConfig);
+
+      const hasConsent = localStorage.getItem('cookie-consent');
+      if (!hasConsent && cookieConfig.enabled) {
+        setTimeout(() => setShowBanner(true), 1000);
+      }
+    });
 
     // Check if user has already given consent
-    const hasConsent = localStorage.getItem('cookie-consent');
-    if (hasConsent) {
+    if (localStorage.getItem('cookie-consent')) {
       setConsentGiven(true);
-    } else if (cookieConfig.enabled) {
-      // Show banner after a short delay
-      const timer = setTimeout(() => {
-        setShowBanner(true);
-      }, 1000);
-      return () => clearTimeout(timer);
     }
+    return () => { cancelled = true; };
   }, []);
 
   const handleAccept = () => {

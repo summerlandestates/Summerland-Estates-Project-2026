@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { formatTierLabel, getAccountStatus, requiresMembershipPayment } from '@/lib/membership';
+import { formatTierLabel, getAccountStatus } from '@/lib/membership';
 import { getPlanById } from '@/data/pricing';
 import { getAddOnsByUserType } from '@/data/addons';
 import NavBar from '@/components/NavBar';
@@ -27,7 +27,9 @@ import {
   Star,
   Shield,
   BadgeCheck,
-  Sparkles
+  Sparkles,
+  CheckCircle2,
+  Circle
 } from 'lucide-react';
 
 type DashboardUserType = 'professional' | 'business' | 'agency' | 'estates';
@@ -202,7 +204,6 @@ const getRoleCopy = (userType: DashboardUserType) => {
 };
 
 const getAddOnIcon = (addOnId: string) => {
-  if (addOnId.includes('background') || addOnId.includes('license')) return Shield;
   if (addOnId.includes('verification')) return BadgeCheck;
   if (addOnId.includes('analytics')) return TrendingUp;
   if (addOnId.includes('priority')) return Star;
@@ -210,6 +211,82 @@ const getAddOnIcon = (addOnId: string) => {
   if (addOnId.includes('community')) return MessageCircle;
   return FileText;
 };
+
+// ── Profile completeness ──────────────────────────────────────────────────
+interface CompletenessResult {
+  percent: number;
+  complete: string[];
+  missing: string[];
+}
+
+const hasValue = (v: any): boolean => {
+  if (v === null || v === undefined) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === 'string') return v.trim().length > 0;
+  return true;
+};
+
+const pick = (data: any, keys: string[]): any => {
+  for (const k of keys) {
+    if (hasValue(data?.[k])) return data[k];
+  }
+  return undefined;
+};
+
+function computeProfileCompleteness(profile: any): CompletenessResult {
+  const data = profile?.application_data || {};
+  const checks: { label: string; present: boolean }[] = [
+    {
+      label: 'Photo',
+      present: hasValue(
+        pick(data, ['profile_photo', 'photo', 'photo_url', 'avatar_url', 'headshot', 'logo', 'image'])
+      ),
+    },
+    {
+      label: 'Bio',
+      present: hasValue(pick(data, ['bio', 'about', 'description', 'agency_bio', 'individual_bio'])),
+    },
+    {
+      label: 'Location',
+      present: hasValue(pick(data, ['location', 'city', 'address', 'formatted_address'])),
+    },
+    {
+      label: 'Services',
+      present: hasValue(
+        pick(data, ['services', 'service_types', 'services_offered', 'title', 'job_title', 'role'])
+      ),
+    },
+    {
+      label: 'Experience',
+      present: hasValue(
+        pick(data, ['experience', 'years_experience', 'work_history', 'previous_jobs'])
+      ),
+    },
+    {
+      label: 'Certifications',
+      present: hasValue(pick(data, ['certifications', 'licenses', 'credentials'])),
+    },
+    {
+      label: 'Availability',
+      present: hasValue(
+        pick(data, ['availability', 'work_availability', 'schedule', 'hours_available'])
+      ),
+    },
+    {
+      label: 'Portfolio',
+      present: hasValue(
+        pick(data, ['portfolio', 'portfolio_link', 'website', 'business_website', 'video_url'])
+      ),
+    },
+  ];
+
+  const done = checks.filter((c) => c.present).length;
+  return {
+    percent: Math.round((done / checks.length) * 100),
+    complete: checks.filter((c) => c.present).map((c) => c.label),
+    missing: checks.filter((c) => !c.present).map((c) => c.label),
+  };
+}
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -237,6 +314,7 @@ export default function DashboardPage() {
   const [savedJobs, setSavedJobs] = useState<SavedItem[]>([]);
   const [savedArticles, setSavedArticles] = useState<SavedItem[]>([]);
   const [downloadedTemplates, setDownloadedTemplates] = useState<SavedItem[]>([]);
+  const [completeness, setCompleteness] = useState<CompletenessResult>({ percent: 0, complete: [], missing: [] });
 
   useEffect(() => {
     if (authLoading) return;
@@ -310,11 +388,6 @@ export default function DashboardPage() {
       return;
     }
 
-    if (requiresMembershipPayment(profile, user)) {
-      navigate('/checkout');
-      return;
-    }
-
     const jobApplications = jobApplicationsResult.data || [];
     const serviceBids = serviceBidsResult.data || [];
     const savedProfileRows = savedProfilesResult.data || [];
@@ -334,6 +407,7 @@ export default function DashboardPage() {
 
     setUserTier(resolvedTier);
     setProfileType(resolvedProfileType);
+    setCompleteness(computeProfileCompleteness(profile));
 
     setStats({
       jobsApplied: jobApplications.length,
@@ -342,10 +416,21 @@ export default function DashboardPage() {
       savedJobs: storedSavedJobs.length,
       savedArticles: storedSavedArticles.length,
       templatesDownloaded: storedTemplates.length,
-      profileViews: ownJobPosts.length + ownServiceRequests.length,
+      profileViews: 0,
       postedJobs: ownJobPosts.length,
       postedServiceRequests: ownServiceRequests.length,
     });
+
+    // Real profile-view count ("Who's Viewed My Profile")
+    supabase
+      .from('profile_views')
+      .select('id', { count: 'exact', head: true })
+      .eq('profile_id', user.id)
+      .then(({ count }) => {
+        if (typeof count === 'number') {
+          setStats((prev) => ({ ...prev, profileViews: count }));
+        }
+      });
 
     setAppliedJobs(
       jobApplications.map((application: any) => ({
@@ -526,6 +611,50 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Profile completeness */}
+          <Card className="mb-8">
+            <CardContent className="pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-heading font-semibold text-foreground">
+                    Your profile is {completeness.percent}% complete
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Complete profiles appear higher in search results
+                  </p>
+                </div>
+                {completeness.percent < 100 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-[#A89F91] text-[#A89F91]"
+                    onClick={() => navigate('/settings')}
+                  >
+                    Complete Profile
+                  </Button>
+                )}
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden mb-4">
+                <div
+                  className="h-full bg-[#A89F91] transition-all duration-500"
+                  style={{ width: `${completeness.percent}%` }}
+                />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                {completeness.complete.map((item) => (
+                  <span key={item} className="flex items-center gap-1.5 text-muted-foreground">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" /> {item}
+                  </span>
+                ))}
+                {completeness.missing.map((item) => (
+                  <span key={item} className="flex items-center gap-1.5 text-muted-foreground/70">
+                    <Circle className="w-4 h-4" /> {item}
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {primaryStats.map((card) => {
@@ -761,7 +890,7 @@ export default function DashboardPage() {
                       {savedProfiles.length > 0 ? savedProfiles.map((item) => (
                         <div key={item.id} className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
                           <h4 className="font-medium text-sm">{item.title}</h4>
-                          <p className="text-xs text-muted-foreground">{item.type} � Saved {item.savedDate}</p>
+                          <p className="text-xs text-muted-foreground">{item.type} � Saved {item.savedDate}</p>
                         </div>
                       )) : (
                         <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -787,7 +916,7 @@ export default function DashboardPage() {
                       {savedJobs.length > 0 ? savedJobs.map((item) => (
                         <div key={item.id} className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
                           <h4 className="font-medium text-sm">{item.title}</h4>
-                          <p className="text-xs text-muted-foreground">{item.type} � Saved {item.savedDate}</p>
+                          <p className="text-xs text-muted-foreground">{item.type} � Saved {item.savedDate}</p>
                         </div>
                       )) : (
                         <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -813,7 +942,7 @@ export default function DashboardPage() {
                       {savedArticles.length > 0 ? savedArticles.map((item) => (
                         <div key={item.id} className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
                           <h4 className="font-medium text-sm">{item.title}</h4>
-                          <p className="text-xs text-muted-foreground">{item.type} � Saved {item.savedDate}</p>
+                          <p className="text-xs text-muted-foreground">{item.type} � Saved {item.savedDate}</p>
                         </div>
                       )) : (
                         <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -877,7 +1006,10 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     {isPaidMember ? (
-                      <Button className="w-full bg-[#A89F91] hover:bg-[#8A8279] cursor-pointer">
+                      <Button
+                        className="w-full bg-[#A89F91] hover:bg-[#8A8279] cursor-pointer"
+                        onClick={() => navigate('/my-articles')}
+                      >
                         <PenSquare className="w-4 h-4 mr-2" />
                         Write New Article
                       </Button>

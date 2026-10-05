@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
+import MapLocationLink from '../components/MapLocationLink';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -255,10 +256,7 @@ export default function ServiceRequestDetailPage() {
                       {service.service_needed}
                     </h1>
                     <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm sm:text-base">
-                      <span className="flex items-center">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        {service.location}
-                      </span>
+                      <MapLocationLink location={service.location} iconClassName="w-4 h-4 mr-1" />
                     </div>
                   </div>
                 </div>
@@ -446,7 +444,7 @@ export default function ServiceRequestDetailPage() {
                       <MapPin className="w-4 h-4 mr-3 mt-0.5 text-[#A89F91]" />
                       <div>
                         <p className="text-muted-foreground">Location</p>
-                        <p>{service.location}</p>
+                        <MapLocationLink location={service.location} iconClassName="hidden" />
                       </div>
                     </div>
                   </div>

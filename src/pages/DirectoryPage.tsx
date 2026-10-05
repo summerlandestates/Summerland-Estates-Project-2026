@@ -12,6 +12,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, BriefcaseBusiness, Search, Sparkles, Loader2 } from 'lucide-react';
 import { fetchListings } from '../utils/listings';
+import { parseSearchIntent, intentScore } from '../lib/searchIntent';
+import { getBlockedIds } from '../components/BlockUserButton';
 import type { Listing, FilterState, PricingTier } from '../types';
 
 const homepageCollections = [
@@ -60,7 +62,8 @@ export default function DirectoryPage() {
     const loadListings = async () => {
       try {
         setLoading(true);
-        const data = await fetchListings();
+        const blocked = new Set(getBlockedIds());
+        const data = (await fetchListings()).filter((l: Listing) => !blocked.has(l.id) && !blocked.has(l.slug));
         setAllListings(data);
         setFilteredListings(data);
       } catch (err: any) {
@@ -78,12 +81,12 @@ export default function DirectoryPage() {
 
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (listing) =>
-          listing.name.toLowerCase().includes(query) ||
-          listing.role.toLowerCase().includes(query) ||
-          listing.bio.toLowerCase().includes(query)
-      );
+      const intent = parseSearchIntent(query);
+      filtered = filtered
+        .map((listing) => ({ listing, score: intentScore(listing, query, intent) }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((x) => x.listing);
     }
 
     if (filters.category && filters.category !== 'all') {
@@ -108,6 +111,62 @@ export default function DirectoryPage() {
 
     if (filters.profileStatus && filters.profileStatus !== 'all') {
       filtered = filtered.filter((listing) => listing.profileStatus === filters.profileStatus);
+    }
+
+    // Multi-select service categories — match role, offered services, or skills
+    const selectedServices = filters.titles?.length
+      ? filters.titles
+      : filters.title
+        ? [filters.title]
+        : [];
+    if (selectedServices.length > 0) {
+      const wanted = selectedServices.map((s) => s.toLowerCase().replace(/-/g, ' '));
+      filtered = filtered.filter((listing) => {
+        const offered = (listing.servicesOffered || [])
+          .map((s: any) => (typeof s === 'string' ? s : s?.name || ''))
+          .join(' ')
+          .toLowerCase();
+        const haystack = [
+          listing.role,
+          offered,
+          (listing.skills || []).join(' '),
+          listing.bio,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .replace(/-/g, ' ');
+        return wanted.some((w) => haystack.includes(w));
+      });
+    }
+
+    if (filters.language) {
+      filtered = filtered.filter((listing) =>
+        listing.languages?.some((lang) => lang.toLowerCase().includes(filters.language!.replace(/-/g, ' ')))
+      );
+    }
+
+    if (filters.workAvailability) {
+      filtered = filtered.filter((listing) =>
+        listing.availability ||
+        listing.availabilityNotes?.toLowerCase().includes(filters.workAvailability!.replace(/-/g, ' '))
+      );
+    }
+
+    if (filters.yearsExperience) {
+      filtered = filtered.filter((listing) => {
+        const years = listing.experienceYears;
+        switch (filters.yearsExperience) {
+          case '0-2': return years >= 0 && years <= 2;
+          case '3-5': return years >= 3 && years <= 5;
+          case '6-10': return years >= 6 && years <= 10;
+          case '10+': return years > 10;
+          default: return true;
+        }
+      });
+    }
+
+    if (filters.hasCar) {
+      filtered = filtered.filter((listing) => listing.hasCarAndInsurance);
     }
 
     setFilteredListings(filtered);
@@ -389,6 +448,14 @@ export default function DirectoryPage() {
           maxItems={5}
           className="bg-muted/30"
         />
+
+        <section className="py-10">
+          <div className="container mx-auto px-6 max-w-4xl">
+            <p className="text-center text-sm text-muted-foreground leading-relaxed">
+              Summerland Estates is a technology platform that enables users to create profiles, discover opportunities, and communicate with one another. Summerland Estates does not employ, recommend, endorse, supervise, or guarantee any user, service, employer, contractor, or opportunity unless expressly stated otherwise.
+            </p>
+          </div>
+        </section>
       </main>
 
       <Footer />

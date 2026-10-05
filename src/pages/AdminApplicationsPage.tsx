@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import AdminSidebar from '../components/AdminSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { loadSessionJson, saveSessionJson } from '@/lib/adminSession';
@@ -256,10 +255,8 @@ export default function AdminApplicationsPage() {
   const pendingCount = applications.filter(a => a.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <AdminSidebar />
-      
-      <main className="flex-1 p-8">
+    <div>
+      <main>
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl font-heading font-bold text-foreground mb-2">

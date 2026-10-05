@@ -21,7 +21,9 @@ import { isComplimentaryTier } from '@/lib/membership';
 import PersonalityAssessmentDialog from '@/components/PersonalityAssessmentDialog';
 import { formatPersonalitySummary, type PersonalityAssessmentResult } from '@/lib/personalityAssessment';
 import { parseResumeFile, type ResumeParseResult } from '@/lib/resumeParser';
-import { professionalTitles, genderOptions, languages, workAvailability, workPreference, certifications, animalExperience, comfortLevels, cookingExperience } from '../data/profileOptions';
+import { professionalTitles, languages, workAvailability, certifications, serviceTypes } from '../data/profileOptions';
+import ServiceCategoryPicker from '@/components/ServiceCategoryPicker';
+import { fetchCustomOptions, saveCustomOption } from '@/lib/customOptions';
 import type { OnboardingType, OnboardingStep, UserType, PricingTier, ApplicationFormData, SerializedApplicationData, CheckoutData } from '../types';
 
 type ProfileType = 'professional' | 'service-provider' | 'agency' | 'estates' | null;
@@ -245,6 +247,11 @@ export default function AddListingPage() {
   const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
+    fetchCustomOptions('professional_title').then(setCustomTitles);
+    fetchCustomOptions('service_type').then(setCustomServiceTypes);
+  }, []);
+
+  useEffect(() => {
     if (!user) {
       setExistingProfile(null);
       setProfileLoading(false);
@@ -269,7 +276,13 @@ export default function AddListingPage() {
   const [resumeAutofilledFields, setResumeAutofilledFields] = useState<string[]>([]);
   const [personalityDialogOpen, setPersonalityDialogOpen] = useState(false);
   const [personalityResult, setPersonalityResult] = useState<PersonalityAssessmentResult | null>(null);
-  const totalFormSteps = 3;
+  const [customTitles, setCustomTitles] = useState<string[]>([]);
+  const [customServiceTypes, setCustomServiceTypes] = useState<string[]>([]);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  // Estates skip the "Professional Details" step entirely.
+  const formStepIds = profileType === 'estates' ? [1, 3] : [1, 2, 3];
+  const totalFormSteps = formStepIds.length;
+  const currentFormStepId = formStepIds[formStep - 1] ?? 1;
   const formRef = useRef<HTMLFormElement>(null);
   const sectionCardClassName = 'rounded-[32px] border border-border/60 bg-card/95 p-5 shadow-sm sm:p-6';
   const sectionBodyClassName = 'space-y-4 md:space-y-5 xl:max-h-[calc(100vh-12rem)] xl:overflow-y-auto xl:pr-3';
@@ -519,7 +532,7 @@ export default function AddListingPage() {
   };
 
   const validateCurrentFormStep = () => {
-    const stepElement = formRef.current?.querySelector<HTMLElement>(`[data-form-step="${formStep}"]`);
+    const stepElement = formRef.current?.querySelector<HTMLElement>(`[data-form-step="${currentFormStepId}"]`);
     if (!stepElement) return true;
 
     const fields = Array.from(
@@ -535,7 +548,7 @@ export default function AddListingPage() {
       }
     }
 
-    if (formStep === 3) {
+    if (currentFormStepId === 3) {
       const passwordField = stepElement.querySelector<HTMLInputElement>('input[name="account_password"]');
       const confirmPasswordField = stepElement.querySelector<HTMLInputElement>('input[name="confirm_password"]');
 
@@ -896,8 +909,12 @@ export default function AddListingPage() {
 
   const handleBack = () => {
     if (showPricing) {
+      // From plan selection, go back to the profile-type cards
       setShowPricing(false);
-      setCurrentStep(steps.length);
+      setSelectedTier(null);
+      setProfileType(null);
+      setEstatesSubType(null);
+      setCurrentStep(1);
     } else if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else if (profileType) {
@@ -951,6 +968,16 @@ export default function AddListingPage() {
     try {
       const plans = getPlansByUserType(profileTypeToUserType[profileType!]);
       const selectedPlan = plans.find(p => p.id === selectedTier);
+      const roleValue = String(formData.get('role') || '').trim();
+      if (roleValue) {
+        const kind = profileType === 'service-provider' ? 'service_type' : 'professional_title';
+        const known = (profileType === 'service-provider' ? [...serviceTypes, ...customServiceTypes] : [...professionalTitles, ...customTitles])
+          .map((v) => v.toLowerCase());
+        if (!known.includes(roleValue.toLowerCase())) {
+          saveCustomOption(kind, roleValue).catch(() => {});
+        }
+      }
+
       const applicationData = await serializeApplicationForm(formData, profileType!, selectedTier);
 
       const checkoutData: CheckoutData = {
@@ -1019,10 +1046,10 @@ export default function AddListingPage() {
       <div className="min-h-screen bg-background page-transition">
         <NavBar currentPage="add-listing" />
         
-        <main className="pt-48 pb-32">
-          <div className="container mx-auto px-12 max-w-3xl">
+        <main className="pt-28 md:pt-48 pb-16 md:pb-32">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-3xl">
             <div className="mb-16 text-center">
-              <h1 className="text-6xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
                 Upgrade Your Account
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed mb-8">
@@ -1098,8 +1125,8 @@ export default function AddListingPage() {
       <div className="min-h-screen bg-background page-transition">
         <NavBar currentPage="add-listing" />
         
-        <main className="pt-48 pb-32">
-          <div className="container mx-auto px-12 max-w-5xl">
+        <main className="pt-28 md:pt-48 pb-16 md:pb-32">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-5xl">
             <Button
               variant="ghost"
               onClick={() => setProfileType(null)}
@@ -1110,7 +1137,7 @@ export default function AddListingPage() {
             </Button>
 
             <div className="mb-16 text-center">
-              <h1 className="text-6xl font-heading font-medium text-foreground mb-6 tracking-tight">
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-heading font-medium text-foreground mb-6 tracking-tight">
                 Estates
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed">
@@ -1233,9 +1260,9 @@ export default function AddListingPage() {
       <div className="min-h-screen bg-background page-transition">
         <NavBar currentPage="add-listing" />
         
-        <main className="pt-48 pb-32">
-          <div className="container mx-auto px-12 max-w-2xl">
-            <Card className="p-12 bg-card text-card-foreground border border-border">
+        <main className="pt-28 md:pt-48 pb-16 md:pb-32">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-2xl">
+            <Card className="p-6 md:p-12 bg-card text-card-foreground border border-border">
               <div className="text-center">
                 <div className="w-20 h-20 bg-[#A89F91]/10 rounded-full flex items-center justify-center mx-auto mb-8">
                   <Shield className="w-10 h-10 text-[#A89F91]" />
@@ -1276,10 +1303,10 @@ export default function AddListingPage() {
       <div className="min-h-screen bg-background page-transition">
         <NavBar currentPage="add-listing" />
         
-        <main className="pt-48 pb-32">
-          <div className="container mx-auto px-12 max-w-5xl">
+        <main className="pt-28 md:pt-48 pb-16 md:pb-32">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-5xl">
             <div className="mb-16 text-center">
-              <h1 className="text-6xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
                 {isCommunityOnly ? 'Create Profile to Join Community' : 'Participation Levels'}
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed">
@@ -1339,7 +1366,7 @@ export default function AddListingPage() {
                     <Briefcase className="w-10 h-10 text-[#A89F91]" />
                   </div>
                   <h2 className="text-2xl font-heading font-semibold text-foreground mb-3 tracking-tight">
-                    Agency Owner
+                    Agency
                   </h2>
                   <p className="text-muted-foreground text-sm mb-6 leading-relaxed flex-grow">
                     Private placement agencies
@@ -1387,8 +1414,8 @@ export default function AddListingPage() {
       <div className="min-h-screen bg-background">
         <NavBar currentPage="add-listing" />
         
-        <main className="pt-48 pb-32">
-          <div className="container mx-auto px-12 max-w-7xl">
+        <main className="pt-28 md:pt-48 pb-16 md:pb-32">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-7xl">
             <Button
               variant="ghost"
               onClick={handleBack}
@@ -1399,7 +1426,7 @@ export default function AddListingPage() {
             </Button>
 
             <div className="mb-16 text-center">
-              <h1 className="text-6xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-heading font-medium text-foreground mb-8 tracking-tight leading-tight">
                 Select Participation Level
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed">
@@ -1514,13 +1541,13 @@ export default function AddListingPage() {
   }
 
   // Onboarding flow
-  if (currentStep < steps.length) {
+  if (currentStep <= steps.length && currentStep >= 1 && !showPricing) {
     return (
       <div className="min-h-screen bg-background">
         <NavBar currentPage="add-listing" />
         
-        <main className="pt-48 pb-32">
-          <div className="container mx-auto px-12 max-w-3xl">
+        <main className="pt-28 md:pt-48 pb-16 md:pb-32">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-3xl">
             <div className="mb-12 text-center">
               <div className="flex justify-center gap-2 mb-8">
                 {steps.map((step) => (
@@ -1537,14 +1564,14 @@ export default function AddListingPage() {
               </p>
             </div>
 
-            <Card className="p-16 bg-card text-card-foreground border-border/50">
+            <Card className="p-6 md:p-16 bg-card text-card-foreground border-border/50">
               <div className="text-center space-y-8">
-                <h1 className="text-5xl font-heading font-medium text-foreground tracking-tight leading-tight">
+                <h1 className="text-3xl md:text-5xl font-heading font-medium text-foreground tracking-tight leading-tight">
                   {currentStepData?.title}
                 </h1>
                 
                 <div className="space-y-6 max-w-2xl mx-auto">
-                  <p className="text-2xl text-foreground leading-relaxed whitespace-pre-line">
+                  <p className="text-lg md:text-2xl text-foreground leading-relaxed whitespace-pre-line">
                     {currentStepData?.content}
                   </p>
                   
@@ -1631,11 +1658,11 @@ export default function AddListingPage() {
               </p>
             </div>
 
-            <div className="mx-auto mb-6 grid max-w-5xl gap-3 md:grid-cols-3">
-              {accountFormSteps.map((step) => {
+            <div className={`mx-auto mb-6 grid max-w-5xl gap-3 ${totalFormSteps === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+              {accountFormSteps.filter((step) => formStepIds.includes(step.id)).map((step, index) => {
                 const Icon = step.icon;
-                const isActive = formStep === step.id;
-                const isCompleted = formStep > step.id;
+                const isActive = formStep === index + 1;
+                const isCompleted = formStep > index + 1;
 
                 return (
                   <div
@@ -1654,7 +1681,7 @@ export default function AddListingPage() {
                           isActive || isCompleted ? 'bg-[#A89F91] text-white' : 'bg-muted text-muted-foreground'
                         }`}
                       >
-                        {isCompleted ? <Check className="h-4 w-4" /> : `0${step.id}`}
+                        {isCompleted ? <Check className="h-4 w-4" /> : `0${index + 1}`}
                       </span>
                       <Icon className={`h-5 w-5 ${isActive ? 'text-[#8A8279]' : 'text-muted-foreground'}`} />
                     </div>
@@ -1703,34 +1730,33 @@ export default function AddListingPage() {
 
                         <div className="space-y-2">
                           <Label htmlFor="role" className="text-foreground text-sm">Professional Title</Label>
-                          <Select name="role" required>
-                            <SelectTrigger className="bg-background text-foreground border-border">
-                              <SelectValue placeholder="Select your title" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card max-h-[300px]">
-                              {professionalTitles.map((title) => (
-                                <SelectItem key={title} value={title.toLowerCase().replace(/\s+/g, '-')}>
-                                  {title}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Input
+                            id="role"
+                            name="role"
+                            list="professional-title-options"
+                            placeholder="Select or type your title"
+                            required
+                            className="bg-background text-foreground border-border"
+                          />
+                          <datalist id="professional-title-options">
+                            {[...professionalTitles, ...customTitles].map((title) => (
+                              <option key={title} value={title} />
+                            ))}
+                          </datalist>
+                          <p className="text-xs text-muted-foreground">Pick a title or type your own — new titles are added to the directory</p>
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="gender" className="text-foreground text-sm">Gender</Label>
-                          <Select name="gender">
-                            <SelectTrigger className="bg-background text-foreground border-border">
-                              <SelectValue placeholder="Select gender" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card">
-                              {genderOptions.map((gender) => (
-                                <SelectItem key={gender} value={gender.toLowerCase()}>
-                                  {gender}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Label className="text-foreground text-sm">Services You Provide</Label>
+                          <ServiceCategoryPicker
+                            selected={selectedServices}
+                            onChange={setSelectedServices}
+                            placeholder="Select one or more services..."
+                          />
+                          {selectedServices.map((service) => (
+                            <input key={service} type="hidden" name="services" value={service} />
+                          ))}
+                          <p className="text-xs text-muted-foreground">Select all that apply — you can also add a new category</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -2487,10 +2513,30 @@ export default function AddListingPage() {
                           <Input
                             id="role"
                             name="role"
-                            placeholder="Landscaping Services, Pool Maintenance"
+                            list="service-type-options"
+                            placeholder="Select or type a service (e.g. Pool Cleaning)"
                             required
                             className="bg-background text-foreground border-border"
                           />
+                          <datalist id="service-type-options">
+                            {[...serviceTypes, ...customServiceTypes].map((service) => (
+                              <option key={service} value={service} />
+                            ))}
+                          </datalist>
+                          <p className="text-xs text-muted-foreground">Pick a service or type your own — new services are added to the directory</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-foreground text-sm">Services You Provide</Label>
+                          <ServiceCategoryPicker
+                            selected={selectedServices}
+                            onChange={setSelectedServices}
+                            placeholder="Select one or more services..."
+                          />
+                          {selectedServices.map((service) => (
+                            <input key={service} type="hidden" name="services" value={service} />
+                          ))}
+                          <p className="text-xs text-muted-foreground">Select all that apply — you can also add a new category</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -2617,20 +2663,6 @@ export default function AddListingPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Staff Options</Label>
-                          <div className="flex gap-4">
-                            {genderOptions.map((gender) => (
-                              <div key={gender} className="flex items-center space-x-2">
-                                <Checkbox id={`staff-${gender}`} name="staff_options" value={gender} />
-                                <Label htmlFor={`staff-${gender}`} className="text-sm text-foreground cursor-pointer">
-                                  {gender}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
                           <Label className="text-foreground text-sm">Availability</Label>
                           <div className="grid grid-cols-2 gap-2">
                             {workAvailability.map((availability) => (
@@ -2704,10 +2736,6 @@ export default function AddListingPage() {
                           <Label className="text-foreground text-sm">Willing to Undergo</Label>
                           <div className="flex gap-4">
                             <div className="flex items-center space-x-2">
-                              <Checkbox id="sp_background_check" name="background_check" />
-                              <Label htmlFor="sp_background_check" className="text-sm text-foreground cursor-pointer">Background Check</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
                               <Checkbox id="sp_drug_test" name="drug_test" />
                               <Label htmlFor="sp_drug_test" className="text-sm text-foreground cursor-pointer">Drug Test</Label>
                             </div>
@@ -2755,7 +2783,7 @@ export default function AddListingPage() {
                         <div className="space-y-2">
                           <Label className="text-foreground text-sm">Languages Spoken</Label>
                           <div className="grid grid-cols-3 gap-2">
-                            {languages.slice(0, 12).map((lang) => (
+                            {languages.map((lang) => (
                               <div key={lang} className="flex items-center space-x-2">
                                 <Checkbox id={`sp-lang-${lang}`} name="languages" value={lang} />
                                 <Label htmlFor={`sp-lang-${lang}`} className="text-xs text-foreground cursor-pointer">
@@ -2797,6 +2825,14 @@ export default function AddListingPage() {
                           const hiddenField = document.getElementById('hidden-location') as HTMLInputElement;
                           if (hiddenField) {
                             hiddenField.value = `${location.city}, ${location.state}`;
+                          }
+                        }}
+                        onTextChange={(text) => {
+                          // Free-text fallback so the typed city/state is
+                          // captured even without picking a suggestion.
+                          const hiddenField = document.getElementById('hidden-location') as HTMLInputElement;
+                          if (hiddenField) {
+                            hiddenField.value = text;
                           }
                         }}
                         placeholder="Enter your city..."
@@ -2901,20 +2937,6 @@ export default function AddListingPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Staff Options</Label>
-                          <div className="flex gap-4">
-                            {genderOptions.map((gender) => (
-                              <div key={gender} className="flex items-center space-x-2">
-                                <Checkbox id={`agency-staff-${gender}`} name="staff_options" value={gender} />
-                                <Label htmlFor={`agency-staff-${gender}`} className="text-sm text-foreground cursor-pointer">
-                                  {gender}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
                           <Label htmlFor="agency_business_hours" className="text-foreground text-sm">Business Hours</Label>
                           <Input
                             id="agency_business_hours"
@@ -2935,42 +2957,6 @@ export default function AddListingPage() {
                                 </Label>
                               </div>
                             ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Comfortable With</Label>
-                          <div className="flex flex-wrap gap-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="agency-pets" name="comfortable_with" value="Pets" />
-                              <Label htmlFor="agency-pets" className="text-sm text-foreground cursor-pointer">Pets</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="agency-children" name="comfortable_with" value="Children" />
-                              <Label htmlFor="agency-children" className="text-sm text-foreground cursor-pointer">Children</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="agency-travel" name="comfortable_with" value="Travel" />
-                              <Label htmlFor="agency-travel" className="text-sm text-foreground cursor-pointer">Travel</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="agency-livein" name="comfortable_with" value="Live-In" />
-                              <Label htmlFor="agency-livein" className="text-sm text-foreground cursor-pointer">Live-In</Label>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-foreground text-sm">Willing to Undergo</Label>
-                          <div className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="agency_background_check" name="background_check" />
-                              <Label htmlFor="agency_background_check" className="text-sm text-foreground cursor-pointer">Background Check</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="agency_drug_test" name="drug_test" />
-                              <Label htmlFor="agency_drug_test" className="text-sm text-foreground cursor-pointer">Drug Test</Label>
-                            </div>
                           </div>
                         </div>
 
@@ -3015,7 +3001,7 @@ export default function AddListingPage() {
                         <div className="space-y-2">
                           <Label className="text-foreground text-sm">Languages Spoken</Label>
                           <div className="grid grid-cols-3 gap-2">
-                            {languages.slice(0, 12).map((lang) => (
+                            {languages.map((lang) => (
                               <div key={lang} className="flex items-center space-x-2">
                                 <Checkbox id={`agency-lang-${lang}`} name="languages" value={lang} />
                                 <Label htmlFor={`agency-lang-${lang}`} className="text-xs text-foreground cursor-pointer">
@@ -3107,9 +3093,9 @@ export default function AddListingPage() {
                             <SelectTrigger className="bg-background text-foreground border-border">
                               <SelectValue placeholder="Select your title" />
                             </SelectTrigger>
-                            <SelectContent className="bg-card max-h-[300px]">
-                              {professionalTitles.map((title) => (
-                                <SelectItem key={title} value={title.toLowerCase().replace(/\s+/g, '-')}>
+                            <SelectContent className="bg-card">
+                              {['Chief of Staff', 'Estate Manager', 'Personal Assistant', 'Executive Assistant'].map((title) => (
+                                <SelectItem key={title} value={title}>
                                   {title}
                                 </SelectItem>
                               ))}
@@ -3184,7 +3170,7 @@ export default function AddListingPage() {
 
                   {/* Middle Column - Professional Details */}
                   <Card
-                    className={`${sectionCardClassName} ${formStep === 2 ? 'block' : 'hidden'}`}
+                    className={`${sectionCardClassName} ${currentFormStepId === 2 ? 'block' : 'hidden'}`}
                     data-form-step="2"
                   >
                   <div className={sectionBodyClassName}>
@@ -3233,7 +3219,7 @@ export default function AddListingPage() {
                     <div className="space-y-2">
                       <Label className="text-foreground text-sm">Languages</Label>
                       <div className="grid grid-cols-2 gap-1 max-h-[120px] overflow-y-auto border border-border rounded-lg p-2 text-xs">
-                        {['English', 'Spanish', 'French', 'German', 'Mandarin', 'Italian'].map((lang) => (
+                        {languages.map((lang) => (
                           <div key={lang} className="flex items-center space-x-1">
                             <Checkbox id={`lang-${lang.toLowerCase()}`} name="languages" value={lang} />
                             <Label htmlFor={`lang-${lang.toLowerCase()}`} className="text-xs text-foreground cursor-pointer">{lang}</Label>
@@ -3257,7 +3243,7 @@ export default function AddListingPage() {
 
                   {/* Third Column - Contact Information */}
                   <Card
-                    className={`${sectionCardClassName} ${formStep === 3 ? 'block' : 'hidden'}`}
+                    className={`${sectionCardClassName} ${currentFormStepId === 3 ? 'block' : 'hidden'}`}
                     data-form-step="3"
                   >
                   <div className={sectionBodyClassName}>
@@ -3456,11 +3442,6 @@ export default function AddListingPage() {
         <Footer />
       </div>
     );
-  }
-
-  // Show pricing immediately after onboarding completes (unless community-only)
-  if (currentStep === steps.length && !showPricing && !isCommunityOnly) {
-    setShowPricing(true);
   }
 
   return null;

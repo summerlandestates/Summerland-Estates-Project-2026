@@ -34,8 +34,6 @@ export interface ContentManagementState {
   cookieConfig: CookieConsentConfig;
 }
 
-const STORAGE_KEY = 'summerland_content_management';
-
 export const defaultContent: ContentManagementState = {
   pages: [
     {
@@ -123,8 +121,8 @@ Email: summerlandestates@summerlandestates.com</p>`,
 <h2>5. Membership and Fees</h2>
 <p>Certain features require paid membership. Fees are as displayed on our pricing page. All payments are non-refundable unless otherwise stated.</p>
 
-<h2>6. Verification and Background Checks</h2>
-<p>We offer optional verification and background check services. While we strive for accuracy, we cannot guarantee the completeness or reliability of background check information.</p>
+<h2>6. Verification</h2>
+<p>We offer optional identity verification services. While we strive for accuracy, we cannot guarantee the completeness or reliability of verification information.</p>
 
 <h2>7. Intellectual Property</h2>
 <p>The Service and its original content, features, and functionality are owned by Summerland Estates and are protected by international copyright, trademark, and other intellectual property laws.</p>
@@ -654,51 +652,110 @@ Email: summerlandestates@summerlandestates.com</p>`,
   }
 };
 
+import { supabase } from '@/lib/supabase';
+
+// ─── Supabase-backed content store ─────────────────────────────────────────
+// Content is cached in memory; call `await contentManager.init()` before
+// reading so admin-edited pages/FAQs appear for every visitor. Until init()
+// resolves, getters return the built-in defaults (identical to the old
+// localStorage behaviour).
+let cache: ContentManagementState = defaultContent;
+let initPromise: Promise<ContentManagementState> | null = null;
+
+const mapDbPage = (row: any): ContentPage => ({
+  id: row.id,
+  title: row.title,
+  slug: row.slug,
+  content: row.content,
+  metaDescription: row.meta_description || '',
+  lastUpdated: row.updated_at,
+  isPublished: row.is_published,
+});
+
+const mapDbFaq = (row: any): FAQItem => ({
+  id: row.id,
+  question: row.question,
+  answer: row.answer,
+  category: row.category,
+  order: row.sort_order,
+  isPublished: row.is_published,
+});
+
 export const contentManager = {
-  getContent(): ContentManagementState {
-    if (typeof window === 'undefined') return defaultContent;
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultContent));
-      return defaultContent;
-    }
-    try {
-      return { ...defaultContent, ...JSON.parse(stored) };
-    } catch {
-      return defaultContent;
-    }
+  async init(force = false): Promise<ContentManagementState> {
+    if (initPromise && !force) return initPromise;
+    initPromise = (async () => {
+      try {
+        const [pagesRes, faqsRes, settingsRes] = await Promise.all([
+          supabase.from('site_content_pages').select('*'),
+          supabase.from('site_content_faqs').select('*'),
+          supabase.from('site_content_settings').select('*').eq('key', 'cookie_config').maybeSingle(),
+        ]);
+
+        const dbPages = (pagesRes.data || []).map(mapDbPage);
+        const dbFaqs = (faqsRes.data || []).map(mapDbFaq);
+        const dbSlugs = new Set(dbPages.map((p) => p.slug));
+        const dbFaqIds = new Set(dbFaqs.map((f) => f.id));
+
+        cache = {
+          pages: [
+            ...dbPages,
+            ...defaultContent.pages.filter((p) => !dbSlugs.has(p.slug)),
+          ],
+          faqs: [
+            ...dbFaqs,
+            ...defaultContent.faqs.filter((f) => !dbFaqIds.has(f.id)),
+          ],
+          cookieConfig:
+            (settingsRes.data?.value as CookieConsentConfig | undefined) ||
+            defaultContent.cookieConfig,
+        };
+      } catch (error) {
+        console.error('Failed to load site content, using defaults:', error);
+        cache = defaultContent;
+      }
+      return cache;
+    })();
+    return initPromise;
   },
 
-  saveContent(content: ContentManagementState): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
+  getContent(): ContentManagementState {
+    return cache;
   },
 
   getPage(slug: string): ContentPage | undefined {
-    const content = this.getContent();
-    return content.pages.find(p => p.slug === slug && p.isPublished);
+    return cache.pages.find(p => p.slug === slug && p.isPublished);
   },
 
-  updatePage(page: ContentPage): void {
-    const content = this.getContent();
-    const index = content.pages.findIndex(p => p.id === page.id);
+  async updatePage(page: ContentPage): Promise<void> {
+    const lastUpdated = new Date().toISOString();
+    const updated = { ...page, lastUpdated };
+    const index = cache.pages.findIndex(p => p.id === page.id || p.slug === page.slug);
     if (index >= 0) {
-      content.pages[index] = { ...page, lastUpdated: new Date().toISOString() };
+      cache.pages[index] = updated;
     } else {
-      content.pages.push({ ...page, lastUpdated: new Date().toISOString() });
+      cache.pages.push(updated);
     }
-    this.saveContent(content);
+    const { error } = await supabase.from('site_content_pages').upsert({
+      id: page.id,
+      slug: page.slug,
+      title: page.title,
+      content: page.content,
+      meta_description: page.metaDescription,
+      is_published: page.isPublished,
+      updated_at: lastUpdated,
+    });
+    if (error) throw new Error(error.message);
   },
 
-  deletePage(id: string): void {
-    const content = this.getContent();
-    content.pages = content.pages.filter(p => p.id !== id);
-    this.saveContent(content);
+  async deletePage(id: string): Promise<void> {
+    cache.pages = cache.pages.filter(p => p.id !== id);
+    const { error } = await supabase.from('site_content_pages').delete().eq('id', id);
+    if (error) throw new Error(error.message);
   },
 
   getFAQs(category?: string): FAQItem[] {
-    const content = this.getContent();
-    let faqs = content.faqs.filter(f => f.isPublished).sort((a, b) => a.order - b.order);
+    let faqs = cache.faqs.filter(f => f.isPublished).sort((a, b) => a.order - b.order);
     if (category) {
       faqs = faqs.filter(f => f.category === category);
     }
@@ -706,65 +763,92 @@ export const contentManager = {
   },
 
   getFAQCategories(): string[] {
-    const content = this.getContent();
-    const categories = new Set(content.faqs.map(f => f.category));
+    const categories = new Set(cache.faqs.map(f => f.category));
     return Array.from(categories);
   },
 
-  updateFAQ(faq: FAQItem): void {
-    const content = this.getContent();
-    const index = content.faqs.findIndex(f => f.id === faq.id);
+  async updateFAQ(faq: FAQItem): Promise<void> {
+    const index = cache.faqs.findIndex(f => f.id === faq.id);
     if (index >= 0) {
-      content.faqs[index] = faq;
+      cache.faqs[index] = faq;
     } else {
-      content.faqs.push(faq);
+      cache.faqs.push(faq);
     }
-    this.saveContent(content);
+    const { error } = await supabase.from('site_content_faqs').upsert({
+      id: faq.id,
+      question: faq.question,
+      answer: faq.answer,
+      category: faq.category,
+      sort_order: faq.order,
+      is_published: faq.isPublished,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
   },
 
-  deleteFAQ(id: string): void {
-    const content = this.getContent();
-    content.faqs = content.faqs.filter(f => f.id !== id);
-    this.saveContent(content);
+  async deleteFAQ(id: string): Promise<void> {
+    cache.faqs = cache.faqs.filter(f => f.id !== id);
+    const { error } = await supabase.from('site_content_faqs').delete().eq('id', id);
+    if (error) throw new Error(error.message);
   },
 
-  reorderFAQs(orderedIds: string[]): void {
-    const content = this.getContent();
+  async reorderFAQs(orderedIds: string[]): Promise<void> {
     orderedIds.forEach((id, index) => {
-      const faq = content.faqs.find(f => f.id === id);
+      const faq = cache.faqs.find(f => f.id === id);
       if (faq) {
         faq.order = index + 1;
       }
     });
-    this.saveContent(content);
+    await Promise.all(
+      orderedIds.map((id, index) =>
+        supabase.from('site_content_faqs').update({ sort_order: index + 1 }).eq('id', id)
+      )
+    );
   },
 
   getCookieConfig(): CookieConsentConfig {
-    const content = this.getContent();
-    return content.cookieConfig;
+    return cache.cookieConfig;
   },
 
-  updateCookieConfig(config: CookieConsentConfig): void {
-    const content = this.getContent();
-    content.cookieConfig = config;
-    this.saveContent(content);
+  async updateCookieConfig(config: CookieConsentConfig): Promise<void> {
+    cache.cookieConfig = config;
+    const { error } = await supabase.from('site_content_settings').upsert({
+      key: 'cookie_config',
+      value: config,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
   },
 
   exportData(): string {
-    return JSON.stringify(this.getContent(), null, 2);
+    return JSON.stringify(cache, null, 2);
   },
 
-  importData(jsonString: string): boolean {
+  async importData(jsonString: string): Promise<boolean> {
     try {
-      const data = JSON.parse(jsonString);
-      this.saveContent(data);
+      const data = JSON.parse(jsonString) as ContentManagementState;
+      if (data.pages) {
+        for (const page of data.pages) await this.updatePage(page);
+      }
+      if (data.faqs) {
+        for (const faq of data.faqs) await this.updateFAQ(faq);
+      }
+      if (data.cookieConfig) {
+        await this.updateCookieConfig(data.cookieConfig);
+      }
+      await this.init(true);
       return true;
     } catch {
       return false;
     }
   },
 
-  resetToDefault(): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultContent));
+  async resetToDefault(): Promise<void> {
+    cache = defaultContent;
+    await Promise.all([
+      supabase.from('site_content_pages').delete().neq('id', ''),
+      supabase.from('site_content_faqs').delete().neq('id', ''),
+      supabase.from('site_content_settings').delete().eq('key', 'cookie_config'),
+    ]);
   }
 };

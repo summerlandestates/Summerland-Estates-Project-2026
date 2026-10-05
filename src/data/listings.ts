@@ -72,7 +72,6 @@ export const listings: Listing[] = [
     willingToStayOvernight: true,
     willingToLiveOnSite: false,
     hasValidDriversLicense: true,
-    willingToBackgroundCheck: true,
     willingToDrugTest: true,
     benefitExpectations: ['Health Insurance', '401(k)', 'Paid Time Off', 'Professional Development'],
     profilePhotos: [
@@ -176,7 +175,6 @@ export const listings: Listing[] = [
     willingToStayOvernight: true,
     willingToLiveOnSite: true,
     hasValidDriversLicense: true,
-    willingToBackgroundCheck: true,
     willingToDrugTest: true,
     benefitExpectations: ['Health Insurance', 'Housing', 'Meals Provided', 'Paid Time Off'],
     profilePhotos: [
@@ -509,7 +507,7 @@ export const listings: Listing[] = [
       },
       {
         name: 'Staff Placement Service',
-        description: 'Full recruitment and placement of household staff with background checks and references',
+        description: 'Full recruitment and placement of household staff with reference verification',
         price: '$2,500 per placement',
         duration: '4-6 weeks'
       },
@@ -771,7 +769,7 @@ export const listings: Listing[] = [
     estatesRole: 'principal' as const,
     availability: true,
     verified: true,
-    bio: 'High-net-worth family seeking discreet and professional household staff. Currently hiring for multiple positions including personal assistant, security director, and household manager. All candidates must be willing to undergo thorough background checks.',
+    bio: 'High-net-worth family seeking discreet and professional household staff. Currently hiring for multiple positions including personal assistant, security director, and household manager. References required for all candidates.',
     isOnlineNow: true,
     lastOnline: '2024-03-15T10:45:00Z',
     canReceiveMessages: true,
@@ -842,7 +840,6 @@ export const listings: Listing[] = [
     willingToStayOvernight: true,
     willingToLiveOnSite: false,
     hasValidDriversLicense: true,
-    willingToBackgroundCheck: true,
     willingToDrugTest: true,
     benefitExpectations: ['Health Insurance', '401(k)', 'Paid Time Off', 'Professional Development'],
     profilePhotos: [

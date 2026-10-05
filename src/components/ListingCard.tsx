@@ -1,4 +1,5 @@
-import { MapPin, Star, CheckCircle, BadgeCheck, Shield, Users } from 'lucide-react';
+import { Star, CheckCircle, BadgeCheck, Users } from 'lucide-react';
+import MapLocationLink from './MapLocationLink';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -94,10 +95,11 @@ export default function ListingCard({
 
             {canViewLocation && (
               <div className="flex flex-wrap items-center gap-4 text-sm">
-                <div className="flex items-center text-foreground">
-                  <MapPin className="w-4 h-4 mr-1 text-accent" />
-                  {listing.location}
-                </div>
+                <MapLocationLink
+                  location={listing.location}
+                  className="text-foreground"
+                  iconClassName="w-4 h-4 mr-1 text-accent"
+                />
                 <div className="flex items-center text-foreground">
                   <Star className="w-4 h-4 mr-1 fill-accent text-accent" />
                   {listing.rating}
@@ -160,9 +162,6 @@ export default function ListingCard({
             {listing.verified && (
               <BadgeCheck className="w-4 h-4 text-[#A89F91]" />
             )}
-            {listing.backgroundCheckAvailable && (
-              <Shield className="w-4 h-4 text-green-600" />
-            )}
           </div>
 
           {/* Role */}
@@ -170,10 +169,11 @@ export default function ListingCard({
 
           {/* Location */}
           {canViewLocation && (
-            <div className="flex items-center text-xs text-muted-foreground mb-2">
-              <MapPin className="w-3 h-3 mr-1" />
-              {listing.location}
-            </div>
+            <MapLocationLink
+              location={listing.location}
+              className="text-xs text-muted-foreground mb-2"
+              iconClassName="w-3 h-3 mr-1"
+            />
           )}
 
           {/* Rating and Experience */}

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminSidebar from '../components/AdminSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
@@ -141,17 +140,18 @@ export default function AdminNewListingsPage() {
       'professional-basic': 'Basic',
       'professional-pro': 'Pro',
       'professional-free': 'Free',
-      'business-free': 'Free',
+      'business-free': 'Basic',
       'business-pro': 'Pro',
       'business-enterprise': 'Enterprise',
-      'agency-free': 'Free',
-      'agency-basic': 'Basic',
-      'agency-hiring': 'Hiring',
-      'agency-pro': 'Pro',
-      'estates-free': 'Free',
-      'estates-basic': 'Basic',
-      'estates-hiring': 'Hiring',
-      'estates-pro': 'Pro',
+      'business-multi': 'Enterprise',
+      'agency-free': 'Basic',
+      'agency-basic': 'Pro',
+      'agency-hiring': 'Elite',
+      'agency-pro': 'Enterprise',
+      'estates-free': 'Basic',
+      'estates-basic': 'Pro',
+      'estates-hiring': 'Elite',
+      'estates-pro': 'Enterprise',
     };
     return tierMap[tier] || tier;
   };
@@ -224,285 +224,282 @@ export default function AdminNewListingsPage() {
 
   if (pageLoading) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
-        <AdminSidebar />
-        <main className="flex-1 p-8 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#A89F91]" />
-        </main>
-      </div>
+      <div className="space-y-6">
+
+  <Loader2 className="w-8 h-8 animate-spin text-[#A89F91]" />
+
+</div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
+    <div className="space-y-6">
 
-      <main className="flex-1 p-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <PlusCircle className="w-8 h-8 text-[#A89F91]" />
-              <h1 className="text-4xl font-heading font-bold text-gray-900">
-                New Listings
-              </h1>
-            </div>
-            <p className="text-gray-600">
-              Review and approve new member applications and listings
-            </p>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <Card className="p-4 bg-white border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Pending</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {listings.filter((l) => l.status === 'pending').length}
-                  </p>
-                </div>
-              </div>
-            </Card>
-            <Card className="p-4 bg-white border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Approved</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {listings.filter((l) => l.status === 'approved').length}
-                  </p>
-                </div>
-              </div>
-            </Card>
-            <Card className="p-4 bg-white border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <XCircle className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Rejected</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {listings.filter((l) => l.status === 'rejected').length}
-                  </p>
-                </div>
-              </div>
-            </Card>
-            <Card className="p-4 bg-white border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Star className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Total</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {listings.length}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Filters */}
-          <Card className="p-4 mb-6 border-gray-200">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search by name, email, or location..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="professional">Professional</SelectItem>
-                  <SelectItem value="business">Service Provider</SelectItem>
-                  <SelectItem value="agency">Agency</SelectItem>
-                  <SelectItem value="estates">Estate</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </Card>
-
-          {/* Listings Table */}
-          <Card className="border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                      Applicant
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                      Type
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                      Plan
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                      Location
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                      Submitted
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {paginatedListings.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                        <PlusCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-lg font-medium">No new listings found</p>
-                        <p className="text-sm">New applications will appear here when submitted</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedListings.map((listing) => (
-                      <tr key={listing.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-[#A89F91]/10 flex items-center justify-center">
-                              {listing.avatar_url ? (
-                                <img
-                                  src={listing.avatar_url}
-                                  alt={listing.full_name}
-                                  className="w-10 h-10 rounded-full object-cover"
-                                />
-                              ) : (
-                                <User className="w-5 h-5 text-[#A89F91]" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900">
-                                {listing.full_name}
-                              </p>
-                              <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <Mail className="w-3 h-3" />
-                                {listing.email}
-                              </div>
-                              {listing.phone && (
-                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                  <Phone className="w-3 h-3" />
-                                  {listing.phone}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {getProfileTypeIcon(listing.profile_type)}
-                            <span className="text-sm text-gray-700">
-                              {getProfileTypeLabel(listing.profile_type)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge variant="outline" className="text-xs">
-                            {getTierLabel(listing.tier)}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4">
-                          {listing.location ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <MapPin className="w-4 h-4 text-gray-400" />
-                              {listing.location}
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Calendar className="w-4 h-4 text-gray-400" />
-                            {new Date(listing.created_at).toLocaleDateString()}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(listing.status)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="rounded-xl border-[#CFC5B7] hover:bg-[#F7F1EA]"
-                            onClick={() => handleReview(listing.id)}
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            Review
-                          </Button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-                  {Math.min(currentPage * itemsPerPage, filteredListings.length)} of{' '}
-                  {filteredListings.length} listings
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="rounded-xl"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <span className="text-sm text-gray-600">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="rounded-xl"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </Card>
-        </div>
-      </main>
+<div className="max-w-7xl mx-auto">
+  {/* Header */}
+  <div className="mb-8">
+    <div className="flex items-center gap-3 mb-2">
+      <PlusCircle className="w-8 h-8 text-[#A89F91]" />
+      <h1 className="text-4xl font-heading font-bold text-gray-900">
+        New Listings
+      </h1>
     </div>
+    <p className="text-gray-600">
+      Review and approve new member applications and listings
+    </p>
+  </div>
+
+  {/* Stats Cards */}
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <Card className="p-4 bg-white border-gray-200">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-amber-100 rounded-lg">
+          <Clock className="w-5 h-5 text-amber-600" />
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">Pending</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {listings.filter((l) => l.status === 'pending').length}
+          </p>
+        </div>
+      </div>
+    </Card>
+    <Card className="p-4 bg-white border-gray-200">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-green-100 rounded-lg">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">Approved</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {listings.filter((l) => l.status === 'approved').length}
+          </p>
+        </div>
+      </div>
+    </Card>
+    <Card className="p-4 bg-white border-gray-200">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-red-100 rounded-lg">
+          <XCircle className="w-5 h-5 text-red-600" />
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">Rejected</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {listings.filter((l) => l.status === 'rejected').length}
+          </p>
+        </div>
+      </div>
+    </Card>
+    <Card className="p-4 bg-white border-gray-200">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-blue-100 rounded-lg">
+          <Star className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">Total</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {listings.length}
+          </p>
+        </div>
+      </div>
+    </Card>
+  </div>
+
+  {/* Filters */}
+  <Card className="p-4 mb-6 border-gray-200">
+    <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex-1 relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Input
+          placeholder="Search by name, email, or location..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="w-40">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="approved">Approved</SelectItem>
+          <SelectItem value="rejected">Rejected</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <SelectTrigger className="w-48">
+          <SelectValue placeholder="Type" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Types</SelectItem>
+          <SelectItem value="professional">Professional</SelectItem>
+          <SelectItem value="business">Service Provider</SelectItem>
+          <SelectItem value="agency">Agency</SelectItem>
+          <SelectItem value="estates">Estate</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </Card>
+
+  {/* Listings Table */}
+  <Card className="border-gray-200 overflow-hidden">
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              Applicant
+            </th>
+            <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              Type
+            </th>
+            <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              Plan
+            </th>
+            <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              Location
+            </th>
+            <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              Submitted
+            </th>
+            <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              Status
+            </th>
+            <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {paginatedListings.length === 0 ? (
+            <tr>
+              <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <PlusCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p className="text-lg font-medium">No new listings found</p>
+                <p className="text-sm">New applications will appear here when submitted</p>
+              </td>
+            </tr>
+          ) : (
+            paginatedListings.map((listing) => (
+              <tr key={listing.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#A89F91]/10 flex items-center justify-center">
+                      {listing.avatar_url ? (
+                        <img
+                          src={listing.avatar_url}
+                          alt={listing.full_name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-5 h-5 text-[#A89F91]" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {listing.full_name}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Mail className="w-3 h-3" />
+                        {listing.email}
+                      </div>
+                      {listing.phone && (
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Phone className="w-3 h-3" />
+                          {listing.phone}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    {getProfileTypeIcon(listing.profile_type)}
+                    <span className="text-sm text-gray-700">
+                      {getProfileTypeLabel(listing.profile_type)}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <Badge variant="outline" className="text-xs">
+                    {getTierLabel(listing.tier)}
+                  </Badge>
+                </td>
+                <td className="px-6 py-4">
+                  {listing.location ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      {listing.location}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    {new Date(listing.created_at).toLocaleDateString()}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  {getStatusBadge(listing.status)}
+                </td>
+                <td className="px-6 py-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl border-[#CFC5B7] hover:bg-[#F7F1EA]"
+                    onClick={() => handleReview(listing.id)}
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    Review
+                  </Button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    {/* Pagination */}
+    {totalPages > 1 && (
+      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+        <p className="text-sm text-gray-600">
+          Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+          {Math.min(currentPage * itemsPerPage, filteredListings.length)} of{' '}
+          {filteredListings.length} listings
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="rounded-xl"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="rounded-xl"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    )}
+  </Card>
+</div>
+
+</div>
   );
 }

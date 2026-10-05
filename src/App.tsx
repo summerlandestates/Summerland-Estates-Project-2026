@@ -18,6 +18,8 @@ import NewsPage from './pages/NewsPage';
 import FAQsPage from './pages/FAQsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
+import ContentPageView from './pages/ContentPageView';
+import MyArticlesPage from './pages/MyArticlesPage';
 import AccountManagementPage from './pages/AccountManagementPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -28,6 +30,8 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminContentPage from './pages/AdminContentPage';
+import AdminContentPageEditor from './pages/AdminContentPageEditor';
+import UpgradePlansPage from './pages/UpgradePlansPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import MyProfilePage from './pages/MyProfilePage';
 import EditProfilePage from './pages/EditProfilePage';
@@ -47,6 +51,7 @@ import AdminArticlesPage from './pages/AdminArticlesPage';
 import AdminNewsletterPage from './pages/AdminNewsletterPage';
 import AdminRecognitionPage from './pages/AdminRecognitionPage';
 import AdminEventsPage from './pages/AdminEventsPage';
+import AdminReportsPage from './pages/AdminReportsPage';
 import AdminEventDetailPage from './pages/AdminEventDetailPage';
 import EventSubmissionPage from './pages/EventSubmissionPage';
 import EventDetailPage from './pages/EventDetailPage';
@@ -60,6 +65,9 @@ import AdminSponsorshipsPage from './pages/AdminSponsorshipsPage';
 import AdminEmailBlastsPage from './pages/AdminEmailBlastsPage';
 import AdminPromoCodesPage from './pages/AdminPromoCodesPage';
 import HowItWorksPage from './pages/HowItWorksPage';
+import ServicesPage from './pages/ServicesPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
+import AdminLayout from './components/AdminLayout';
 import CookieConsent from './components/CookieConsent';
 
 function AppRoutes() {
@@ -73,16 +81,21 @@ function AppRoutes() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/my-profile" element={<MyProfilePage />} />
           <Route path="/my-profile/edit" element={<EditProfilePage />} />
+          <Route path="/my-articles" element={<MyArticlesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/users" element={<AdminUsersPage />} />
-          <Route path="/admin/content" element={<AdminContentPage />} />
-          <Route path="/admin/settings" element={<AdminSettingsPage />} />
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/content" element={<AdminContentPage />} />
+            <Route path="/admin/content/pages/:id" element={<AdminContentPageEditor />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
+          </Route>
           <Route path="/profile/:slug" element={<ProfilePage />} />
           <Route path="/add-listing" element={<AddListingPage />} />
           <Route path="/about" element={<AboutPage />} />
@@ -101,8 +114,11 @@ function AppRoutes() {
           <Route path="/faqs" element={<FAQsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/pages/:slug" element={<ContentPageView />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
-          <Route path="/pricing" element={<Navigate to="/advertisements" replace />} />
+          <Route path="/services" element={<ServicesPage />} />
+          <Route path="/pricing" element={<UpgradePlansPage />} />
+          <Route path="/upgrade" element={<UpgradePlansPage />} />
           <Route path="/account" element={<AccountManagementPage />} />
           <Route path="/payment-success" element={<PaymentSuccessPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
@@ -112,14 +128,17 @@ function AppRoutes() {
           <Route path="/recognition" element={<RecognitionPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/event/:id" element={<EventDetailPage />} />
-          <Route path="/admin/jobs" element={<AdminJobsPage />} />
-          <Route path="/admin/applications" element={<AdminApplicationsPage />} />
-          <Route path="/admin/applications/:id" element={<AdminApplicationDetailPage />} />
-          <Route path="/admin/newsletter" element={<AdminNewsletterPage />} />
-          <Route path="/admin/articles" element={<AdminArticlesPage />} />
-          <Route path="/admin/recognition" element={<AdminRecognitionPage />} />
-          <Route path="/admin/events" element={<AdminEventsPage />} />
-          <Route path="/admin/event/:id" element={<AdminEventDetailPage />} />
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/jobs" element={<AdminJobsPage />} />
+            <Route path="/admin/applications" element={<AdminApplicationsPage />} />
+            <Route path="/admin/applications/:id" element={<AdminApplicationDetailPage />} />
+            <Route path="/admin/newsletter" element={<AdminNewsletterPage />} />
+            <Route path="/admin/articles" element={<AdminArticlesPage />} />
+            <Route path="/admin/recognition" element={<AdminRecognitionPage />} />
+            <Route path="/admin/events" element={<AdminEventsPage />} />
+            <Route path="/admin/event/:id" element={<AdminEventDetailPage />} />
+            <Route path="/admin/reports" element={<AdminReportsPage />} />
+          </Route>
           <Route path="/submit-event" element={<EventSubmissionPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/articles/:slug" element={<ArticlePage />} />
@@ -127,9 +146,11 @@ function AppRoutes() {
           <Route path="/registration-pending" element={<RegistrationPendingPage />} />
           <Route path="/sponsorship" element={<SponsorshipPage />} />
           <Route path="/email-blast" element={<EmailBlastPage />} />
-          <Route path="/admin/sponsorships" element={<AdminSponsorshipsPage />} />
-          <Route path="/admin/email-blasts" element={<AdminEmailBlastsPage />} />
-          <Route path="/admin/promo-codes" element={<AdminPromoCodesPage />} />
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/sponsorships" element={<AdminSponsorshipsPage />} />
+            <Route path="/admin/email-blasts" element={<AdminEmailBlastsPage />} />
+            <Route path="/admin/promo-codes" element={<AdminPromoCodesPage />} />
+          </Route>
         </Routes>
       </PageTransition>
     );

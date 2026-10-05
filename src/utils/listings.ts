@@ -48,12 +48,16 @@ function mapListingFromRow(row: any, index: number = 0): Listing {
   const certifications = (row.certifications || []).map((c: any) => c.certification_name).filter(Boolean);
   const reviews: Review[] = (row.reviews || []).map((r: any) => ({
     id: r.id,
+    reviewerId: r.reviewer_id,
     reviewerName: r.reviewer_name,
     reviewerRole: r.reviewer_role,
     rating: r.rating,
     date: r.created_at,
     comment: r.comment,
-    verified: r.verified
+    verified: r.verified,
+    response: r.response,
+    responseAt: r.response_at,
+    flagged: r.flagged === true
   }));
   const servicesOffered: Service[] = (row.services || []).map((s: any) => ({
     name: s.service_name,
@@ -104,9 +108,7 @@ function mapListingFromRow(row: any, index: number = 0): Listing {
     willingToStayOvernight: row.willing_to_stay_overnight === true,
     willingToLiveOnSite: row.willing_to_live_on_site === true,
     hasValidDriversLicense: row.has_valid_drivers_license === true,
-    willingToBackgroundCheck: row.willing_to_background_check !== false,
     willingToDrugTest: row.willing_to_drug_test !== false,
-    backgroundCheckAvailable: row.willing_to_background_check === true,
     benefitExpectations: mapArray(row.benefit_expectations),
     profilePhotos: mapArray(row.profile_photos).length > 0 ? mapArray(row.profile_photos) : (row.profile_photo ? [row.profile_photo] : []),
     videoUrl: row.video_url,
@@ -148,7 +150,7 @@ export async function fetchListings(): Promise<Listing[]> {
       skills(skill_name),
       work_history(job_title, city, duties, start_date, end_date),
       certifications(certification_name),
-      reviews(id, reviewer_name, reviewer_role, rating, comment, verified, created_at),
+      reviews(id, reviewer_id, reviewer_name, reviewer_role, rating, comment, verified, response, response_at, flagged, created_at),
       services(service_name, description, price, duration)
     `)
     .eq('approved', true)
@@ -170,7 +172,7 @@ export async function fetchListingBySlug(slug: string): Promise<Listing | null> 
       skills(skill_name),
       work_history(job_title, city, duties, start_date, end_date),
       certifications(certification_name),
-      reviews(id, reviewer_name, reviewer_role, rating, comment, verified, created_at),
+      reviews(id, reviewer_id, reviewer_name, reviewer_role, rating, comment, verified, response, response_at, flagged, created_at),
       services(service_name, description, price, duration)
     `)
     .eq('slug', slug)
@@ -193,7 +195,7 @@ export async function fetchListingById(id: string): Promise<Listing | null> {
       skills(skill_name),
       work_history(job_title, city, duties, start_date, end_date),
       certifications(certification_name),
-      reviews(id, reviewer_name, reviewer_role, rating, comment, verified, created_at),
+      reviews(id, reviewer_id, reviewer_name, reviewer_role, rating, comment, verified, response, response_at, flagged, created_at),
       services(service_name, description, price, duration)
     `)
     .eq('id', id)

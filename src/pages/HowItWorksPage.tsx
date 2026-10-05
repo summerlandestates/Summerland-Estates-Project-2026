@@ -84,7 +84,6 @@ const notPlatformItems = [
 // Badges data
 const badgesData = [
   { icon: BadgeCheck, name: 'Identity Verified', means: 'Identity was verified through an independent provider', notMeans: 'Does not guarantee honesty or future conduct' },
-  { icon: Shield, name: 'Background Check', means: 'A background screening process was completed', notMeans: 'Does not mean the person is "approved" or "safe"' },
   { icon: Award, name: 'Licensed', means: 'Licensing information was submitted or verified', notMeans: 'Does not guarantee current status for every job' },
   { icon: Lock, name: 'Insured', means: 'Insurance information was submitted or verified', notMeans: 'Does not guarantee coverage for every circumstance' },
 ];
@@ -608,7 +607,7 @@ export default function HowItWorksPage() {
           </div>
         </section>
 
-        {/* Verification & Background Checks */}
+        {/* Identity Verification */}
         <section className="scroll-animate mb-24">
           <div className="text-center mb-12">
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#A89F91]/10 text-[#8B7355] text-sm font-medium mb-4">
@@ -616,14 +615,14 @@ export default function HowItWorksPage() {
               Trust & Verification
             </span>
             <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground mb-4">
-              Identity Verification & Background Checks
+              Identity Verification
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Verification is optional and should be considered one factor among many
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 mb-12">
+          <div className="grid gap-8 mb-12 max-w-2xl mx-auto">
             <div className="scroll-animate delay-1 responsibility-card bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
               <div className="flex items-center gap-4 mb-4">
                 <div className="responsibility-icon w-12 h-12 rounded-xl bg-[#A89F91]/10 flex items-center justify-center">
@@ -637,22 +636,6 @@ export default function HowItWorksPage() {
               <div className="bg-[#FAFAF8] rounded-xl p-4">
                 <p className="text-sm text-foreground font-medium mb-1">It does not guarantee:</p>
                 <p className="text-sm text-muted-foreground">Character, Honesty, Professional ability, Licensing, Safety, or Future conduct.</p>
-              </div>
-            </div>
-
-            <div className="scroll-animate delay-2 responsibility-card bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="responsibility-icon w-12 h-12 rounded-xl bg-[#A89F91]/10 flex items-center justify-center">
-                  <Shield className="w-6 h-6 text-[#A89F91]" />
-                </div>
-                <h3 className="text-xl font-heading font-bold text-foreground">Background Checks</h3>
-              </div>
-              <p className="text-muted-foreground mb-4">
-                Some users may choose to complete an optional background screening through one of our independent third-party providers. A completed background check means only that the screening process was completed.
-              </p>
-              <div className="bg-[#FAFAF8] rounded-xl p-4">
-                <p className="text-sm text-foreground font-medium mb-1">It should not be interpreted as:</p>
-                <p className="text-sm text-muted-foreground">An endorsement, A recommendation, A guarantee, or A certification of safety.</p>
               </div>
             </div>
           </div>
@@ -685,7 +668,39 @@ export default function HowItWorksPage() {
             ))}
           </div>
 
-          <div className="scroll-animate delay-3 mt-10 bg-[#FAFAF8] rounded-2xl p-6 text-center">
+          {/* Badge Meanings Table */}
+          <div className="scroll-animate delay-3 overflow-hidden rounded-2xl border border-gray-100 shadow-sm bg-white mt-10">
+            <div className="bg-[#FAFAF8] px-6 py-4 border-b border-gray-100">
+              <h3 className="font-heading font-bold text-foreground text-lg">What Each Badge Means</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-gray-50 text-foreground font-semibold">
+                  <tr>
+                    <th className="px-6 py-3 w-48">Badge</th>
+                    <th className="px-6 py-3">What It Means</th>
+                    <th className="px-6 py-3">What It Does NOT Mean</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {badgesData.map((badge, index) => (
+                    <tr key={index} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <badge.icon className="w-4 h-4 text-[#A89F91] flex-shrink-0" />
+                          <span className="font-medium text-foreground">{badge.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">{badge.means}</td>
+                      <td className="px-6 py-4 text-muted-foreground">{badge.notMeans}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="scroll-animate delay-4 mt-10 bg-[#FAFAF8] rounded-2xl p-6 text-center">
             <p className="text-foreground text-lg">
               Verification should be considered <span className="text-[#A89F91] font-medium">one factor among many</span> when evaluating a professional.
             </p>

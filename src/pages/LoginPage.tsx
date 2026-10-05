@@ -3,13 +3,13 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { requiresMembershipPayment } from '@/lib/membership';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
+import LinkedInAuthButton from '@/components/LinkedInAuthButton';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
-  const { user, loading: authLoading, signIn, signInWithGoogle, signOut } = useAuth();
+  const { user, loading: authLoading, signIn, signInWithGoogle, signInWithLinkedIn, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -85,58 +85,61 @@ export default function LoginPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('status, rejection_reason, application_data')
+        .select('role, status, rejection_reason, application_data')
         .eq('id', signedInUser.id)
         .maybeSingle();
 
-      const accountStatus =
-        profile?.status ||
-        profile?.application_data?.account_status ||
-        signedInUser.user_metadata?.account_status ||
-        (signedInUser.user_metadata?.application_data ? 'pending' : null);
-      const rejectionReason =
-        profile?.rejection_reason ||
-        profile?.application_data?.rejection_reason ||
-        signedInUser.user_metadata?.rejection_reason;
-
-      if (accountStatus === 'pending') {
-        await signOut();
-        toast.info('Account under review', {
-          description: 'Your registration is still pending admin approval.',
-        });
-        setLoading(false);
-        navigate('/registration-pending', { state: { email } });
-        return;
+      // One-time backfill: if signup-time profile writes failed (e.g. email
+      // confirmation was on), sync application_data from auth metadata so the
+      // profile page shows their info.
+      const metaApplicationData = signedInUser.user_metadata?.application_data;
+      if (profile && !profile.application_data && metaApplicationData) {
+        await supabase
+          .from('profiles')
+          .update({
+            application_data: metaApplicationData,
+            ...(profile.role ? {} : { role: signedInUser.user_metadata?.profile_type || null }),
+          })
+          .eq('id', signedInUser.id);
+        profile.application_data = metaApplicationData;
       }
 
-      if (accountStatus === 'rejected') {
-        await signOut();
-        toast.error('Application not approved', {
-          description: rejectionReason || 'Your registration was not approved. Please contact support.',
-        });
-        setLoading(false);
-        return;
-      }
+      // Admins bypass application status checks entirely
+      if (profile?.role !== 'admin') {
+        const accountStatus =
+          profile?.status ||
+          profile?.application_data?.account_status ||
+          signedInUser.user_metadata?.account_status ||
+          (!profile && signedInUser.user_metadata?.application_data ? 'pending' : null);
+        const rejectionReason =
+          profile?.rejection_reason ||
+          profile?.application_data?.rejection_reason ||
+          signedInUser.user_metadata?.rejection_reason;
 
-      if (requiresMembershipPayment(profile, signedInUser)) {
-        toast.info('Membership payment required', {
-          description: 'Your application is approved. Please complete payment to activate your account.',
-        });
-        setLoading(false);
-        navigate('/checkout');
-        return;
-      }
+        if (accountStatus === 'pending') {
+          await signOut();
+          toast.info('Account under review', {
+            description: 'Your registration is still pending admin approval.',
+          });
+          setLoading(false);
+          navigate('/registration-pending', { state: { email } });
+          return;
+        }
 
-      const { data: roleProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', signedInUser.id)
-        .maybeSingle();
+        if (accountStatus === 'rejected') {
+          await signOut();
+          toast.error('Application not approved', {
+            description: rejectionReason || 'Your registration was not approved. Please contact support.',
+          });
+          setLoading(false);
+          return;
+        }
+      }
 
       toast.success('Login Successful!', {
         description: 'Welcome back to Summerland Estates',
       });
-      setTimeout(() => navigate(roleProfile?.role === 'admin' ? '/admin/dashboard' : '/dashboard'), 500);
+      setTimeout(() => navigate(profile?.role === 'admin' ? '/admin/dashboard' : '/dashboard'), 500);
     }
   };
 
@@ -144,9 +147,22 @@ export default function LoginPage() {
     setLoading(true);
     
     const { error } = await signInWithGoogle();
-    
+
     if (error) {
       toast.error('Google Sign-In Failed', {
+        description: error.message,
+      });
+      setLoading(false);
+    }
+  };
+
+  const handleLinkedInSignIn = async () => {
+    setLoading(true);
+
+    const { error } = await signInWithLinkedIn();
+
+    if (error) {
+      toast.error('LinkedIn Sign-In Failed', {
         description: error.message,
       });
       setLoading(false);
@@ -176,6 +192,7 @@ export default function LoginPage() {
               )}
 
               <GoogleAuthButton onClick={handleGoogleSignIn} disabled={loading} />
+              <LinkedInAuthButton onClick={handleLinkedInSignIn} disabled={loading} />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">

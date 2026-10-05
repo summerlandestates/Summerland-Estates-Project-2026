@@ -11,9 +11,11 @@ export default function PrivacyPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const privacyPage = contentManager.getPage('privacy');
-    setPage(privacyPage || null);
-    setLoading(false);
+    contentManager.init().then(() => {
+      const privacyPage = contentManager.getPage('privacy');
+      setPage(privacyPage || null);
+      setLoading(false);
+    });
   }, []);
 
   if (loading) {

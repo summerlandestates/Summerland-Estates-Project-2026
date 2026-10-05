@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, User, Loader2 } from 'lucide-react';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
+import LinkedInAuthButton from '@/components/LinkedInAuthButton';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -18,7 +19,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signInWithGoogle, signInWithLinkedIn } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,9 +62,22 @@ export default function SignupPage() {
     setLoading(true);
     
     const { error } = await signInWithGoogle();
-    
+
     if (error) {
       toast.error('Google Sign-In Failed', {
+        description: error.message,
+      });
+      setLoading(false);
+    }
+  };
+
+  const handleLinkedInSignIn = async () => {
+    setLoading(true);
+
+    const { error } = await signInWithLinkedIn();
+
+    if (error) {
+      toast.error('LinkedIn Sign-In Failed', {
         description: error.message,
       });
       setLoading(false);
@@ -84,6 +98,7 @@ export default function SignupPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <GoogleAuthButton onClick={handleGoogleSignIn} disabled={loading} />
+              <LinkedInAuthButton onClick={handleLinkedInSignIn} disabled={loading} />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">

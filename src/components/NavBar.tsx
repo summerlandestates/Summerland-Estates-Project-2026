@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import NotificationBell from './NotificationBell';
 
 interface NavBarProps {
   currentPage: string;
@@ -306,7 +307,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   <button
                     type="button"
                     className={`inline-flex items-center gap-1 text-base font-normal transition-colors cursor-pointer hover:text-primary ${
-                      ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing', 'advertisements', 'how-it-works'].includes(currentPage)
+                      ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing', 'advertisements', 'how-it-works', 'services'].includes(currentPage)
                         ? 'text-primary font-semibold'
                         : 'text-foreground'
                     }`}
@@ -331,6 +332,13 @@ export default function NavBar({ currentPage }: NavBarProps) {
                       >
                         <div className="text-sm font-medium leading-none">How It Works</div>
                         <p className="mt-1 text-sm leading-snug text-muted-foreground">Learn how the platform connects you</p>
+                      </Link>
+                      <Link
+                        to="/services"
+                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
+                      >
+                        <div className="text-sm font-medium leading-none">Services</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Browse in-home & personal services</p>
                       </Link>
                       <Link
                         to="/contact"
@@ -368,13 +376,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
                         <p className="mt-1 text-sm leading-snug text-muted-foreground">Network guidelines</p>
                       </Link>
                       <Link
-                        to="/pricing"
-                        className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
-                      >
-                        <div className="text-sm font-medium leading-none">Participation Levels</div>
-                        <p className="mt-1 text-sm leading-snug text-muted-foreground">Review participation options</p>
-                      </Link>
-                      <Link
                         to="/advertisements"
                         className="block rounded-lg p-3 transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91]"
                       >
@@ -390,6 +391,8 @@ export default function NavBar({ currentPage }: NavBarProps) {
 
           <div className="flex items-center gap-3">
             {user ? (
+              <>
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -445,7 +448,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                     Saved Profiles
                   </DropdownMenuItem>
                   <div className="h-px bg-border my-1" />
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     className="text-destructive cursor-pointer hover:bg-muted"
                     onClick={handleSignOut}
                   >
@@ -454,6 +457,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             ) : (
               <>
                 <Button
@@ -471,6 +475,8 @@ export default function NavBar({ currentPage }: NavBarProps) {
         {/* Mobile Profile Icon - shown before menu button for logged-in users */}
         <div className="flex items-center gap-2 md:hidden">
           {user && (
+            <>
+            <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -519,6 +525,7 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
+            </>
           )}
           <Button
             variant="ghost"
@@ -624,6 +631,12 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 How It Works
               </button>
               <button
+                onClick={() => handleNavigation('/services')}
+                className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
+              >
+                Services
+              </button>
+              <button
                 onClick={() => handleNavigation('/contact')}
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
               >
@@ -654,12 +667,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
                 Standards & Conduct
               </button>
               <button
-                onClick={() => handleNavigation('/pricing')}
-                className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
-              >
-                Participation Levels
-              </button>
-              <button
                 onClick={() => handleNavigation('/advertisements')}
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
               >
@@ -676,9 +683,6 @@ export default function NavBar({ currentPage }: NavBarProps) {
               </button>
               <button className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors">
                 Login
-              </button>
-              <button className="w-full text-left px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                Participation Levels
               </button>
               <button
                 onClick={() => handleNavigation('/saved-profiles')}

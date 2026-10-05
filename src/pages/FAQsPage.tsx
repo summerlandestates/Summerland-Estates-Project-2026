@@ -49,11 +49,13 @@ export default function FAQsPage() {
   }, []);
 
   const loadFAQs = () => {
-    const allFAQs = contentManager.getFAQs();
-    const allCategories = contentManager.getFAQCategories();
-    setFaqs(allFAQs);
-    setCategories(allCategories);
-    setLoading(false);
+    contentManager.init().then(() => {
+      const allFAQs = contentManager.getFAQs();
+      const allCategories = contentManager.getFAQCategories();
+      setFaqs(allFAQs);
+      setCategories(allCategories);
+      setLoading(false);
+    });
   };
 
   const filteredFAQs = activeCategory === 'all' 

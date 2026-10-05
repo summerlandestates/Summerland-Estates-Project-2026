@@ -11,6 +11,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { Send, MessageSquare, Loader2, ArrowLeft, User } from 'lucide-react';
+import ReportButton from '@/components/ReportButton';
+import { getTierLimits } from '@/utils/tierAccess';
+import type { PricingTier } from '../types';
 
 interface ConversationParticipant {
   conversation_id: string;
@@ -136,6 +139,32 @@ export default function ConversationsPage() {
 
     setSending(true);
     try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
+      if (limits.messageLimitMonthly) {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('sender_id', user.id)
+          .gte('created_at', startOfMonth.toISOString());
+        if ((count || 0) >= limits.messageLimitMonthly) {
+          toast.error(`You have reached your limit of ${limits.messageLimitMonthly} messages this month.`, {
+            description: 'Upgrade for unlimited messaging.',
+          });
+          setSending(false);
+          navigate('/upgrade');
+          return;
+        }
+      }
+
       const { error } = await supabase.from('messages').insert({
         conversation_id: activeConversation,
         sender_id: user.id,
@@ -227,8 +256,18 @@ export default function ConversationsPage() {
 
               {/* Active Conversation */}
               <Card className="md:col-span-2 flex flex-col border-[#e8dfd3]">
-                <div className="p-4 border-b border-[#e8dfd3]">
+                <div className="p-4 border-b border-[#e8dfd3] flex items-center justify-between">
                   <h2 className="font-semibold text-foreground">{recipientName}</h2>
+                  {activeConversation && (
+                    <ReportButton
+                      targetType="message"
+                      targetId={activeConversation}
+                      targetLabel={recipientName}
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
+                    />
+                  )}
                 </div>
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
@@ -236,11 +275,23 @@ export default function ConversationsPage() {
                       <p className="text-center text-muted-foreground py-8">No messages yet. Send the first one below.</p>
                     ) : (
                       messages.map((msg) => (
-                        <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
+                        <div key={msg.id} className={`group flex items-center gap-2 ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[70%] p-3 rounded-2xl ${msg.sender_id === user?.id ? 'bg-[#A89F91] text-white rounded-br-none' : 'bg-muted text-foreground rounded-bl-none'}`}>
                             <p className="text-sm">{msg.content}</p>
                             <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? 'text-white/70' : 'text-muted-foreground'}`}>{formatTime(msg.created_at)}</p>
                           </div>
+                          {msg.sender_id !== user?.id && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ReportButton
+                                targetType="message"
+                                targetId={msg.id}
+                                targetLabel={`Message from ${recipientName}`}
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive [&_svg]:mr-0"
+                              />
+                            </div>
+                          )}
                         </div>
                       ))
                     )}

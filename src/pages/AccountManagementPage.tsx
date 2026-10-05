@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -15,10 +16,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { AlertTriangle, Check, User, Mail, Phone, MapPin, Briefcase } from 'lucide-react';
-import { listings } from '../data/listings';
 import type { PricingTier, UserType } from '../types';
 
-type ExitStep = 'outcome' | 'select-profile' | 'community-offer' | 'confirm-delete';
+type ExitStep = 'community-offer' | 'confirm-delete';
 
 export default function AccountManagementPage() {
   const navigate = useNavigate();
@@ -26,9 +26,9 @@ export default function AccountManagementPage() {
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
   const [userType, setUserType] = useState<UserType>('professional');
   const [showExitFlow, setShowExitFlow] = useState(false);
-  const [exitStep, setExitStep] = useState<ExitStep>('outcome');
-  const [hireOccurred, setHireOccurred] = useState<boolean | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState('');
+  const [exitStep, setExitStep] = useState<ExitStep>('community-offer');
+  const [accountEmail, setAccountEmail] = useState('');
+  const [accountLocation, setAccountLocation] = useState('');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -44,6 +44,25 @@ export default function AccountManagementPage() {
     const type = localStorage.getItem('userType') as UserType;
     setUserTier(tier);
     setUserType(type || 'professional');
+
+    setAccountEmail(user?.email || '');
+
+    const loadProfile = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email, location, application_data')
+        .eq('id', user!.id)
+        .maybeSingle();
+
+      if (profile?.email) setAccountEmail(profile.email);
+      const location =
+        profile?.location ||
+        (typeof profile?.application_data?.location === 'string' ? profile.application_data.location : '') ||
+        (typeof profile?.application_data?.city === 'string' ? profile.application_data.city : '');
+      setAccountLocation(location);
+    };
+
+    loadProfile();
   }, [user, loading, navigate]);
 
   if (loading) {
@@ -60,26 +79,7 @@ export default function AccountManagementPage() {
 
   const handleStartExitFlow = () => {
     setShowExitFlow(true);
-    setExitStep('outcome');
-    setHireOccurred(null);
-    setSelectedProfile('');
-  };
-
-  const handleOutcomeSelection = (occurred: boolean) => {
-    setHireOccurred(occurred);
-    if (occurred) {
-      setExitStep('select-profile');
-    } else {
-      setExitStep('community-offer');
-    }
-  };
-
-  const handleProfileSelection = () => {
-    if (!selectedProfile) {
-      alert('Please select a profile');
-      return;
-    }
-    setExitStep('confirm-delete');
+    setExitStep('community-offer');
   };
 
   const handleStayInCommunity = () => {
@@ -92,16 +92,6 @@ export default function AccountManagementPage() {
   };
 
   const handleDeleteAccount = () => {
-    // Store hire confirmation if applicable
-    if (hireOccurred && selectedProfile) {
-      const confirmation = {
-        userId: '1', // Mock current user
-        hiredProfileId: selectedProfile,
-        confirmedDate: new Date().toISOString()
-      };
-      localStorage.setItem('exit_hire_confirmation', JSON.stringify(confirmation));
-    }
-
     // Delete account
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('userTier');
@@ -115,18 +105,46 @@ export default function AccountManagementPage() {
 
   const handleCancelExit = () => {
     setShowExitFlow(false);
-    setExitStep('outcome');
-    setHireOccurred(null);
-    setSelectedProfile('');
+    setExitStep('community-offer');
+  };
+
+  const handleDownloadData = async () => {
+    if (!user) return;
+    try {
+      const [profileResult, jobsResult, requestsResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        supabase.from('job_postings').select('*').eq('user_id', user.id),
+        supabase.from('service_requests').select('*').eq('user_id', user.id),
+      ]);
+
+      const exportPayload = {
+        exportedAt: new Date().toISOString(),
+        account: {
+          id: user.id,
+          email: user.email,
+          createdAt: user.created_at,
+          metadata: user.user_metadata,
+        },
+        profile: profileResult.data,
+        jobPostings: jobsResult.data || [],
+        serviceRequests: requestsResult.data || [],
+      };
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `summerland-estates-data-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Unable to export your data right now. Please contact support for a copy of your data.');
+    }
   };
 
   const isProfessional = userType === 'professional';
-  const isHiringRole = userType === 'agency' || userType === 'estates';
-
-  // Get eligible profiles for selection
-  const eligibleProfiles = isProfessional
-    ? listings.filter(l => l.category === 'Agency' || l.category === 'Estates' || l.profileStatus === 'actively-hiring')
-    : listings.filter(l => l.category === 'Staff' || l.profileStatus === 'available-for-hire');
 
   const communityPrice = isProfessional ? '$1' : '$3.99';
 
@@ -180,7 +198,7 @@ export default function AccountManagementPage() {
                   <Mail className="w-5 h-5 text-muted-foreground" />
                   <span className="text-foreground">Email</span>
                 </div>
-                <span className="text-muted-foreground">user@example.com</span>
+                <span className="text-muted-foreground">{accountEmail || '—'}</span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -188,7 +206,7 @@ export default function AccountManagementPage() {
                   <MapPin className="w-5 h-5 text-muted-foreground" />
                   <span className="text-foreground">Location</span>
                 </div>
-                <span className="text-muted-foreground">Beverly Hills, CA</span>
+                <span className="text-muted-foreground">{accountLocation || '—'}</span>
               </div>
             </div>
           </Card>
@@ -217,6 +235,14 @@ export default function AccountManagementPage() {
               </Button>
 
               <Button
+                onClick={handleDownloadData}
+                variant="outline"
+                className="w-full justify-start border-border text-foreground hover:bg-muted"
+              >
+                Download My Data
+              </Button>
+
+              <Button
                 onClick={handleStartExitFlow}
                 variant="outline"
                 className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10"
@@ -238,117 +264,7 @@ export default function AccountManagementPage() {
       {/* Exit Flow Dialog */}
       <Dialog open={showExitFlow} onOpenChange={setShowExitFlow}>
         <DialogContent className="bg-card text-card-foreground max-w-lg">
-          {/* Step 1: Outcome */}
-          {exitStep === 'outcome' && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-3xl font-heading font-medium text-foreground tracking-tight">
-                  {isProfessional ? 'Did you get hired?' : 'Did you hire a candidate?'}
-                </DialogTitle>
-                <DialogDescription className="text-muted-foreground">
-                  This helps us understand outcomes within the network.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 mt-6">
-                <div
-                  onClick={() => handleOutcomeSelection(true)}
-                  className="p-6 border-2 border-border rounded-lg cursor-pointer hover:border-primary transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full border-2 border-border flex items-center justify-center">
-                      <div className="w-3 h-3 rounded-full" />
-                    </div>
-                    <span className="text-lg font-medium text-foreground">Yes</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => handleOutcomeSelection(false)}
-                  className="p-6 border-2 border-border rounded-lg cursor-pointer hover:border-primary transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full border-2 border-border flex items-center justify-center">
-                      <div className="w-3 h-3 rounded-full" />
-                    </div>
-                    <span className="text-lg font-medium text-foreground">No</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-6">
-                <Button
-                  variant="ghost"
-                  onClick={handleCancelExit}
-                  className="text-muted-foreground"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Step 2: Select Profile */}
-          {exitStep === 'select-profile' && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-3xl font-heading font-medium text-foreground tracking-tight">
-                  {isProfessional ? 'Who hired you?' : 'Who did you hire?'}
-                </DialogTitle>
-                <DialogDescription className="text-muted-foreground">
-                  Select the profile involved.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-3 mt-6 max-h-[400px] overflow-y-auto">
-                {eligibleProfiles.map((profile) => (
-                  <div
-                    key={profile.id}
-                    onClick={() => setSelectedProfile(profile.id)}
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      selectedProfile === profile.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={profile.profilePhoto}
-                        alt={profile.name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">{profile.name}</p>
-                        <p className="text-sm text-muted-foreground truncate">{profile.role}</p>
-                      </div>
-                      {selectedProfile === profile.id && (
-                        <Check className="w-5 h-5 text-primary flex-shrink-0" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <Button
-                  variant="ghost"
-                  onClick={() => setExitStep('outcome')}
-                  className="flex-1 text-muted-foreground"
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleProfileSelection}
-                  disabled={!selectedProfile}
-                  className="flex-1 bg-primary text-primary-foreground"
-                >
-                  Continue
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Step 3: Community Offer */}
+          {/* Step 1: Community Offer */}
           {exitStep === 'community-offer' && (
             <>
               <DialogHeader>
@@ -435,23 +351,6 @@ export default function AccountManagementPage() {
                   </div>
                 </div>
               </Card>
-
-              {hireOccurred && selectedProfile && (
-                <Card className="p-6 bg-success/10 border-success/20 mt-4">
-                  <div className="flex items-start gap-3">
-                    <Check className="w-6 h-6 text-success flex-shrink-0 mt-1" />
-                    <div>
-                      <p className="text-foreground font-medium mb-2">
-                        Hire confirmation recorded
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {isProfessional ? 'Hired by: ' : 'Hired: '}
-                        {listings.find(l => l.id === selectedProfile)?.name}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              )}
 
               <div className="flex flex-col gap-3 mt-6">
                 <Button

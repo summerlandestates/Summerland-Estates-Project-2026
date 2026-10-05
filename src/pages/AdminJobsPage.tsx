@@ -214,35 +214,9 @@ export default function AdminJobsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Admin Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/admin/dashboard')}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <div className="h-6 w-px bg-gray-200" />
-              <h1 className="text-xl font-semibold text-gray-900">Jobs & Service Requests</h1>
-            </div>
-            <Button
-              onClick={() => navigate('/post-job')}
-              className="bg-[#A89F91] hover:bg-[#8A8279] text-white"
-            >
-              <Briefcase className="w-4 h-4 mr-2" />
-              Create New
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div>
 
-      <main className="container mx-auto px-6 py-8">
+      <main>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card className="p-4 bg-white">
             <div className="flex items-center gap-3">

@@ -11,9 +11,11 @@ export default function TermsPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const termsPage = contentManager.getPage('terms');
-    setPage(termsPage || null);
-    setLoading(false);
+    contentManager.init().then(() => {
+      const termsPage = contentManager.getPage('terms');
+      setPage(termsPage || null);
+      setLoading(false);
+    });
   }, []);
 
   if (loading) {

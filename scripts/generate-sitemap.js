@@ -40,7 +40,6 @@ const NO_INDEX_PATHS = new Set([
   '/compare',
   '/registration-pending',
   '/email-blast',
-  '/pricing',
 ]);
 
 const ROUTE_OVERRIDES = {
@@ -135,32 +134,100 @@ function buildUrlNode(loc, lastmod, changefreq, priority) {
   return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 }
 
+async function fetchDynamicUrls(supabase) {
+  const dynamicUrls = [];
+
+  const queries = [
+    {
+      table: 'listings',
+      select: 'slug, updated_at',
+      filters: (q) => q.eq('approved', true).not('slug', 'is', null),
+      toUrl: (row) => `/profile/${row.slug || row.id}`,
+      changefreq: 'weekly',
+      priority: '0.6',
+      label: 'listings',
+    },
+    {
+      table: 'job_postings',
+      select: 'id, updated_at',
+      filters: (q) => q.eq('status', 'active'),
+      toUrl: (row) => `/job/${row.id}`,
+      changefreq: 'daily',
+      priority: '0.7',
+      label: 'job postings',
+    },
+    {
+      table: 'events',
+      select: 'id, updated_at',
+      filters: (q) => q.in('status', ['approved', 'published']),
+      toUrl: (row) => `/event/${row.id}`,
+      changefreq: 'weekly',
+      priority: '0.6',
+      label: 'events',
+    },
+    {
+      table: 'service_requests',
+      select: 'id, created_at',
+      filters: (q) => q.eq('status', 'open'),
+      toUrl: (row) => `/service-request/${row.id}`,
+      changefreq: 'daily',
+      priority: '0.6',
+      label: 'service requests',
+    },
+    {
+      table: 'articles',
+      select: 'slug, updated_at',
+      filters: (q) => q.eq('status', 'published'),
+      toUrl: (row) => `/articles/${row.slug || row.id}`,
+      changefreq: 'weekly',
+      priority: '0.6',
+      label: 'articles',
+    },
+    {
+      table: 'site_content_pages',
+      select: 'slug, updated_at',
+      filters: (q) => q.eq('is_published', true),
+      toUrl: (row) => `/pages/${row.slug}`,
+      changefreq: 'monthly',
+      priority: '0.5',
+      label: 'CMS pages',
+    },
+  ];
+
+  for (const query of queries) {
+    try {
+      let q = supabase.from(query.table).select(query.select);
+      q = query.filters(q);
+      const { data, error } = await q;
+      if (error) {
+        console.warn(`⚠️ Could not fetch ${query.label}:`, error.message);
+        continue;
+      }
+      const urls = (data || []).map((row) => ({
+        path: query.toUrl(row),
+        lastmod: row.updated_at || row.created_at,
+        changefreq: query.changefreq,
+        priority: query.priority,
+      }));
+      dynamicUrls.push(...urls);
+      console.log(`✅ Fetched ${urls.length} ${query.label}`);
+    } catch (err) {
+      console.warn(`⚠️ Skipping ${query.label}:`, err.message);
+    }
+  }
+
+  return dynamicUrls;
+}
+
 async function main() {
-  let profileUrls = [];
+  let dynamicUrls = [];
 
   if (supabaseUrl && supabaseAnonKey) {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const { data, error } = await supabase
-      .from('listings')
-      .select('slug, updated_at')
-      .eq('approved', true)
-      .not('slug', 'is', null)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      console.warn('⚠️ Could not fetch listings for sitemap:', error.message);
-    } else if (data?.length) {
-      profileUrls = data.map((listing) => ({
-        path: `/profile/${listing.slug || listing.id}`,
-        lastmod: listing.updated_at,
-        changefreq: 'weekly',
-        priority: '0.6',
-      }));
-      console.log(`✅ Fetched ${profileUrls.length} approved listings`);
-    }
+    dynamicUrls = await fetchDynamicUrls(supabase);
   } else {
     console.warn(
-      '⚠️ Supabase env vars not found. Generating sitemap without profile URLs.'
+      '⚠️ Supabase env vars not found. Generating sitemap without dynamic URLs.'
     );
   }
 
@@ -172,7 +239,7 @@ async function main() {
       ...route,
       lastmod: today,
     })),
-    ...profileUrls,
+    ...dynamicUrls,
   ];
 
   const urlNodes = allUrls.map((route) =>

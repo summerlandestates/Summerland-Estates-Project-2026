@@ -6,12 +6,13 @@ import SEOHead from '../components/SEOHead';
 import FAQSection from '../components/FAQSection';
 import UpgradePrompt from '../components/UpgradePrompt';
 import { getTierLimits } from '@/utils/tierAccess';
+import { supabase } from '@/lib/supabase';
 import type { PricingTier } from '../types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Text } from '@/components/ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -297,8 +298,13 @@ export default function CollectivePage() {
     window.scrollTo(0, 0);
 
     // Check if user is logged in and get their profile location and tier
+    supabase.auth.getUser().then(({ data }) => {
+      const loggedIn = !!data.user;
+      setIsLoggedIn(loggedIn);
+      if (loggedIn) localStorage.setItem('isLoggedIn', 'true');
+    });
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    setIsLoggedIn(loggedIn);
+    setIsLoggedIn((prev) => prev || loggedIn);
 
     const tier = (localStorage.getItem('userTier') || 'professional-basic') as PricingTier;
     setUserTier(tier);
@@ -306,17 +312,37 @@ export default function CollectivePage() {
     setCanAccessCommunity(!!limits.canAccessCommunity);
 
     if (loggedIn) {
-      const profileLocation = localStorage.getItem('userLocation') || '';
-      if (profileLocation) {
+      const applyLocation = (profileLocation: string) => {
         const [city, state] = profileLocation.split(',').map(s => s.trim());
-        setUserCity(city);
-        setUserState(state);
-
-        // Check if community already exists for user's location
+        setUserCity(city || '');
+        setUserState(state || '');
         const communityExists = communities.some(
           c => c.city === city && c.state === state
         );
-        setCanStartCommunity(!communityExists && limits.canAccessCommunity);
+        setCanStartCommunity(!communityExists && !!city && limits.canAccessCommunity);
+      };
+
+      const stored = localStorage.getItem('userLocation') || '';
+      if (stored) {
+        applyLocation(stored);
+      } else {
+        // Fall back to the real profile location from Supabase
+        supabase.auth.getUser().then(async ({ data }) => {
+          if (!data.user) return;
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('location, application_data')
+            .eq('id', data.user.id)
+            .maybeSingle();
+          const loc =
+            profile?.location ||
+            (typeof profile?.application_data?.location === 'string' ? profile.application_data.location : '') ||
+            '';
+          if (loc) {
+            localStorage.setItem('userLocation', loc);
+            applyLocation(loc);
+          }
+        });
       }
     }
   }, [communities]);

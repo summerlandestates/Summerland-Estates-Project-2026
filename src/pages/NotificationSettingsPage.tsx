@@ -142,7 +142,8 @@ export default function NotificationSettingsPage() {
     icon: Icon,
     category,
     emailEnabled,
-    smsEnabled
+    smsEnabled,
+    disabled = false,
   }: {
     title: string;
     description: string;
@@ -150,8 +151,9 @@ export default function NotificationSettingsPage() {
     category: keyof Omit<NotificationPreferences, 'subscribedTopics'>;
     emailEnabled: boolean;
     smsEnabled: boolean;
+    disabled?: boolean;
   }) => (
-    <div className="py-6 first:pt-0 last:pb-0">
+    <div className={`py-6 first:pt-0 last:pb-0 ${disabled ? 'opacity-50' : ''}`}>
       <div className="flex items-start gap-4 mb-4">
         <div className="p-2 bg-primary/10 rounded-lg">
           <Icon className="w-5 h-5 text-primary" />
@@ -159,6 +161,9 @@ export default function NotificationSettingsPage() {
         <div className="flex-1">
           <h3 className="text-lg font-heading font-semibold text-foreground mb-1">
             {title}
+            {disabled && (
+              <Badge variant="secondary" className="ml-2 text-xs font-normal">Pro</Badge>
+            )}
           </h3>
           <p className="text-sm text-muted-foreground leading-relaxed">
             {description}
@@ -178,6 +183,7 @@ export default function NotificationSettingsPage() {
             id={`${category}-email`}
             checked={emailEnabled}
             onCheckedChange={() => handleToggle(category, 'email')}
+            disabled={disabled}
           />
         </div>
 
@@ -192,12 +198,12 @@ export default function NotificationSettingsPage() {
             id={`${category}-sms`}
             checked={smsEnabled}
             onCheckedChange={() => handleToggle(category, 'sms')}
-            disabled={!hasPhone}
+            disabled={disabled || !hasPhone}
           />
         </div>
       </div>
 
-      {!hasPhone && (
+      {!hasPhone && !disabled && (
         <p className="text-xs text-muted-foreground ml-14 mt-2">
           Add a phone number to your profile to enable text notifications
         </p>
@@ -245,6 +251,7 @@ export default function NotificationSettingsPage() {
                 category="newJobPostings"
                 emailEnabled={preferences.newJobPostings.email}
                 smsEnabled={preferences.newJobPostings.sms}
+                disabled={!isPaid}
               />
 
               <Separator className="bg-border" />
@@ -256,6 +263,7 @@ export default function NotificationSettingsPage() {
                 category="newServiceRequests"
                 emailEnabled={preferences.newServiceRequests.email}
                 smsEnabled={preferences.newServiceRequests.sms}
+                disabled={!isPaid}
               />
 
               <Separator className="bg-border" />
@@ -267,6 +275,7 @@ export default function NotificationSettingsPage() {
                 category="newEvents"
                 emailEnabled={preferences.newEvents.email}
                 smsEnabled={preferences.newEvents.sms}
+                disabled={!isPaid}
               />
 
               <Separator className="bg-border" />
@@ -289,6 +298,7 @@ export default function NotificationSettingsPage() {
                 category="profileViewed"
                 emailEnabled={preferences.profileViewed.email}
                 smsEnabled={preferences.profileViewed.sms}
+                disabled={!isPaid}
               />
 
               <Separator className="bg-border" />
@@ -300,6 +310,7 @@ export default function NotificationSettingsPage() {
                 category="forumTopics"
                 emailEnabled={preferences.forumTopics.email}
                 smsEnabled={preferences.forumTopics.sms}
+                disabled={!isPaid}
               />
             </div>
           </Card>

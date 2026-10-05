@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminSidebar from '../components/AdminSidebar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -221,22 +220,19 @@ export default function AdminSponsorshipsPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
-        <AdminSidebar />
-        <main className="flex-1 p-8">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-[#A89F91]" />
-          </div>
-        </main>
-      </div>
+      <div className="space-y-6">
+
+  <div className="flex items-center justify-center h-64">
+    <Loader2 className="w-8 h-8 animate-spin text-[#A89F91]" />
+  </div>
+
+</div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
-
-      <main className="flex-1 p-8 overflow-x-hidden overflow-y-auto">
+    <div>
+      <main>
         <div className="max-w-7xl mx-auto w-full">
           {/* Header */}
           <div className="mb-8">

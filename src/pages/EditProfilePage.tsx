@@ -11,13 +11,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Loader2, Save, Upload } from 'lucide-react';
+import { ArrowLeft, Loader2, MapPin, Plus, Save, Upload, X } from 'lucide-react';
+import LocationAutocomplete from '@/components/LocationAutocomplete';
+import ServiceCategoryPicker from '@/components/ServiceCategoryPicker';
+import { getTierLimits } from '@/utils/tierAccess';
+import type { PricingTier } from '../types';
 
 interface ProfileRecord {
   id: string;
   email: string;
   full_name: string | null;
   avatar_url: string | null;
+  tier?: string | null;
   application_data?: Record<string, unknown> | null;
 }
 
@@ -105,6 +110,9 @@ export default function EditProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [serviceLocations, setServiceLocations] = useState<string[]>([]);
+  const [newServiceLocation, setNewServiceLocation] = useState('');
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -117,7 +125,7 @@ export default function EditProfilePage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, avatar_url, application_data')
+        .select('id, email, full_name, avatar_url, tier, application_data')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -141,6 +149,20 @@ export default function EditProfilePage() {
         nextForm[key] = stringifyValue(applicationData[key]);
       });
 
+      const storedLocations = Array.isArray(applicationData.service_locations)
+        ? (applicationData.service_locations as unknown[]).filter((item): item is string => typeof item === 'string' && !!item.trim())
+        : [];
+      if (storedLocations.length === 0) {
+        const fallback = stringifyValue(applicationData.location) || stringifyValue(applicationData.business_address);
+        if (fallback) storedLocations.push(fallback);
+      }
+      setServiceLocations(storedLocations);
+
+      const storedServices = Array.isArray(applicationData.services)
+        ? (applicationData.services as unknown[]).filter((s): s is string => typeof s === 'string' && !!s.trim())
+        : [];
+      setSelectedServices(storedServices);
+
       setProfile(data);
       setForm(nextForm);
       setFullName(data.full_name || '');
@@ -160,6 +182,38 @@ export default function EditProfilePage() {
     () => stringifyValue(profile?.application_data?.selected_tier || profile?.application_data?.tier).replace(/-/g, ' '),
     [profile]
   );
+
+  const isServiceProvider = profileType === 'service-provider' || profileType === 'agency';
+
+  const serviceLocationLimit = useMemo(() => {
+    const tier = (profile?.tier ||
+      stringifyValue(profile?.application_data?.selected_tier || profile?.application_data?.tier).replace(/ /g, '-') ||
+      'business-free') as PricingTier;
+    return getTierLimits(tier).serviceLocationLimit ?? 1;
+  }, [profile]);
+
+  const serviceLocationLimitLabel = serviceLocationLimit >= 999 ? 'Unlimited' : `${serviceLocationLimit}`;
+
+  const addServiceLocation = () => {
+    const value = newServiceLocation.trim();
+    if (!value) return;
+    if (serviceLocations.length >= serviceLocationLimit) {
+      toast.error(`Your plan allows ${serviceLocationLimit} service location${serviceLocationLimit === 1 ? '' : 's'}.`, {
+        description: 'Upgrade to add more service locations.',
+      });
+      return;
+    }
+    if (serviceLocations.some((loc) => loc.toLowerCase() === value.toLowerCase())) {
+      toast.error('This location is already added.');
+      return;
+    }
+    setServiceLocations((current) => [...current, value]);
+    setNewServiceLocation('');
+  };
+
+  const removeServiceLocation = (index: number) => {
+    setServiceLocations((current) => current.filter((_, i) => i !== index));
+  };
 
   const updateField = (key: EditableFieldKey, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -208,6 +262,12 @@ export default function EditProfilePage() {
       FIELD_KEYS.forEach((key) => {
         nextApplicationData[key] = form[key].trim();
       });
+
+      if (isServiceProvider) {
+        nextApplicationData.service_locations = serviceLocations.filter((loc) => loc.trim());
+      }
+
+      nextApplicationData.services = selectedServices;
 
       const { error } = await supabase
         .from('profiles')
@@ -342,7 +402,12 @@ export default function EditProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="location">Location</Label>
-                  <Input id="location" value={form.location} onChange={(e) => updateField('location', e.target.value)} className="rounded-2xl border-[#d9cfc3] bg-[#fcfaf7]" />
+                  <LocationAutocomplete
+                    placeholder="City, State or ZIP (Google Maps)"
+                    defaultValue={form.location}
+                    onLocationSelect={(loc) => updateField('location', [loc.city, loc.state].filter(Boolean).join(', ') || loc.formattedAddress)}
+                    onTextChange={(text) => updateField('location', text)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
@@ -406,6 +471,15 @@ export default function EditProfilePage() {
                   <Label htmlFor="service-type">Service Type</Label>
                   <Input id="service-type" value={form.service_type} onChange={(e) => updateField('service_type', e.target.value)} className="rounded-2xl border-[#d9cfc3] bg-[#fcfaf7]" />
                 </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Services You Provide</Label>
+                  <ServiceCategoryPicker
+                    selected={selectedServices}
+                    onChange={setSelectedServices}
+                    placeholder="Select one or more services..."
+                  />
+                  <p className="text-xs text-[#7d786f]">Select all that apply — you can also add a new category</p>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="year-founded">Year Founded</Label>
                   <Input id="year-founded" value={form.year_founded} onChange={(e) => updateField('year_founded', e.target.value)} className="rounded-2xl border-[#d9cfc3] bg-[#fcfaf7]" />
@@ -416,13 +490,94 @@ export default function EditProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="business-address">Business Address</Label>
-                  <Input id="business-address" value={form.business_address} onChange={(e) => updateField('business_address', e.target.value)} className="rounded-2xl border-[#d9cfc3] bg-[#fcfaf7]" />
+                  <LocationAutocomplete
+                    placeholder="Street address (Google Maps)"
+                    defaultValue={form.business_address}
+                    onLocationSelect={(loc) => updateField('business_address', loc.formattedAddress)}
+                    onTextChange={(text) => updateField('business_address', text)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="business-phone">Business Phone</Label>
                   <Input id="business-phone" value={form.business_phone} onChange={(e) => updateField('business_phone', e.target.value)} className="rounded-2xl border-[#d9cfc3] bg-[#fcfaf7]" />
                 </div>
               </section>
+
+              {isServiceProvider && (
+                <section className="rounded-[24px] border border-[#ebe2d7] bg-[#fbf8f3] p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="font-heading text-2xl font-medium text-[#23231f]">Service Locations</h2>
+                      <p className="mt-1 text-sm text-[#7d786f]">
+                        {serviceLocationLimit >= 999
+                          ? 'Your plan includes unlimited service locations.'
+                          : `Your plan includes ${serviceLocationLimit} service location${serviceLocationLimit === 1 ? '' : 's'}.`}
+                      </p>
+                    </div>
+                    <span className="text-xs font-medium uppercase tracking-[0.2em] text-[#8d8478]">
+                      {serviceLocations.length} / {serviceLocationLimitLabel}
+                    </span>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    {serviceLocations.length === 0 && (
+                      <p className="text-sm text-[#7d786f]">No service locations added yet.</p>
+                    )}
+                    {serviceLocations.map((loc, index) => (
+                      <div
+                        key={`${loc}-${index}`}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-[#e5d9cd] bg-white px-4 py-3"
+                      >
+                        <span className="flex items-center gap-2 text-sm text-[#4e4a43]">
+                          <MapPin className="h-4 w-4 text-[#6d7662]" />
+                          {loc}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeServiceLocation(index)}
+                          className="text-[#8d8478] transition-colors hover:text-[#b64f4f]"
+                          aria-label={`Remove ${loc}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex gap-2">
+                    <div className="flex-1">
+                      <LocationAutocomplete
+                        placeholder="City, State (Google Maps)"
+                        defaultValue={newServiceLocation}
+                        onLocationSelect={(loc) => setNewServiceLocation([loc.city, loc.state].filter(Boolean).join(', ') || loc.formattedAddress)}
+                        onTextChange={setNewServiceLocation}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={addServiceLocation}
+                      disabled={!newServiceLocation.trim() || serviceLocations.length >= serviceLocationLimit}
+                      className="rounded-2xl bg-[#6d7662] text-white hover:bg-[#5f6756]"
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Add
+                    </Button>
+                  </div>
+                  {serviceLocations.length >= serviceLocationLimit && (
+                    <p className="mt-2 text-xs text-[#7d786f]">
+                      You've reached your service location limit.{' '}
+                      <button
+                        type="button"
+                        onClick={() => navigate('/upgrade')}
+                        className="font-medium text-[#6d7662] underline hover:text-[#5f6756]"
+                      >
+                        Upgrade to add more locations
+                      </button>
+                      .
+                    </p>
+                  )}
+                </section>
+              )}
 
               <section className="grid gap-5 md:grid-cols-2">
                 <div className="rounded-[24px] border border-[#ebe2d7] bg-[#fbf8f3] p-5">

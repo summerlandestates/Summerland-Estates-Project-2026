@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,14 +15,44 @@ export default function VerifyEmailPage() {
   const email = searchParams.get('email');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  const sendCode = useCallback(async (silent = false) => {
+    if (!email) return;
+    try {
+      const res = await fetch('/api/send-verification-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (!silent) {
+          toast.error('Failed to Send Code', {
+            description: result.error || 'Please try again in a moment.',
+          });
+        }
+        return false;
+      }
+      return true;
+    } catch {
+      if (!silent) {
+        toast.error('Failed to Send Code', {
+          description: 'Network error. Please try again.',
+        });
+      }
+      return false;
+    }
+  }, [email]);
+
   useEffect(() => {
     if (!email) {
       toast.error('Invalid Request', {
         description: 'No email provided for verification',
       });
       navigate('/signup');
+      return;
     }
-  }, [email, navigate]);
+    sendCode(true);
+  }, [email, navigate, sendCode]);
 
   const handleChange = (index: number, value: string) => {
     if (value.length > 1) {
@@ -82,45 +111,42 @@ export default function VerifyEmailPage() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.verifyOtp({
-      email: email!,
-      token: verificationCode,
-      type: 'signup',
-    });
+    try {
+      const res = await fetch('/api/verify-email-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code: verificationCode }),
+      });
+      const result = await res.json().catch(() => ({}));
 
-    if (error) {
+      if (!res.ok) {
+        toast.error('Verification Failed', {
+          description: result.error || 'Invalid or expired code',
+        });
+        setLoading(false);
+      } else {
+        toast.success('Email Verified!', {
+          description: 'Your account has been verified successfully',
+        });
+        setTimeout(() => navigate('/login'), 1000);
+      }
+    } catch {
       toast.error('Verification Failed', {
-        description: error.message,
+        description: 'Network error. Please try again.',
       });
       setLoading(false);
-    } else {
-      toast.success('Email Verified!', {
-        description: 'Your account has been verified successfully',
-      });
-      setTimeout(() => navigate('/'), 1000);
     }
   };
 
   const handleResend = async () => {
     if (!email) return;
-
     setResending(true);
-
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: email,
-    });
-
-    if (error) {
-      toast.error('Resend Failed', {
-        description: error.message,
-      });
-    } else {
+    const sent = await sendCode();
+    if (sent) {
       toast.success('Code Resent', {
         description: 'A new verification code has been sent to your email',
       });
     }
-
     setResending(false);
   };
 

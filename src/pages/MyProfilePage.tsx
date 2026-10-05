@@ -111,6 +111,9 @@ export default function MyProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sendingVerification, setSendingVerification] = useState(false);
+  const [verificationCodeSent, setVerificationCodeSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verifyingCode, setVerifyingCode] = useState(false);
   const [fullName, setFullName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -119,10 +122,7 @@ export default function MyProfilePage() {
   
   // Delete profile states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteStep, setDeleteStep] = useState<'confirm' | 'hired' | 'hired-details' | 'deleting'>('confirm');
-  const [gotHired, setGotHired] = useState<boolean | null>(null);
-  const [hiredByName, setHiredByName] = useState('');
-  const [hiredByProfileLink, setHiredByProfileLink] = useState('');
+  const [deleteStep, setDeleteStep] = useState<'confirm' | 'deleting'>('confirm');
   const [deleting, setDeleting] = useState(false);
   const [personalityDialogOpen, setPersonalityDialogOpen] = useState(false);
   const [personalitySaving, setPersonalitySaving] = useState(false);
@@ -243,19 +243,18 @@ export default function MyProfilePage() {
     setSendingVerification(true);
 
     try {
-      // Send verification email via Supabase
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: user.email || '',
-        options: {
-          emailRedirectTo: `${window.location.origin}/my-profile?verified=true`,
-        },
+      const response = await fetch('/api/send-verification-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
       });
+      const result = await response.json().catch(() => ({}));
 
-      if (error) throw error;
+      if (!response.ok) throw new Error(result.error || 'Failed to send');
 
+      setVerificationCodeSent(true);
       toast.success('Verification Email Sent!', {
-        description: 'Check your inbox and click the verification link',
+        description: 'Check your inbox for the 6-digit code',
       });
     } catch (error: any) {
       toast.error('Failed to send verification email', {
@@ -263,6 +262,34 @@ export default function MyProfilePage() {
       });
     } finally {
       setSendingVerification(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!user || verificationCode.trim().length !== 6) return;
+
+    setVerifyingCode(true);
+    try {
+      const response = await fetch('/api/verify-email-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, code: verificationCode.trim() }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) throw new Error(result.error || 'Verification failed');
+
+      setEmailVerified(true);
+      setVerificationCodeSent(false);
+      toast.success('Email Verified!', {
+        description: 'Your email address has been verified',
+      });
+    } catch (error: any) {
+      toast.error('Verification failed', {
+        description: error.message || 'Please try again',
+      });
+    } finally {
+      setVerifyingCode(false);
     }
   };
 
@@ -347,42 +374,19 @@ export default function MyProfilePage() {
   const handleDeleteClick = () => {
     setShowDeleteModal(true);
     setDeleteStep('confirm');
-    setGotHired(null);
-    setHiredByName('');
-    setHiredByProfileLink('');
   };
 
   const handleDeleteConfirm = () => {
-    setDeleteStep('hired');
-  };
-
-  const handleHiredResponse = (hired: boolean) => {
-    setGotHired(hired);
-    if (hired) {
-      setDeleteStep('hired-details');
-    } else {
-      // Not hired, proceed to delete
-      handleFinalDelete();
-    }
+    handleFinalDelete();
   };
 
   const handleFinalDelete = async () => {
     if (!user) return;
-    
+
     setDeleting(true);
     setDeleteStep('deleting');
-    
-    try {
-      // If user got hired, log the hiring info
-      if (gotHired && (hiredByName || hiredByProfileLink)) {
-        await supabase.from('hiring_feedback').insert({
-          user_id: user.id,
-          hired_by_name: hiredByName || null,
-          hired_by_profile_link: hiredByProfileLink || null,
-          created_at: new Date().toISOString()
-        });
-      }
 
+    try {
       // Delete user profile
       const { error: profileError } = await supabase
         .from('profiles')
@@ -412,9 +416,6 @@ export default function MyProfilePage() {
   const closeDeleteModal = () => {
     setShowDeleteModal(false);
     setDeleteStep('confirm');
-    setGotHired(null);
-    setHiredByName('');
-    setHiredByProfileLink('');
   };
 
   const applicationData = useMemo(
@@ -518,8 +519,8 @@ export default function MyProfilePage() {
               <div className="pointer-events-none absolute -left-24 top-8 h-56 w-56 rounded-full bg-[#d8ccc0]/50 blur-3xl" />
               <div className="pointer-events-none absolute right-[-4.5rem] top-[-3rem] h-56 w-56 rounded-full bg-[#d7dfd0]/55 blur-3xl" />
               <div className="pointer-events-none absolute bottom-[-5rem] left-1/3 h-44 w-44 rounded-full bg-[#efe4d8]/70 blur-3xl" />
-              <div className="grid gap-0 lg:grid-cols-[1.18fr_0.82fr]">
-                <section className="relative z-10 p-6 sm:p-8 lg:p-10">
+              <div className="grid gap-0 lg:grid-cols-[0.82fr_1.18fr]">
+                <section className="relative z-10 p-6 sm:p-8 lg:order-last lg:p-10">
                   <div className="flex flex-wrap items-center gap-3">
                     <Badge className="rounded-full bg-[#6d7662] px-4 py-1.5 text-white hover:bg-[#6d7662]">
                       My Profile
@@ -606,7 +607,7 @@ export default function MyProfilePage() {
                   </div>
                 </section>
 
-                <aside className="relative z-10 border-t border-[#e7ddd2] bg-white/80 p-6 sm:p-8 lg:border-l lg:border-t-0 lg:p-8">
+                <aside className="relative z-10 border-t border-[#e7ddd2] bg-white/80 p-6 sm:p-8 lg:order-first lg:border-r lg:border-t-0 lg:p-8">
                   <div className="flex flex-col gap-6">
                     <div className="rounded-[30px] border border-[#e5d9cd] bg-[#f5ede3] p-5 shadow-[0_20px_45px_rgba(76,70,60,0.08)]">
                       <Avatar className="h-[260px] w-full rounded-[24px] border border-white/70 bg-white shadow-sm sm:h-[320px] lg:h-[360px]">
@@ -698,14 +699,44 @@ export default function MyProfilePage() {
                               </p>
                             </div>
                           </div>
-                          <Button
-                            size="sm"
-                            onClick={handleSendVerificationEmail}
-                            disabled={sendingVerification}
-                            className="mt-4 w-full rounded-full bg-[#6d7662] text-white hover:bg-[#5f6756]"
-                          >
-                            {sendingVerification ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send Verification Email'}
-                          </Button>
+                          {verificationCodeSent ? (
+                            <div className="mt-4 space-y-2">
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={6}
+                                placeholder="6-digit code"
+                                value={verificationCode}
+                                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                                className="text-center tracking-[0.3em] font-semibold"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={handleVerifyCode}
+                                disabled={verifyingCode || verificationCode.length !== 6}
+                                className="w-full rounded-full bg-[#6d7662] text-white hover:bg-[#5f6756]"
+                              >
+                                {verifyingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify Code'}
+                              </Button>
+                              <button
+                                type="button"
+                                onClick={handleSendVerificationEmail}
+                                disabled={sendingVerification}
+                                className="w-full text-xs text-[#6d7662] hover:underline"
+                              >
+                                Resend code
+                              </button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={handleSendVerificationEmail}
+                              disabled={sendingVerification}
+                              className="mt-4 w-full rounded-full bg-[#6d7662] text-white hover:bg-[#5f6756]"
+                            >
+                              {sendingVerification ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send Verification Email'}
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -714,8 +745,8 @@ export default function MyProfilePage() {
               </div>
             </div>
 
-            <div className="grid gap-0 lg:grid-cols-[1.08fr_0.92fr]">
-              <section className="border-b border-[#e7ddd2] p-6 sm:p-8 lg:border-r lg:p-10">
+            <div className="grid gap-0 lg:grid-cols-[0.92fr_1.08fr]">
+              <section className="border-b border-[#e7ddd2] p-6 sm:p-8 lg:order-last lg:border-l lg:p-10">
                 <div className="flex items-center gap-3">
                   <Briefcase className="h-5 w-5 text-[#6d7662]" />
                   <div>
@@ -786,7 +817,7 @@ export default function MyProfilePage() {
                 </div>
               </section>
 
-              <section className="border-b border-[#e7ddd2] bg-[#fdfaf6] p-6 sm:p-8 lg:p-10">
+              <section className="border-b border-[#e7ddd2] bg-[#fdfaf6] p-6 sm:p-8 lg:order-first lg:p-10">
                 <div className="grid gap-8">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.34em] text-[#8d8478]">
@@ -945,8 +976,8 @@ export default function MyProfilePage() {
               </section>
             </div>
 
-            <div className="grid gap-0 lg:grid-cols-[1.08fr_0.58fr]">
-              <section id="profile-settings" className="p-6 sm:p-8 lg:border-r lg:border-[#e7ddd2] lg:p-10">
+            <div className="grid gap-0 lg:grid-cols-[0.58fr_1.08fr]">
+              <section id="profile-settings" className="p-6 sm:p-8 lg:order-last lg:border-l lg:border-[#e7ddd2] lg:p-10">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.34em] text-[#8d8478]">
                     Profile Settings
@@ -1022,7 +1053,7 @@ export default function MyProfilePage() {
                 </div>
               </section>
 
-              <aside className="border-t border-[#e7ddd2] bg-[#fffaf7] p-6 sm:p-8 lg:border-t-0 lg:p-10">
+              <aside className="border-t border-[#e7ddd2] bg-[#fffaf7] p-6 sm:p-8 lg:order-first lg:border-t-0 lg:p-10">
                 <p className="text-xs font-semibold uppercase tracking-[0.34em] text-[#b17a7a]">
                   Danger Zone
                 </p>
@@ -1078,76 +1109,6 @@ export default function MyProfilePage() {
                   className="bg-red-600 hover:bg-red-700"
                 >
                   Yes, Delete My Account
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {deleteStep === 'hired' && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Did you get hired?</DialogTitle>
-                <DialogDescription>
-                  Before you go, we'd love to know if you found success on our platform.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex gap-4 py-4">
-                <Button 
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => handleHiredResponse(true)}
-                >
-                  Yes, I got hired!
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => handleHiredResponse(false)}
-                >
-                  No
-                </Button>
-              </div>
-            </>
-          )}
-
-          {deleteStep === 'hired-details' && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Congratulations! 🎉</DialogTitle>
-                <DialogDescription>
-                  We're thrilled you found success! Please share who hired you so we can celebrate.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="hired-by-name">Name of person/company who hired you</Label>
-                  <Input
-                    id="hired-by-name"
-                    value={hiredByName}
-                    onChange={(e) => setHiredByName(e.target.value)}
-                    placeholder="Enter name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hired-by-link">Or link to their profile (optional)</Label>
-                  <Input
-                    id="hired-by-link"
-                    value={hiredByProfileLink}
-                    onChange={(e) => setHiredByProfileLink(e.target.value)}
-                    placeholder="https://..."
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteStep('hired')}>
-                  Back
-                </Button>
-                <Button 
-                  variant="destructive"
-                  onClick={handleFinalDelete}
-                  disabled={!hiredByName && !hiredByProfileLink}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Submit & Delete Account
                 </Button>
               </DialogFooter>
             </>

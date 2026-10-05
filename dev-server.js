@@ -10,7 +10,9 @@ const PORT = 3001;
 
 app.use(cors());
 app.use((req, res, next) => {
+  // Stripe webhooks and raw file uploads need the unparsed body
   if (req.path === '/api/upload-article-image') return next();
+  if (req.path === '/api/stripe-webhook') return next();
   express.json()(req, res, next);
 });
 
@@ -106,8 +108,8 @@ const approvalTemplate = (name, requiresPayment) => `
     <div style="max-width:640px; margin:0 auto; background:#ffffff; border:1px solid #e8dfd4; border-radius:24px; padding:40px;">
       <p style="text-transform:uppercase; letter-spacing:0.18em; font-size:12px; color:#8A8279; margin:0 0 20px;">Summerland Estates</p>
       <h1 style="font-size:32px; line-height:1.2; color:#1f1f1f; margin:0 0 16px;">Your account is approved</h1>
-      <p style="font-size:16px; line-height:1.7; color:#4b4b4b; margin:0 0 24px;">${name || 'Hello'}, your registration has been approved.${requiresPayment ? ' Please sign in to complete your membership payment and activate access.' : ' You can now sign in and access your account.'}</p>
-      <a href="${APP_URL}/login" style="display:inline-block; background:#A89F91; color:#ffffff; text-decoration:none; padding:14px 24px; border-radius:12px;">${requiresPayment ? 'Sign in to Complete Payment' : 'Sign in'}</a>
+      <p style="font-size:16px; line-height:1.7; color:#4b4b4b; margin:0 0 24px;">${name || 'Hello'}, your registration has been approved. You can now sign in and access your account.</p>
+      <a href="${APP_URL}/login" style="display:inline-block; background:#A89F91; color:#ffffff; text-decoration:none; padding:14px 24px; border-radius:12px;">Sign in</a>
     </div>
   </div>
 `;
@@ -551,6 +553,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
   try {
     const { priceAmount, email, metadata } = req.body;
 
+    const parsedAmount = parseFloat(String(priceAmount).replace(/[^0-9.]/g, ''));
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid checkout amount' });
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -561,7 +568,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
               name: metadata.planName || 'Premium Plan',
               description: `${metadata.selectedTier} - Summerland Estates`,
             },
-            unit_amount: Math.round(parseFloat(priceAmount) * 100),
+            unit_amount: Math.round(parsedAmount * 100),
           },
           quantity: 1,
         },
@@ -579,6 +586,80 @@ app.post('/api/create-checkout-session', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Stripe webhook — keeps profile tier/payment status in sync with Stripe events.
+// Requires STRIPE_WEBHOOK_SECRET in .env (Stripe Dashboard → Developers → Webhooks).
+// Register events: checkout.session.completed, customer.subscription.updated,
+// customer.subscription.deleted, invoice.payment_failed
+app.post(
+  '/api/stripe-webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error('STRIPE_WEBHOOK_SECRET not configured');
+      return res.status(500).json({ error: 'Webhook not configured' });
+    }
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        req.headers['stripe-signature'],
+        webhookSecret
+      );
+    } catch (err) {
+      console.error('Stripe webhook signature verification failed:', err.message);
+      return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    }
+
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object;
+          const email = session.customer_email || session.metadata?.email;
+          const tier = session.metadata?.selectedTier;
+          if (supabaseAdmin && email) {
+            const update = { payment_status: 'paid' };
+            if (tier) update.tier = tier;
+            const { error } = await supabaseAdmin
+              .from('profiles')
+              .update(update)
+              .eq('email', email);
+            if (error) console.error('Webhook profile update failed:', error);
+          }
+          break;
+        }
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object;
+          if (supabaseAdmin && subscription.metadata?.email) {
+            await supabaseAdmin
+              .from('profiles')
+              .update({ payment_status: 'cancelled' })
+              .eq('email', subscription.metadata.email);
+          }
+          break;
+        }
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object;
+          if (supabaseAdmin && invoice.customer_email) {
+            await supabaseAdmin
+              .from('profiles')
+              .update({ payment_status: 'failed' })
+              .eq('email', invoice.customer_email);
+          }
+          break;
+        }
+        default:
+          break;
+      }
+      res.json({ received: true });
+    } catch (err) {
+      console.error('Stripe webhook handler error:', err);
+      res.status(500).json({ error: 'Webhook handler failed' });
+    }
+  }
+);
 
 app.post(
   '/api/application-upload',
@@ -741,17 +822,25 @@ app.post('/api/admin-review-application', async (req, res) => {
       reviewed_by: reviewedBy || null,
     });
 
-    await sendEmail(
-      profile?.email || authUser.email,
-      action === 'approve'
-        ? 'Your Summerland Estates account has been approved'
-        : 'Update on your Summerland Estates registration',
-      action === 'approve'
-        ? approvalTemplate(profile?.full_name || existingUserMetadata.full_name, paymentStatus === 'pending')
-        : rejectionTemplate(profile?.full_name || existingUserMetadata.full_name, rejectionReason)
-    );
+    let emailSent = false;
+    let emailError = null;
+    try {
+      await sendEmail(
+        profile?.email || authUser.email,
+        action === 'approve'
+          ? 'Your Summerland Estates account has been approved'
+          : 'Update on your Summerland Estates registration',
+        action === 'approve'
+          ? approvalTemplate(profile?.full_name || existingUserMetadata.full_name, paymentStatus === 'pending')
+          : rejectionTemplate(profile?.full_name || existingUserMetadata.full_name, rejectionReason)
+      );
+      emailSent = true;
+    } catch (sendError) {
+      emailError = sendError.message || 'Email delivery failed';
+      console.error(`Review ${action} email failed for ${profile?.email || authUser.email}:`, sendError);
+    }
 
-    res.json({ success: true });
+    res.json({ success: true, emailSent, emailError });
   } catch (error) {
     console.error('Admin review error:', error);
     res.status(500).json({ error: error.message || 'Failed to review application' });
@@ -977,7 +1066,7 @@ app.post('/api/upload-article-image', async (req, res) => {
 });
 
 // ─── Google Places API Proxy (avoids CORS from frontend) ───────────────────
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || 'AIzaSyAtJTuqP_MisCAr5buaRgieC5rzed_DAew';
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || 'AIzaSyC-WnvF1ZW6s2TMnWQomlGvUbKgEc5MQgs';
 
 app.get('/api/places/autocomplete', async (req, res) => {
   try {
@@ -1084,6 +1173,215 @@ app.post('/api/send-registration-emails', async (req, res) => {
   }
 });
 
+// ─── Email Verification Code ──────────────────────────────────────────────
+const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
+
+const findProfileForVerification = async ({ userId, email }) => {
+  let query = supabaseAdmin
+    .from('profiles')
+    .select('id, email, full_name, application_data');
+  if (userId) {
+    query = query.eq('id', userId);
+  } else {
+    query = query.eq('email', String(email).trim().toLowerCase());
+  }
+  const { data, error } = await query.maybeSingle();
+
+  if (!error && data) {
+    return { data, error: null };
+  }
+
+  // Fallback: the profiles row may not exist yet (e.g. plain /signup flow).
+  // Resolve the auth user by email and create a minimal profile row.
+  if (email) {
+    try {
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      const authUser = usersData?.users?.find(
+        (u) => u.email?.toLowerCase() === String(email).trim().toLowerCase()
+      );
+      if (authUser) {
+        const { data: upserted } = await supabaseAdmin
+          .from('profiles')
+          .upsert(
+            {
+              id: authUser.id,
+              email: authUser.email,
+              full_name: authUser.user_metadata?.full_name || null,
+              application_data: {},
+            },
+            { onConflict: 'id' }
+          )
+          .select('id, email, full_name, application_data')
+          .single();
+        if (upserted) {
+          return { data: upserted, error: null };
+        }
+      }
+    } catch (lookupError) {
+      console.warn('Auth user lookup fallback failed:', lookupError.message);
+    }
+  }
+
+  return { data, error };
+};
+
+app.post('/api/send-verification-code', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Missing Supabase service role configuration' });
+  }
+
+  try {
+    const { userId, email } = req.body;
+    if (!userId && !email) {
+      return res.status(400).json({ error: 'userId or email is required' });
+    }
+
+    const { data: profile, error: profileError } = await findProfileForVerification({ userId, email });
+
+    if (profileError || !profile?.email) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = new Date(Date.now() + VERIFICATION_CODE_TTL_MS).toISOString();
+
+    await updateProfileApplicationData(profile.id, {
+      email_verification_code: code,
+      email_verification_expires: expiresAt,
+    });
+
+    await sendEmail(
+      profile.email,
+      'Verify Your Email - Summerland Estates',
+      `<div style="font-family:Georgia,serif;background:#f8f4ee;padding:32px;">
+        <div style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #e8dfd4;border-radius:24px;padding:40px;">
+          <p style="text-transform:uppercase;letter-spacing:0.18em;font-size:12px;color:#8A8279;margin:0 0 20px;">Summerland Estates</p>
+          <h1 style="font-size:26px;color:#1f1f1f;margin:0 0 16px;">Verify your email address</h1>
+          <p style="font-size:16px;line-height:1.7;color:#4b4b4b;margin:0 0 24px;">
+            ${profile.full_name || 'Hello'}, enter this code in your profile to verify your email address:
+          </p>
+          <div style="background:#f8f4ee;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+            <span style="font-size:36px;letter-spacing:0.35em;font-weight:700;color:#1f1f1f;">${code}</span>
+          </div>
+          <p style="font-size:13px;color:#8A8279;">This code expires in 15 minutes. If you didn't request it, you can ignore this email.</p>
+        </div>
+      </div>`
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Send verification code error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send verification email' });
+  }
+});
+
+app.post('/api/verify-email-code', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Missing Supabase service role configuration' });
+  }
+
+  try {
+    const { userId, email, code } = req.body;
+    if ((!userId && !email) || !code) {
+      return res.status(400).json({ error: 'userId or email, and code are required' });
+    }
+
+    const { data: profile, error: profileError } = await findProfileForVerification({ userId, email });
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const storedCode = profile.application_data?.email_verification_code;
+    const expires = profile.application_data?.email_verification_expires;
+
+    if (!storedCode || !expires || new Date(expires) < new Date()) {
+      return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+    }
+
+    if (String(code).trim() !== String(storedCode)) {
+      return res.status(400).json({ error: 'Incorrect verification code' });
+    }
+
+    await supabaseAdmin
+      .from('profiles')
+      .update({ email_verified: true })
+      .eq('id', profile.id);
+
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(profile.id, { email_confirm: true });
+    } catch (confirmError) {
+      console.warn('Could not confirm auth email:', confirmError.message);
+    }
+
+    await updateProfileApplicationData(profile.id, {
+      email_verification_code: null,
+      email_verification_expires: null,
+      email_verified_at: new Date().toISOString(),
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Verify email code error:', error);
+    res.status(500).json({ error: error.message || 'Failed to verify email' });
+  }
+});
+
+// ─── Sync Application Profile ─────────────────────────────────────────────
+// Called right after supabase.auth.signUp() during membership application.
+// The client often has no session yet (email confirmation pending), so RLS
+// silently blocks the client-side profiles write — do it with the service key.
+app.post('/api/sync-application-profile', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Supabase admin client not configured' });
+  }
+
+  try {
+    const {
+      userId,
+      email,
+      fullName,
+      role,
+      phone,
+      location,
+      profileType,
+      tier,
+      applicationData,
+      subscriptionStatus,
+      subscriptionExpiresAt,
+    } = req.body || {};
+
+    if (!userId || !email) {
+      return res.status(400).json({ error: 'userId and email are required' });
+    }
+
+    const payload = {
+      id: userId,
+      email,
+      full_name: fullName || null,
+      role: role || null,
+      phone: phone || null,
+      location: location || null,
+      profile_type: profileType || null,
+      tier: tier || null,
+      application_data: applicationData || {},
+    };
+    if (subscriptionStatus) payload.subscription_status = subscriptionStatus;
+    if (subscriptionExpiresAt) payload.subscription_expires_at = subscriptionExpiresAt;
+
+    const { error } = await supabaseAdmin
+      .from('profiles')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Sync application profile error:', error);
+    res.status(500).json({ error: error.message || 'Failed to sync profile' });
+  }
+});
+
 // ─── Newsletter Signup ────────────────────────────────────────────────────
 app.post('/api/newsletter-signup', async (req, res) => {
   try {
@@ -1140,7 +1438,7 @@ app.post('/api/track-profile-view', async (req, res) => {
     // Get profile owner details
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('email, full_name, user_metadata')
+      .select('email, full_name, tier, notification_preferences')
       .eq('id', profileId)
       .maybeSingle();
 
@@ -1149,8 +1447,8 @@ app.post('/api/track-profile-view', async (req, res) => {
     }
 
     const ownerEmail = profile.email;
-    const ownerName = profile.full_name || profile.user_metadata?.full_name || 'Member';
-    const ownerTier = profile.user_metadata?.tier || profile.tier || 'professional-basic';
+    const ownerName = profile.full_name || 'Member';
+    const ownerTier = profile.tier || 'professional-basic';
     const tierLimits = getTierLimitsForProfile(ownerTier);
 
     // Check if this viewer has already been counted in last 24 hours
@@ -1583,6 +1881,42 @@ app.post('/api/notify-admin-recognition', async (req, res) => {
   }
 });
 
+// Nominee approval request — the featured employee must approve before publishing
+app.post('/api/notify-recognition-nominee', async (req, res) => {
+  try {
+    const { nomineeEmail, nomineeName, submitterName, category } = req.body;
+
+    if (!nomineeEmail || !nomineeName) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const categoryLabel = String(category || 'recognition').replace(/_/g, ' ');
+    await sendEmail(
+      nomineeEmail,
+      'You have been nominated on Summerland Estates',
+      `
+      <div style="font-family: Georgia, serif; max-width: 520px; margin: 0 auto; background:#FBF8F4; padding: 32px; border-radius: 16px;">
+        <p style="letter-spacing: 3px; color:#8A8279; font-size: 12px; margin:0 0 16px;">SUMMERLAND ESTATES</p>
+        <h1 style="font-size: 28px; color:#23231f; margin:0 0 16px;">You've been nominated</h1>
+        <p style="font-size:16px; line-height:1.7; color:#4b4b4b; margin:0 0 16px;">
+          ${nomineeName}, ${submitterName || 'a Summerland Estates member'} has nominated you for
+          <strong>${categoryLabel}</strong>. Before this recognition can be featured on the site,
+          we need your sign-off.
+        </p>
+        <p style="font-size:16px; line-height:1.7; color:#4b4b4b; margin:0 0 24px;">
+          Sign in to your dashboard and open the Recognition section to approve or decline this feature.
+        </p>
+        <a href="${APP_URL}/login" style="display:inline-block; background:#A89F91; color:#ffffff; text-decoration:none; padding:14px 24px; border-radius:12px;">Sign in to review</a>
+      </div>`
+    );
+
+    res.json({ success: true, message: 'Nominee notified' });
+  } catch (error) {
+    console.error('Nominee notification error:', error);
+    res.status(500).json({ error: error.message || 'Failed to notify nominee' });
+  }
+});
+
 // Admin Status Update Notification
 app.post('/api/notify-status-update', async (req, res) => {
   try {
@@ -1605,6 +1939,121 @@ app.post('/api/notify-status-update', async (req, res) => {
   }
 });
 
+// Sends SMS via Twilio when TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and
+// TWILIO_PHONE_NUMBER are configured. Returns false when not configured.
+const sendSms = async (to, message) => {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+  if (!sid || !token || !from) return false;
+
+  try {
+    const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ To: to, From: from, Body: message }),
+    });
+    if (!response.ok) {
+      console.error('Twilio SMS failed:', await response.text());
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Twilio SMS error:', error.message);
+    return false;
+  }
+};
+
+// ─── Notification delivery (shared by /api/send-notification and
+//     /api/notify-job-matches) — direct function call, works on serverless
+//     where a self-HTTP call to localhost would fail. ────────────────────────
+const deliverNotification = async ({ userId, type, title, body, link }) => {
+  // Fetch user profile
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email, phone, tier, notification_preferences')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (profileError) throw profileError;
+  if (!profile) return { sent: false, reason: 'user-not-found' };
+
+  const tierLimits = getTierLimitsForProfile(profile.tier);
+
+  const defaultPreferences = {
+    newJobPostings: { email: false, sms: false },
+    newServiceRequests: { email: false, sms: false },
+    newEvents: { email: false, sms: false },
+    messageReceived: { email: true, sms: false },
+    profileViewed: { email: false, sms: false },
+    forumTopics: { email: false, sms: false }
+  };
+
+  const preferences = {
+    ...defaultPreferences,
+    ...(profile.notification_preferences || {})
+  };
+
+  const typeMap = {
+    'new-job': 'newJobPostings',
+    'new-service-request': 'newServiceRequests',
+    'new-event': 'newEvents',
+    'message': 'messageReceived',
+    'profile-view': 'profileViewed',
+    'forum-update': 'forumTopics'
+  };
+
+  const category = typeMap[type] || 'messageReceived';
+  const canNotify = !!tierLimits?.canReceiveNotifications;
+  const shouldEmail = canNotify && preferences[category]?.email;
+  const shouldSms = canNotify && preferences[category]?.sms && !!profile.phone;
+
+  // Store in-app notification
+  const { data: notification, error: insertError } = await supabaseAdmin
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      type,
+      title,
+      message: body,
+      link,
+      is_read: false,
+      email_sent: false,
+      sms_sent: false
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error('Failed to insert notification:', insertError);
+  }
+
+  // Send email
+  if (shouldEmail && profile.email) {
+    const html = notificationEmailTemplate(title, body, link);
+    await sendEmail(profile.email, title, html);
+    if (notification) {
+      await supabaseAdmin.from('notifications').update({ email_sent: true }).eq('id', notification.id);
+    }
+  }
+
+  // SMS via Twilio when configured
+  if (shouldSms && profile.phone) {
+    const smsSent = await sendSms(profile.phone, `${title}: ${body}`);
+    if (!smsSent) {
+      console.log('SMS not sent (Twilio not configured) to', profile.phone);
+    }
+    if (notification && smsSent) {
+      await supabaseAdmin.from('notifications').update({ sms_sent: true }).eq('id', notification.id);
+    }
+  }
+
+  return { sent: !!(shouldEmail || shouldSms) || !!notification };
+};
+
 // ─── Generic User Notification Endpoint ────────────────────────────────────
 // Sends email/SMS notifications to paid users based on their preferences
 app.post('/api/send-notification', async (req, res) => {
@@ -1619,84 +2068,11 @@ app.post('/api/send-notification', async (req, res) => {
       return res.status(503).json({ error: 'Supabase admin client not configured' });
     }
 
-    // Fetch user profile
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, email, phone, tier, notification_preferences')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (profileError) throw profileError;
-    if (!profile) return res.status(404).json({ error: 'User not found' });
-
-    const tierLimits = getTierLimitsForProfile(profile.tier);
-    if (!tierLimits?.canReceiveNotifications) {
-      return res.json({ success: true, sent: false, reason: 'User tier does not include notifications' });
+    const result = await deliverNotification({ userId, type, title, body, link });
+    if (result.reason === 'user-not-found') {
+      return res.status(404).json({ error: 'User not found' });
     }
-
-    const defaultPreferences = {
-      newJobPostings: { email: false, sms: false },
-      newServiceRequests: { email: false, sms: false },
-      newEvents: { email: false, sms: false },
-      messageReceived: { email: true, sms: false },
-      profileViewed: { email: false, sms: false },
-      forumTopics: { email: false, sms: false }
-    };
-
-    const preferences = {
-      ...defaultPreferences,
-      ...(profile.notification_preferences || {})
-    };
-
-    const typeMap = {
-      'new-job': 'newJobPostings',
-      'message': 'messageReceived',
-      'profile-view': 'profileViewed',
-      'forum-update': 'forumTopics'
-    };
-
-    const category = typeMap[type] || 'messageReceived';
-    const shouldEmail = preferences[category]?.email;
-    const shouldSms = preferences[category]?.sms && !!profile.phone;
-
-    // Store in-app notification
-    const { data: notification, error: insertError } = await supabaseAdmin
-      .from('notifications')
-      .insert({
-        user_id: userId,
-        type,
-        title,
-        message: body,
-        link,
-        is_read: false,
-        email_sent: false,
-        sms_sent: false
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Failed to insert notification:', insertError);
-    }
-
-    // Send email
-    if (shouldEmail && profile.email) {
-      const html = notificationEmailTemplate(title, body, link);
-      await sendEmail(profile.email, title, html);
-      if (notification) {
-        await supabaseAdmin.from('notifications').update({ email_sent: true }).eq('id', notification.id);
-      }
-    }
-
-    // SMS is logged only unless Twilio is configured
-    if (shouldSms && profile.phone) {
-      console.log('SMS notification would be sent to', profile.phone, ':', `${title}: ${body}`);
-      if (notification) {
-        await supabaseAdmin.from('notifications').update({ sms_sent: true }).eq('id', notification.id);
-      }
-    }
-
-    res.json({ success: true, sent: shouldEmail || shouldSms });
+    res.json({ success: true, sent: result.sent });
   } catch (error) {
     console.error('Send notification error:', error);
     res.status(500).json({ error: error.message || 'Failed to send notification' });
@@ -1706,13 +2082,20 @@ app.post('/api/send-notification', async (req, res) => {
 function getTierLimitsForProfile(tier) {
   const tiers = {
     'professional-basic': { canReceiveNotifications: false },
+    'professional-free': { canReceiveNotifications: false },
     'professional-pro': { canReceiveNotifications: true },
     'business-free': { canReceiveNotifications: false },
     'business-pro': { canReceiveNotifications: true },
     'business-enterprise': { canReceiveNotifications: true },
+    'business-multi': { canReceiveNotifications: true },
+    'agency-free': { canReceiveNotifications: false },
     'agency-basic': { canReceiveNotifications: true },
     'agency-hiring': { canReceiveNotifications: true },
-    'agency-pro': { canReceiveNotifications: true }
+    'agency-pro': { canReceiveNotifications: true },
+    'estates-free': { canReceiveNotifications: false },
+    'estates-basic': { canReceiveNotifications: true },
+    'estates-hiring': { canReceiveNotifications: true },
+    'estates-pro': { canReceiveNotifications: true }
   };
   return tiers[tier] || { canReceiveNotifications: false };
 }
@@ -1733,12 +2116,55 @@ function notificationEmailTemplate(title, body, link) {
 
 // ─── Notify Matching Users of New Job ─────────────────────────────────────
 // Finds paid users whose profile matches the job and sends notifications
+// ─── Radius-based geocoding helpers ────────────────────────────────────────
+const geocodeCache = new Map();
+
+const geocodeLocation = async (address) => {
+  if (!address) return null;
+  const key = address.trim().toLowerCase();
+  if (geocodeCache.has(key)) return geocodeCache.get(key);
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_PLACES_API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    const loc = data?.results?.[0]?.geometry?.location || null;
+    geocodeCache.set(key, loc);
+    return loc;
+  } catch {
+    geocodeCache.set(key, null);
+    return null;
+  }
+};
+
+const haversineMiles = (a, b) => {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 3958.8;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
 app.post('/api/notify-job-matches', async (req, res) => {
   try {
-    const { jobId, jobTitle, jobDescription, jobCategory, location } = req.body;
+    const {
+      jobId,
+      serviceId,
+      itemType = 'job',
+      jobTitle,
+      jobDescription,
+      jobCategory,
+      location,
+      radiusMiles = 50,
+    } = req.body;
 
-    if (!jobId || !jobTitle) {
-      return res.status(400).json({ error: 'Missing required fields: jobId, jobTitle' });
+    const itemId = jobId || serviceId;
+
+    if (!itemId || !jobTitle) {
+      return res.status(400).json({ error: 'Missing required fields: jobId/serviceId, jobTitle' });
     }
 
     if (!supabaseAdmin) {
@@ -1751,34 +2177,62 @@ app.post('/api/notify-job-matches', async (req, res) => {
     const { data: profiles, error } = await supabaseAdmin
       .from('profiles')
       .select('id, email, phone, location, bio, role, tier, notification_preferences')
-      .neq('id', req.body.userId || '')
-      .in('tier', ['professional-pro', 'business-pro', 'business-enterprise', 'agency-basic', 'agency-hiring', 'agency-pro']);
+      .neq('id', req.body.userId || '');
 
     if (error) throw error;
+
+    // Geocode the posted location once; profile locations are geocoded lazily.
+    const jobCoords = location ? await geocodeLocation(location) : null;
 
     const sent = [];
     for (const p of (profiles || [])) {
       const resumeText = `${p.bio || ''} ${p.role || ''} ${p.location || ''}`.toLowerCase();
-      const matches = jobKeywords.some(k => resumeText.includes(k)) ||
-                      (p.location && location && location.toLowerCase().includes(p.location.toLowerCase()));
+      const keywordMatch = jobKeywords.some(k => resumeText.includes(k)) ||
+        (p.location && location && location.toLowerCase().includes(p.location.toLowerCase()));
+
+      // Radius check: if the job location geocoded, only notify profiles
+      // within the radius (or whose location text matches directly).
+      let withinRadius = false;
+      if (jobCoords && p.location) {
+        if (location && p.location.toLowerCase().includes(location.toLowerCase().split(',')[0])) {
+          withinRadius = true;
+        } else {
+          const profileCoords = await geocodeLocation(p.location);
+          if (profileCoords && haversineMiles(jobCoords, profileCoords) <= radiusMiles) {
+            withinRadius = true;
+          }
+        }
+      } else if (!jobCoords) {
+        // Geocoding unavailable — fall back to keyword/text matching only
+        withinRadius = false;
+      }
+
+      // Notify every user within the radius. When geocoding is unavailable
+      // (no Google Maps key), fall back to keyword/location text matching.
+      const matches = jobCoords ? (withinRadius || keywordMatch) : keywordMatch;
 
       if (matches) {
-        const notifResult = await fetch(`http://localhost:${PORT}/api/send-notification`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const isService = itemType === 'service';
+        try {
+          const result = await deliverNotification({
             userId: p.id,
-            type: 'new-job',
-            title: `New job matches your resume: ${jobTitle}`,
-            body: `A new ${jobTitle} position in ${location || 'your area'} looks like a great fit for your profile.`,
-            link: `${APP_URL}/job/${jobId}`
-          })
-        });
-        if (notifResult.ok) sent.push(p.id);
+            type: isService ? 'new-service-request' : 'new-job',
+            title: isService
+              ? `New service request near you: ${jobTitle}`
+              : `New job matches your resume: ${jobTitle}`,
+            body: isService
+              ? `A new service request (${jobTitle}) in ${location || 'your area'} was posted${jobCoords ? ` within ${radiusMiles} miles of you` : ''}.`
+              : `A new ${jobTitle} position in ${location || 'your area'} looks like a great fit for your profile.`,
+            link: `${APP_URL}/${isService ? 'service-request' : 'job'}/${itemId}`
+          });
+          if (result.sent) sent.push(p.id);
+        } catch (notifErr) {
+          console.error(`Notification to ${p.id} failed:`, notifErr.message);
+        }
       }
     }
 
-    res.json({ success: true, matchedUsers: sent.length, sentTo: sent });
+    res.json({ success: true, matchedUsers: sent.length, sentTo: sent, radiusMiles, geocoded: !!jobCoords });
   } catch (error) {
     console.error('Notify job matches error:', error);
     res.status(500).json({ error: error.message || 'Failed to notify matches' });
@@ -1817,6 +2271,11 @@ function buildSitemapUrlNode(loc, lastmod, changefreq, priority) {
 
 async function generateSitemapXml() {
   let profileUrls = [];
+  let contentPageUrls = [];
+  let jobUrls = [];
+  let eventUrls = [];
+  let serviceRequestUrls = [];
+  let articleUrls = [];
 
   if (supabaseReadClient) {
     const { data, error } = await supabaseReadClient
@@ -1836,12 +2295,95 @@ async function generateSitemapXml() {
         priority: '0.6',
       }));
     }
+
+    const { data: contentPages, error: contentError } = await supabaseReadClient
+      .from('site_content_pages')
+      .select('slug, updated_at')
+      .eq('is_published', true);
+
+    if (contentError) {
+      if (contentError.code !== '42P01') {
+        console.error('Could not fetch content pages for sitemap:', contentError.message);
+      }
+    } else if (contentPages?.length) {
+      contentPageUrls = contentPages
+        .filter((page) => page.slug && page.slug !== 'privacy' && page.slug !== 'terms')
+        .map((page) => ({
+          path: `/pages/${page.slug}`,
+          lastmod: page.updated_at,
+          changefreq: 'monthly',
+          priority: '0.5',
+        }));
+    }
+
+    const dynamicSources = [
+      {
+        table: 'job_postings',
+        select: 'id, updated_at',
+        filter: (q) => q.eq('status', 'active'),
+        toUrl: (row) => `/job/${row.id}`,
+        changefreq: 'daily',
+        priority: '0.7',
+      },
+      {
+        table: 'events',
+        select: 'id, updated_at',
+        filter: (q) => q.in('status', ['approved', 'published']),
+        toUrl: (row) => `/event/${row.id}`,
+        changefreq: 'weekly',
+        priority: '0.6',
+      },
+      {
+        table: 'service_requests',
+        select: 'id, created_at',
+        filter: (q) => q.eq('status', 'open'),
+        toUrl: (row) => `/service-request/${row.id}`,
+        changefreq: 'daily',
+        priority: '0.6',
+      },
+      {
+        table: 'articles',
+        select: 'slug, updated_at',
+        filter: (q) => q.eq('status', 'published'),
+        toUrl: (row) => `/articles/${row.slug || row.id}`,
+        changefreq: 'weekly',
+        priority: '0.6',
+      },
+    ];
+
+    const collected = { job_postings: [], events: [], service_requests: [], articles: [] };
+    for (const source of dynamicSources) {
+      const { data: rows, error: sourceError } = await source.filter(
+        supabaseReadClient.from(source.table).select(source.select)
+      );
+      if (sourceError) {
+        if (sourceError.code !== '42P01') {
+          console.error(`Could not fetch ${source.table} for sitemap:`, sourceError.message);
+        }
+        continue;
+      }
+      collected[source.table] = (rows || []).map((row) => ({
+        path: source.toUrl(row),
+        lastmod: row.updated_at || row.created_at,
+        changefreq: source.changefreq,
+        priority: source.priority,
+      }));
+    }
+    jobUrls = collected.job_postings;
+    eventUrls = collected.events;
+    serviceRequestUrls = collected.service_requests;
+    articleUrls = collected.articles;
   }
 
   const today = formatSitemapDate();
   const allUrls = [
     ...sitemapStaticRoutes.map((route) => ({ ...route, lastmod: today })),
     ...profileUrls,
+    ...jobUrls,
+    ...eventUrls,
+    ...serviceRequestUrls,
+    ...articleUrls,
+    ...contentPageUrls,
   ];
 
   const urlNodes = allUrls.map((route) =>

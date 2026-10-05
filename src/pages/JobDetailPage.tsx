@@ -13,6 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { getTierLimits } from '@/utils/tierAccess';
 import { sendBackendNotification } from '@/utils/notifications';
+import ReportButton from '@/components/ReportButton';
+import MapLocationLink from '../components/MapLocationLink';
 import { 
   ArrowLeft,
   Briefcase, 
@@ -51,7 +53,6 @@ interface JobPosting {
   qualifications: string | null;
   personality_fit: string | null;
   drivers_license_required: boolean;
-  background_check_required: boolean;
   references_required: boolean;
   drug_test_required: boolean;
   benefits: string[];
@@ -287,10 +288,10 @@ export default function JobDetailPage() {
                       {job.job_title}
                     </h1>
                     <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
-                      <span className="flex items-center">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        {job.location}
-                      </span>
+                      <MapLocationLink
+                        location={job.location}
+                        iconClassName="w-4 h-4 mr-1"
+                      />
                       <span className="flex items-center">
                         <DollarSign className="w-4 h-4 mr-1" />
                         {job.salary_range}
@@ -312,9 +313,19 @@ export default function JobDetailPage() {
                 </div>
 
                 {/* Posted Date */}
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Posted on {formatDate(job.created_at)}
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Posted on {formatDate(job.created_at)}
+                  </span>
+                  <ReportButton
+                    targetType="job"
+                    targetId={job.id}
+                    targetLabel={job.job_title}
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive"
+                  />
                 </div>
               </Card>
 
@@ -441,12 +452,7 @@ export default function JobDetailPage() {
                         {job.drivers_license_required ? 'Required' : 'Not Required'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-muted-foreground">Background Check</span>
-                      <span className={`font-medium ${job.background_check_required ? 'text-orange-600' : 'text-green-600'}`}>
-                        {job.background_check_required ? 'Required' : 'Not Required'}
-                      </span>
-                    </div>
+
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <span className="text-muted-foreground">References</span>
                       <span className={`font-medium ${job.references_required ? 'text-orange-600' : 'text-green-600'}`}>

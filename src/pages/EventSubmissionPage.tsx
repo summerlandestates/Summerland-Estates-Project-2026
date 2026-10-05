@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const eventTypes = [
   { value: 'networking', label: 'Networking Event', icon: Users },
@@ -531,12 +532,11 @@ export default function EventSubmissionPage() {
                   ) : (
                     <div className="space-y-2">
                       <Label htmlFor="location">Venue/Location *</Label>
-                      <Input
-                        id="location"
-                        value={formData.location}
-                        onChange={(e) => handleInputChange('location', e.target.value)}
-                        placeholder="e.g., Beverly Hills Hotel, 9641 Sunset Blvd, Beverly Hills, CA"
-                        className={formErrors.location ? 'border-red-500' : ''}
+                      <LocationAutocomplete
+                        placeholder="Venue or address (Google Maps)"
+                        defaultValue={formData.location === 'Online' ? '' : formData.location}
+                        onLocationSelect={(loc) => handleInputChange('location', loc.formattedAddress || [loc.city, loc.state].filter(Boolean).join(', '))}
+                        onTextChange={(text) => handleInputChange('location', text)}
                       />
                       {formErrors.location && (
                         <p className="text-sm text-red-500 flex items-center gap-1">

@@ -3,7 +3,8 @@ import BlurredProfileCard from './BlurredProfileCard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, MapPin, Star, BadgeCheck, Shield, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Star, BadgeCheck, Users } from 'lucide-react';
+import MapLocationLink from './MapLocationLink';
 import { shouldBlurProfile, canAccessProfile } from '@/utils/profileVisibility';
 import type { Listing, PricingTier } from '../types';
 
@@ -99,15 +100,13 @@ export default function DirectoryGrid({
                       {listing.verified && (
                         <BadgeCheck className="w-4 h-4 text-[#A89F91]" />
                       )}
-                      {listing.backgroundCheckAvailable && (
-                        <Shield className="w-4 h-4 text-green-600" />
-                      )}
                     </div>
                     <p className="text-sm text-muted-foreground mb-1">{listing.role}</p>
-                    <div className="flex items-center text-xs text-muted-foreground mb-2">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      {listing.location}
-                    </div>
+                    <MapLocationLink
+                      location={listing.location}
+                      className="text-xs text-muted-foreground mb-2"
+                      iconClassName="w-3 h-3 mr-1"
+                    />
                     <div className="flex items-center gap-2 mb-3">
                       <div className="flex items-center">
                         <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 mr-1" />
@@ -138,10 +137,11 @@ export default function DirectoryGrid({
                       {listing.verified && <BadgeCheck className="w-4 h-4 text-[#A89F91] flex-shrink-0" />}
                     </div>
                     <p className="text-sm text-muted-foreground">{listing.role}</p>
-                    <div className="flex items-center text-xs text-muted-foreground mt-1">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      {listing.location}
-                    </div>
+                    <MapLocationLink
+                      location={listing.location}
+                      className="text-xs text-muted-foreground mt-1"
+                      iconClassName="w-3 h-3 mr-1"
+                    />
                   </div>
                 </div>
               )}

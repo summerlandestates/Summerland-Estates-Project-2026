@@ -12,17 +12,6 @@ export interface AddOnFeature {
 }
 
 export const addOnFeatures: AddOnFeature[] = [
-  // Background Check
-  {
-    id: 'background-check',
-    name: 'Background Check',
-    description: 'Get a verified background check badge on your profile that says "Background Check Available"',
-    price: '$29',
-    priceType: 'one-time',
-    availableFor: ['professional', 'business', 'agency', 'estates'],
-    badge: 'Background Check Available'
-  },
-  
   // Verification
   {
     id: 'verification',
@@ -37,7 +26,7 @@ export const addOnFeatures: AddOnFeature[] = [
     id: 'verification-business',
     name: 'Verification',
     description: 'Get a verified checkmark next to your name on your profile',
-    price: '$4.99',
+    price: '$2.99',
     priceType: 'one-time',
     availableFor: ['business', 'agency', 'estates'],
     badge: 'Verified'
@@ -226,14 +215,6 @@ export const addOnFeatures: AddOnFeature[] = [
     priceType: 'monthly',
     availableFor: ['business']
   },
-  {
-    id: 'license-verification',
-    name: 'Background/License Verification',
-    description: 'Get your business license and credentials verified',
-    price: '$9.99',
-    priceType: 'one-time',
-    availableFor: ['business']
-  }
 ];
 
 // Get add-ons available for a specific user type

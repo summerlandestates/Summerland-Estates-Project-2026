@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import AdminSidebar from '@/components/AdminSidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -247,24 +246,18 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/admin/login');
-  };
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#A89F91]" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar onLogout={handleLogout} />
-
-      <main className="flex-1 p-8">
+    <div>
+      <main>
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
@@ -356,7 +349,7 @@ export default function AdminUsersPage() {
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="professional">Professional</SelectItem>
                     <SelectItem value="business">Service Provider</SelectItem>
-                    <SelectItem value="agency">Agency Owner</SelectItem>
+                    <SelectItem value="agency">Agency</SelectItem>
                     <SelectItem value="estates">Estates</SelectItem>
                   </SelectContent>
                 </Select>

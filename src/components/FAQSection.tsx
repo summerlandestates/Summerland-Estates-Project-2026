@@ -57,10 +57,12 @@ export default function FAQSection({
 
   const loadFAQs = () => {
     setLoading(true);
-    const allFAQs = contentManager.getFAQs(category);
-    const filteredFAQs = maxItems ? allFAQs.slice(0, maxItems) : allFAQs;
-    setFaqs(filteredFAQs);
-    setLoading(false);
+    contentManager.init().then(() => {
+      const allFAQs = contentManager.getFAQs(category);
+      const filteredFAQs = maxItems ? allFAQs.slice(0, maxItems) : allFAQs;
+      setFaqs(filteredFAQs);
+      setLoading(false);
+    });
   };
 
   if (loading) {

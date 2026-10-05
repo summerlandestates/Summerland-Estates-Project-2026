@@ -5,6 +5,7 @@ import NavBar from '@/components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import FAQSection from '../components/FAQSection';
+import MapLocationLink from '../components/MapLocationLink';
 import { getTierLimits } from '@/utils/tierAccess';
 import type { PricingTier } from '../types';
 import { Button } from '@/components/ui/button';
@@ -246,10 +247,7 @@ export default function OpenRolesPage() {
                                     {job.job_title}
                                   </h3>
                                   <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-3">
-                                    <span className="flex items-center">
-                                      <MapPin className="w-4 h-4 mr-1" />
-                                      {job.location}
-                                    </span>
+                                    <MapLocationLink location={job.location} iconClassName="w-4 h-4 mr-1" />
                                     <span className="flex items-center">
                                       <DollarSign className="w-4 h-4 mr-1" />
                                       {job.salary_range}
@@ -340,10 +338,7 @@ export default function OpenRolesPage() {
                                     {service.service_needed}
                                   </h3>
                                   <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-3">
-                                    <span className="flex items-center">
-                                      <MapPin className="w-4 h-4 mr-1" />
-                                      {service.location}
-                                    </span>
+                                    <MapLocationLink location={service.location} iconClassName="w-4 h-4 mr-1" />
                                     {service.date_needed && (
                                       <span className="flex items-center">
                                         <Clock className="w-4 h-4 mr-1" />

@@ -12,7 +12,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, DollarSign, Clock, Loader2, Briefcase, Users } from 'lucide-react';
+import { DollarSign, Clock, Loader2, Briefcase, Users } from 'lucide-react';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import { getTierLimits } from '@/utils/tierAccess';
+import type { PricingTier } from '../types';
 
 interface JobFormData {
   jobTitle: string;
@@ -36,7 +39,6 @@ interface JobFormData {
   qualifications: string;
   personalityFit: string;
   driversLicenseRequired: boolean;
-  backgroundCheckRequired: boolean;
   referencesRequired: boolean;
   drugTestRequired: boolean;
   benefits: string[];
@@ -78,7 +80,6 @@ export default function JobPostingPage() {
     qualifications: '',
     personalityFit: '',
     driversLicenseRequired: false,
-    backgroundCheckRequired: false,
     referencesRequired: false,
     drugTestRequired: false,
     benefits: [],
@@ -110,12 +111,46 @@ export default function JobPostingPage() {
     setSubmitting(true);
 
     try {
-      const { error } = await supabase.from('job_postings').insert({
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
+      if (!limits.canPostRoles) {
+        toast.error('Posting placements is not available on your current plan', {
+          description: 'Upgrade to post open roles.',
+        });
+        setSubmitting(false);
+        navigate('/upgrade');
+        return;
+      }
+      if (limits.rolePostLimit) {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const { count } = await supabase
+          .from('job_postings')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .gte('created_at', startOfMonth.toISOString());
+        if ((count || 0) >= limits.rolePostLimit) {
+          toast.error(`You have reached your limit of ${limits.rolePostLimit} job posting${limits.rolePostLimit === 1 ? '' : 's'} this month.`, {
+            description: 'Upgrade for unlimited job posting.',
+          });
+          setSubmitting(false);
+          navigate('/upgrade');
+          return;
+        }
+      }
+
+      const { data: insertedJob, error } = await supabase.from('job_postings').insert({
         user_id: user.id,
         job_title: jobForm.jobTitle,
         job_description: jobForm.jobDescription,
-        location: jobForm.location,
-        salary_range: jobForm.salaryRange,
+        location: jobForm.location || (jobForm.employmentTypes.includes('remote') ? 'Remote' : null),
+        salary_range: jobForm.salaryRange || null,
         employment_types: jobForm.employmentTypes,
         days_required: jobForm.daysRequired,
         hours_per_week: jobForm.hoursPerWeek ? parseInt(jobForm.hoursPerWeek) : null,
@@ -132,7 +167,6 @@ export default function JobPostingPage() {
         qualifications: jobForm.qualifications || null,
         personality_fit: jobForm.personalityFit || null,
         drivers_license_required: jobForm.driversLicenseRequired,
-        background_check_required: jobForm.backgroundCheckRequired,
         references_required: jobForm.referencesRequired,
         drug_test_required: jobForm.drugTestRequired,
         benefits: jobForm.benefits,
@@ -145,7 +179,7 @@ export default function JobPostingPage() {
         travel_required: jobForm.travelRequired,
         relocation_assistance: jobForm.relocationAssistance,
         status: 'active',
-      });
+      }).select('id').single();
 
       if (error) throw error;
 
@@ -156,6 +190,8 @@ export default function JobPostingPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
+            jobId: insertedJob?.id,
+            itemType: 'job',
             jobTitle: jobForm.jobTitle,
             jobDescription: jobForm.jobDescription,
             jobCategory: jobForm.jobCategory,
@@ -263,28 +299,44 @@ export default function JobPostingPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="jobLocation" className="text-foreground">Location *</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="jobLocation"
-                        placeholder="City, State"
-                        required
-                        value={jobForm.location}
-                        onChange={(e) => setJobForm(prev => ({ ...prev, location: e.target.value }))}
-                        className="pl-10 bg-background text-foreground border-border"
+                    <Label htmlFor="jobLocation" className="text-foreground">Location</Label>
+                    <LocationAutocomplete
+                      placeholder="City, State or ZIP (Google Maps)"
+                      defaultValue={jobForm.location}
+                      onLocationSelect={(loc) =>
+                        setJobForm(prev => ({
+                          ...prev,
+                          location: [loc.city, loc.state].filter(Boolean).join(', ') || loc.formattedAddress,
+                        }))
+                      }
+                      onTextChange={(text) => setJobForm(prev => ({ ...prev, location: text }))}
+                    />
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="remotePosition"
+                        checked={jobForm.employmentTypes.includes('remote')}
+                        onCheckedChange={(checked) => {
+                          setJobForm(prev => ({
+                            ...prev,
+                            employmentTypes: checked
+                              ? [...prev.employmentTypes.filter(t => t !== 'remote'), 'remote']
+                              : prev.employmentTypes.filter(t => t !== 'remote')
+                          }));
+                        }}
                       />
+                      <Label htmlFor="remotePosition" className="text-foreground cursor-pointer text-sm">
+                        Remote position
+                      </Label>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="salaryRange" className="text-foreground">Salary Range *</Label>
+                    <Label htmlFor="salaryRange" className="text-foreground">Salary Range</Label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="salaryRange"
                         placeholder="e.g., $80,000 - $120,000/year"
-                        required
                         value={jobForm.salaryRange}
                         onChange={(e) => setJobForm(prev => ({ ...prev, salaryRange: e.target.value }))}
                         className="pl-10 bg-background text-foreground border-border"
@@ -388,24 +440,6 @@ export default function JobPostingPage() {
                     />
                     <Label htmlFor="temporary" className="text-foreground cursor-pointer">
                       Temporary
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="remote"
-                      checked={jobForm.employmentTypes.includes('remote')}
-                      onCheckedChange={(checked) => {
-                        setJobForm(prev => ({
-                          ...prev,
-                          employmentTypes: checked 
-                            ? [...prev.employmentTypes, 'remote']
-                            : prev.employmentTypes.filter(t => t !== 'remote')
-                        }));
-                      }}
-                    />
-                    <Label htmlFor="remote" className="text-foreground cursor-pointer">
-                      Remote
                     </Label>
                   </div>
 
@@ -650,17 +684,6 @@ export default function JobPostingPage() {
                     />
                     <Label htmlFor="driversLicense" className="text-foreground cursor-pointer">
                       Valid Driver's License Required
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="backgroundCheck"
-                      checked={jobForm.backgroundCheckRequired}
-                      onCheckedChange={(checked) => setJobForm(prev => ({ ...prev, backgroundCheckRequired: !!checked }))}
-                    />
-                    <Label htmlFor="backgroundCheck" className="text-foreground cursor-pointer">
-                      Background Check Required
                     </Label>
                   </div>
 

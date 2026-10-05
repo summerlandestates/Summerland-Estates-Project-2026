@@ -23,6 +23,7 @@ interface Location {
 
 interface LocationAutocompleteProps {
   onLocationSelect: (location: Location) => void;
+  onTextChange?: (text: string) => void;
   placeholder?: string;
   className?: string;
   defaultValue?: string;
@@ -30,6 +31,7 @@ interface LocationAutocompleteProps {
 
 export default function LocationAutocomplete({ 
   onLocationSelect, 
+  onTextChange,
   placeholder = "Enter city or address...",
   className = "",
   defaultValue = ""
@@ -82,6 +84,9 @@ export default function LocationAutocomplete({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
     setSelectedLocation(null);
+    // Free-text fallback: keep parent forms in sync even when the Google
+    // Places API is unavailable or the user never picks a suggestion.
+    onTextChange?.(e.target.value);
   };
 
   const handlePredictionClick = async (prediction: PlacePrediction) => {
@@ -96,6 +101,10 @@ export default function LocationAutocomplete({
         const location = parsePlaceDetails(placeDetails, prediction.place_id);
         setSelectedLocation(location);
         onLocationSelect(location);
+        onTextChange?.(
+          [location.city, location.state].filter(Boolean).join(', ') ||
+            location.formattedAddress
+        );
       }
     } catch (error) {
       console.error('Error fetching place details:', error);
@@ -116,7 +125,7 @@ export default function LocationAutocomplete({
       
       if (types.includes('locality')) {
         city = component.long_name;
-      } else if (types.includes('administrative_area_area_level_1')) {
+      } else if (types.includes('administrative_area_level_1')) {
         state = component.long_name;
       } else if (types.includes('country')) {
         country = component.long_name;

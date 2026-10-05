@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { emailNotifications } from '@/services/emailNotifications';
+import MapLocationLink from '../components/MapLocationLink';
 
 interface Event {
   id: string;
@@ -431,7 +432,15 @@ export default function EventDetailPage() {
                     )}
                     <div>
                       <p className="font-medium">{event.is_online ? 'Virtual Event' : 'Location'}</p>
-                      <p className="text-muted-foreground">{event.location}</p>
+                      {event.is_online ? (
+                        <p className="text-muted-foreground">{event.location}</p>
+                      ) : (
+                        <MapLocationLink
+                          location={event.location}
+                          className="text-muted-foreground"
+                          iconClassName="hidden"
+                        />
+                      )}
                       {event.is_online && event.meeting_link && (
                         <p className="text-sm text-blue-600 mt-1">Link provided after registration</p>
                       )}

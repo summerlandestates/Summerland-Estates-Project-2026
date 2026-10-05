@@ -182,6 +182,27 @@ class EmailNotificationService {
     }
   }
 
+  async notifyNomineeApproval(data: {
+    nomineeEmail: string;
+    nomineeName: string;
+    submitterName?: string;
+    category: string;
+  }): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/notify-recognition-nominee`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to send nominee approval notification');
+      }
+    } catch (error) {
+      console.error('Error sending nominee notification:', error);
+    }
+  }
+
   async notifyAdminRecognition(data: AdminRecognitionData): Promise<void> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/notify-admin-recognition`, {

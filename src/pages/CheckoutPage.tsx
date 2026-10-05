@@ -8,7 +8,7 @@ import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Check, CreditCard, Shield, BadgeCheck, Star, Plus } from 'lucide-react';
+import { Loader2, Check, CreditCard, BadgeCheck, Star, Plus } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import type { CheckoutData } from '../types';
@@ -16,6 +16,7 @@ import {
   buildCheckoutDataFromMembership,
   getAccountStatus,
   getPaymentStatus,
+  isComplimentaryTier,
   requiresMembershipPayment,
 } from '@/lib/membership';
 import { validateAndRedeemPromoCode } from '@/lib/membershipApplication';
@@ -41,21 +42,25 @@ export default function CheckoutPage() {
   const [checkoutContext, setCheckoutContext] = useState<'application' | 'approval'>('application');
   
   // Additional Features state
-  const [addBackgroundCheck, setAddBackgroundCheck] = useState(false);
   const [addVerificationBadge, setAddVerificationBadge] = useState(false);
   const [addPriorityListing, setAddPriorityListing] = useState(false);
   
   // Pricing for additional features
   const additionalFeatures = {
-    backgroundCheck: { price: 49.99, label: 'Background Check', description: 'Verified background check badge on your profile' },
-    verificationBadge: { price: 29.99, label: 'Verification Badge', description: 'Premium verified checkmark next to your name' },
+    verificationBadge: { price: 2.99, label: 'Verification Badge', description: 'Premium verified checkmark next to your name' },
     priorityListing: { price: 19.99, label: 'Priority Listing', description: 'Appear at the top of search results for 30 days' },
   };
   
+  const isFreePlan = (data: CheckoutData) =>
+    isComplimentaryTier(data.selectedTier) ||
+    data.selectedTier.includes('community') ||
+    !!data.promoCode ||
+    !/\d/.test(data.planPrice) ||
+    parseFloat(data.planPrice.replace(/[^0-9.]/g, '')) === 0;
+
   const calculateTotal = () => {
     if (!checkoutData) return 0;
     let total = parseFloat(checkoutData.planPrice.replace(/[^0-9.]/g, '')) || 0;
-    if (addBackgroundCheck) total += additionalFeatures.backgroundCheck.price;
     if (addVerificationBadge) total += additionalFeatures.verificationBadge.price;
     if (addPriorityListing) total += additionalFeatures.priorityListing.price;
     return total;
@@ -131,7 +136,7 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
-      const isFree = checkoutData.selectedTier.includes('free') || checkoutData.selectedTier.includes('community') || checkoutData.planPrice === '$0' || !!checkoutData.promoCode;
+      const isFree = isFreePlan(checkoutData);
 
       if (isFree) {
         sessionStorage.removeItem('checkoutData');
@@ -233,8 +238,7 @@ export default function CheckoutPage() {
     );
   }
 
-  const isFree = checkoutData.selectedTier.includes('free') || 
-                 checkoutData.selectedTier.includes('community');
+  const isFree = isFreePlan(checkoutData);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -284,40 +288,6 @@ export default function CheckoutPage() {
                       Add-On Features
                     </h4>
                     <div className="space-y-3">
-                      {/* Background Check */}
-                      <div 
-                        className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                          addBackgroundCheck 
-                            ? 'border-[#A89F91] bg-[#A89F91]/5' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => setAddBackgroundCheck(!addBackgroundCheck)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <Checkbox 
-                            checked={addBackgroundCheck}
-                            onCheckedChange={(checked) => setAddBackgroundCheck(!!checked)}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Shield className="w-4 h-4 text-green-600" />
-                                <span className="text-sm font-medium text-gray-900">
-                                  {additionalFeatures.backgroundCheck.label}
-                                </span>
-                              </div>
-                              <span className="text-sm font-semibold text-[#A89F91]">
-                                +${additionalFeatures.backgroundCheck.price}
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {additionalFeatures.backgroundCheck.description}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
                       {/* Verification Badge */}
                       <div 
                         className={`p-3 rounded-lg border cursor-pointer transition-all ${
@@ -396,18 +366,12 @@ export default function CheckoutPage() {
                       {isFree ? checkoutData.planPrice : `$${calculateTotal().toFixed(2)}`}
                     </span>
                   </div>
-                  {(addBackgroundCheck || addVerificationBadge || addPriorityListing) && (
+                  {(addVerificationBadge || addPriorityListing) && (
                     <div className="mt-2 text-xs text-gray-500">
                       <div className="flex justify-between">
                         <span>Base plan:</span>
                         <span>{checkoutData.planPrice}</span>
                       </div>
-                      {addBackgroundCheck && (
-                        <div className="flex justify-between">
-                          <span>Background Check:</span>
-                          <span>+${additionalFeatures.backgroundCheck.price}</span>
-                        </div>
-                      )}
                       {addVerificationBadge && (
                         <div className="flex justify-between">
                           <span>Verification Badge:</span>

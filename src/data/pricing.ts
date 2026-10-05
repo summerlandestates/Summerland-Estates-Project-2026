@@ -26,7 +26,6 @@ export const pricingPlans: PricingPlan[] = [
     price: '$0.99',
     period: '/month',
     features: [
-      'Access to Jobs First',
       'Get Sent Jobs That Match Your Resume',
       'Notifications Sent via Text or Email',
       'Analytics - Who\'s Viewed My Profile',
@@ -43,16 +42,16 @@ export const pricingPlans: PricingPlan[] = [
   // Service Provider / Business Plans
   {
     id: 'business-free',
-    name: 'Free / Basic',
-    price: '$0',
-    period: '/month',
+    name: 'Basic Plan',
+    price: 'Complimentary',
+    period: '',
     features: [
-      'Business name & services',
-      'Location & contact info',
-      'Upload 1 photo',
-      'Limited search visibility',
-      'View 1 service request',
-      'Limited inquiries & responses',
+      'Business Name & Services',
+      'Location & Contact Information',
+      'Upload 1 Photo',
+      'Limited Profile Visibility',
+      'View and Bid on 2 Service Requests/Month',
+      'Limited Messaging',
       'Calendar, Booking',
       'Networking',
       'Optional Feature Add-Ons'
@@ -62,20 +61,20 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'business-pro',
     name: 'Pro',
-    price: '$9.99',
+    price: '$6.99',
     period: '/month',
     features: [
-      'One Location',
+      'One Service Location',
       'Notifications',
-      'Analytics - who\'s viewed my profile',
+      'Analytics - Who\'s Viewed My Profile',
       'Community Access',
       'Add 1 Article',
       'Unlimited Profile Visibility',
       'Unlimited Messaging',
       'Multiple Photos & Videos',
       'Calendar, Booking, Interviews',
-      'Add 1 job posting/month',
-      'Bid on 4 jobs/month',
+      'Add 1 Job Posting/Month',
+      'Bid on 4 Jobs/Month',
       'Optional Feature Add-Ons'
     ],
     userType: 'business'
@@ -83,11 +82,11 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: 'business-enterprise',
     name: 'Enterprise / Multi-Location',
-    price: '$14.99',
+    price: '$9.99',
     period: '/month',
     features: [
       'Notifications',
-      'Analytics - who\'s viewed my profile',
+      'Analytics - Who\'s Viewed My Profile',
       'Community Access',
       'Add 1 Article',
       'Unlimited Profile Visibility',
@@ -102,66 +101,61 @@ export const pricingPlans: PricingPlan[] = [
     userType: 'business'
   },
 
-  // Agency Owner / Recruiter Plans
+  // Agency / Recruiter Plans
   {
     id: 'agency-free',
-    name: 'Free',
-    price: '$0',
-    period: '/month',
+    name: 'Basic',
+    price: 'Complimentary',
+    period: '',
     features: [
-      'View 2 profiles (limited info)',
-      'No messaging',
-      'Public profile',
-      '1 city/service location'
+      'Search & View 3 Profiles/Month',
+      'No Messaging',
+      'Public Profile',
+      '1 City/Service Location'
     ],
     userType: 'agency'
   },
   {
     id: 'agency-basic',
-    name: 'Basic',
-    price: '$12.99',
+    name: 'Pro',
+    price: '$7.99',
     period: '/month',
     features: [
-      'Unlimited view of candidates (limited info)',
-      'Message 5 professionals',
-      'Post 1 role',
-      'Post 1 Service Request',
-      '1 city/service location',
-      'Pay $199 per hire'
+      'Unlimited Profile Searches',
+      'Message 5 Profiles/Month',
+      'Post 1 Open Role/Month',
+      'Post 1 Service Request/Month',
+      '1 City/Service Location'
     ],
     userType: 'agency'
   },
   {
     id: 'agency-hiring',
-    name: 'Hiring',
-    price: '$19.99',
+    name: 'Elite',
+    price: '$10.99',
     period: '/month',
     features: [
-      'Unlimited view of candidates (limited info)',
-      'Contact 25 professionals',
-      'Post 8 roles',
+      'Unlimited Profile Searches',
+      'Message 25 Profiles/Month',
+      'Post 8 Open Roles/Month',
       'Community Access',
-      'Post 5 Service Requests',
-      '4 city/service locations',
-      'Pay $129 per hire'
+      'Post 5 Service Requests/Month',
+      '4 City/Service Locations'
     ],
     userType: 'agency'
   },
   {
     id: 'agency-pro',
-    name: 'Pro',
-    price: '$29.99',
+    name: 'Enterprise',
+    price: '$14.99',
     period: '/month',
     features: [
-      'Unlimited view of candidates (limited info)',
-      'Unlimited outreach',
-      'Unlimited job posts',
-      'Verification credits included',
+      'Unlimited Profile Searches',
+      'Unlimited Outreach',
+      'Unlimited Job Posts',
       'Community Access',
-      'Unlimited templates',
       'Unlimited Service Requests',
-      'Unlimited service locations',
-      'Pay $99 per hire'
+      'Unlimited Service Locations'
     ],
     userType: 'agency'
   },
@@ -169,62 +163,54 @@ export const pricingPlans: PricingPlan[] = [
   // Estates Plans
   {
     id: 'estates-free',
-    name: 'Free',
-    price: '$0',
-    period: '/month',
+    name: 'Basic',
+    price: 'Complimentary',
+    period: '',
     features: [
-      'View 2 profiles (limited info)',
-      'No messaging',
-      'Public profile'
+      'Search & View 3 Profiles/Month',
+      'No Messaging',
+      'Public Profile'
     ],
     userType: 'estates'
   },
   {
     id: 'estates-basic',
-    name: 'Basic',
-    price: '$14.99',
+    name: 'Pro',
+    price: '$7.99',
     period: '/month',
     features: [
-      'Unlimited view of candidates (limited info)',
-      'Message 5 professionals',
-      'Post 1 role',
-      'Post 1 Service Request',
-      'Download 4 templates',
-      'Pay $199 per hire'
+      'Unlimited Profile Searches',
+      'Message 5 Profiles/Month',
+      'Post 1 Open Role/Month',
+      'Post 1 Service Request/Month'
     ],
     userType: 'estates'
   },
   {
     id: 'estates-hiring',
-    name: 'Hiring',
-    price: '$24.99',
+    name: 'Elite',
+    price: '$10.99',
     period: '/month',
     features: [
-      'Unlimited view of candidates (limited info)',
-      'Contact 25 professionals',
-      'Post 10 roles',
+      'Unlimited Profile Searches',
+      'Message 25 Profiles/Month',
+      'Post 10 Open Roles/Month',
       'Community Access',
-      'Post 5 Service Requests',
-      'Download 5 Templates',
-      'Pay $199 per hire'
+      'Post 5 Service Requests/Month'
     ],
     userType: 'estates'
   },
   {
     id: 'estates-pro',
-    name: 'Pro',
-    price: '$29.99',
+    name: 'Enterprise',
+    price: '$14.99',
     period: '/month',
     features: [
-      'Unlimited view of candidates (limited info)',
-      'Unlimited outreach',
-      'Unlimited job posts',
-      'Verification credits included',
+      'Unlimited Profile Searches',
+      'Unlimited Outreach',
+      'Unlimited Job Posts',
       'Community Access',
-      'Unlimited templates',
-      'Unlimited Service Requests',
-      'Download 8 Templates',
-      'Pay $199 per hire'
+      'Unlimited Service Requests'
     ],
     userType: 'estates'
   }

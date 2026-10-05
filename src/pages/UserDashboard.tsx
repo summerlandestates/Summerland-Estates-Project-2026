@@ -40,6 +40,8 @@ import {
   ChevronRight,
   Clock,
   CheckCircle2,
+  CheckCircle,
+  BadgeCheck,
   AlertCircle,
   ExternalLink,
   FileText,
@@ -149,6 +151,7 @@ export default function UserDashboard() {
   const [mySponsorships, setMySponsorships] = useState<MySponsorship[]>([]);
   const [myEmailBlasts, setMyEmailBlasts] = useState<MyEmailBlast[]>([]);
   const [myRecognitions, setMyRecognitions] = useState<MyRecognition[]>([]);
+  const [pendingNomineeApprovals, setPendingNomineeApprovals] = useState<any[]>([]);
   const [myPlans, setMyPlans] = useState<MyPlan[]>([]);
   const [profileData, setProfileData] = useState<any>(null);
   const [userTier, setUserTier] = useState<string>(localStorage.getItem('userTier') || 'professional-basic');
@@ -175,6 +178,7 @@ export default function UserDashboard() {
         loadMySponsorships(),
         loadMyEmailBlasts(),
         loadMyRecognitions(),
+        loadPendingNomineeApprovals(),
         loadMyPlans(),
         loadProfileData()
       ]);
@@ -305,6 +309,46 @@ export default function UserDashboard() {
     }
   };
 
+  const loadPendingNomineeApprovals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('recognitions')
+        .select('*')
+        .eq('nominee_email', user?.email)
+        .eq('nominee_status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPendingNomineeApprovals(data || []);
+    } catch (error) {
+      console.error('Failed to load nominee approvals:', error);
+    }
+  };
+
+  const handleNomineeDecision = async (id: string, approve: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('recognitions')
+        .update({
+          nominee_status: approve ? 'approved' : 'declined',
+          nominee_responded_at: new Date().toISOString(),
+          ...(approve ? {} : { status: 'rejected' }),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success(approve ? 'Recognition approved' : 'Recognition declined', {
+        description: approve
+          ? 'This feature request has been signed off and is now awaiting admin review.'
+          : 'This nomination has been declined.',
+      });
+      loadPendingNomineeApprovals();
+      loadMyRecognitions();
+    } catch (error: any) {
+      toast.error('Failed to update', { description: error.message });
+    }
+  };
+
   const loadMyPlans = async () => {
     try {
       // Fetch user profile to get membership tier info
@@ -368,7 +412,11 @@ export default function UserDashboard() {
 
   const handleDeleteEmailBlast = async (id: string) => {
     try {
-      const { error } = await supabase.from('email_blasts').delete().eq('id', id);
+      const { error } = await supabase
+        .from('email_blast_submissions')
+        .delete()
+        .eq('id', id)
+        .eq('sender_email', user?.email || '');
       if (error) throw error;
       toast.success('Email blast deleted');
       loadMyEmailBlasts();
@@ -1109,6 +1157,51 @@ export default function UserDashboard() {
 
           {/* My Recognition Section */}
           {activeSection === 'recognition' && (
+            <>
+            {pendingNomineeApprovals.length > 0 && (
+              <Card className="border-[#e8dfd3] mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BadgeCheck className="w-5 h-5 text-[#A89F91]" />
+                    Approvals Needed
+                  </CardTitle>
+                  <CardDescription>You've been nominated — approve or decline before it can be featured</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {pendingNomineeApprovals.map((nomination) => (
+                      <div key={nomination.id} className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                          <div>
+                            <h3 className="font-semibold text-[#23231f]">{nomination.nominee_name}</h3>
+                            <p className="text-sm text-[#6b665f] capitalize">{(nomination.category || '').replace(/_/g, ' ')}</p>
+                            <p className="text-sm text-[#6b665f] mt-2 italic">"{nomination.reason}"</p>
+                            <p className="text-xs text-[#6b665f] mt-1">Nominated by {nomination.submitter_name || nomination.submitter_email}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                              onClick={() => handleNomineeDecision(nomination.id, true)}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-300 text-red-600 hover:bg-red-50"
+                              onClick={() => handleNomineeDecision(nomination.id, false)}
+                            >
+                              Decline
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card className="border-[#e8dfd3]">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -1170,6 +1263,7 @@ export default function UserDashboard() {
                 )}
               </CardContent>
             </Card>
+            </>
           )}
 
           {/* My Plans Section */}
@@ -1183,7 +1277,7 @@ export default function UserDashboard() {
                   </CardTitle>
                   <CardDescription>Your active memberships and plans</CardDescription>
                 </div>
-                <Button onClick={() => navigate('/add-listing')} className="bg-[#A89F91] hover:bg-[#8A8279]">
+                <Button onClick={() => navigate('/upgrade')} className="bg-[#A89F91] hover:bg-[#8A8279]">
                   <Plus className="w-4 h-4 mr-2" />
                   Upgrade
                 </Button>
@@ -1194,7 +1288,7 @@ export default function UserDashboard() {
                     <Crown className="w-16 h-16 text-[#A89F91]/30 mx-auto mb-4" />
                     <p className="text-[#6b665f] text-lg">No active plans</p>
                     <p className="text-sm text-[#6b665f]/70 mt-1">Upgrade to unlock premium features</p>
-                    <Button onClick={() => navigate('/add-listing')} className="mt-4 bg-[#A89F91] hover:bg-[#8A8279]">
+                    <Button onClick={() => navigate('/upgrade')} className="mt-4 bg-[#A89F91] hover:bg-[#8A8279]">
                       View Plans
                     </Button>
                   </div>

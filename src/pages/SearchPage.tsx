@@ -36,24 +36,22 @@ import {
   Loader2
 } from 'lucide-react';
 import { fetchListings } from '../utils/listings';
-import { professionalTitles, languages } from '../data/profileOptions';
+import { getBlockedIds } from '../components/BlockUserButton';
+import { languages } from '../data/profileOptions';
+import ServiceCategoryPicker from '../components/ServiceCategoryPicker';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import { parseSearchIntent, intentScore, getServiceEmoji } from '../lib/searchIntent';
 import type { Listing, FilterState, PricingTier } from '../types';
 
-const locationOptions = [
-  'Beverly Hills, CA',
-  'Los Angeles, CA',
-  'Malibu, CA',
-  'Santa Monica, CA',
-  'Bel Air, CA',
-  'Pacific Palisades, CA',
-  'Newport Beach, CA',
-  'San Francisco, CA',
-  'New York, NY',
-  'Miami, FL',
-  'Palm Beach, FL',
-  'Aspen, CO',
-  'Greenwich, CT',
-  'The Hamptons, NY',
+const SEARCH_EXAMPLES = [
+  'What do you need help with?',
+  'Find a math tutor for my 10-year-old',
+  'Someone to pick my kids up from school',
+  'Move a couch upstairs',
+  'I need a birthday party planner',
+  'Find a personal trainer',
+  'Dog walker this weekend',
+  'Someone to clean my house',
 ];
 
 const experienceOptions = [
@@ -94,6 +92,7 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
   const [isPublicView, setIsPublicView] = useState(true);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const itemsPerPage = 12;
 
   // Filter states
@@ -105,10 +104,10 @@ export default function SearchPage() {
     verifiedOnly: false,
     profileStatus: 'all',
     title: '',
+    titles: [],
     serviceType: '',
     language: '',
     workAvailability: '',
-    hasBackgroundCheck: false,
     willingDrugTest: false,
     certifications: [],
     comfortWith: [],
@@ -131,7 +130,8 @@ export default function SearchPage() {
     const loadListings = async () => {
       try {
         setLoading(true);
-        const data = await fetchListings();
+        const blocked = new Set(getBlockedIds());
+        const data = (await fetchListings()).filter((l: Listing) => !blocked.has(l.id) && !blocked.has(l.slug));
         setAllListings(data);
         setFilteredListings(data);
       } catch (err: any) {
@@ -143,6 +143,12 @@ export default function SearchPage() {
     };
 
     loadListings();
+
+    const placeholderTimer = setInterval(
+      () => setPlaceholderIndex((i) => (i + 1) % SEARCH_EXAMPLES.length),
+      3500
+    );
+    return () => clearInterval(placeholderTimer);
   }, []);
 
   useEffect(() => {
@@ -152,16 +158,14 @@ export default function SearchPage() {
   const applyFilters = () => {
     let filtered = [...allListings];
 
-    // Search query
+    // Search query — loose Google-style matching with intent parsing
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (listing) =>
-          listing.name.toLowerCase().includes(query) ||
-          listing.role.toLowerCase().includes(query) ||
-          listing.bio.toLowerCase().includes(query) ||
-          listing.location.toLowerCase().includes(query)
-      );
+      const intent = parseSearchIntent(searchQuery);
+      filtered = filtered
+        .map((listing) => ({ listing, score: intentScore(listing, searchQuery, intent) }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((x) => x.listing);
     }
 
     // Category filter
@@ -172,17 +176,36 @@ export default function SearchPage() {
     }
 
     // Location filter
-    if (filters.location) {
+    if (filters.location && filters.location !== 'all') {
       filtered = filtered.filter((listing) =>
-        listing.location.toLowerCase().includes(filters.location.toLowerCase())
+        listing.location.toLowerCase().includes(filters.location!.toLowerCase())
       );
     }
 
-    // Title filter
-    if (filters.title) {
-      filtered = filtered.filter((listing) =>
-        listing.role.toLowerCase().includes(filters.title.toLowerCase())
-      );
+    // Service categories — multi-select, matches role/offered services/skills/bio
+    const selectedServices = filters.titles?.length
+      ? filters.titles
+      : filters.title && filters.title !== 'all'
+        ? [filters.title]
+        : [];
+    if (selectedServices.length > 0) {
+      const wanted = selectedServices.map((s) => s.toLowerCase().replace(/-/g, ' '));
+      filtered = filtered.filter((listing) => {
+        const offered = (listing.servicesOffered || [])
+          .map((s: any) => (typeof s === 'string' ? s : s?.name || ''))
+          .join(' ')
+          .toLowerCase();
+        const haystack = [
+          listing.role,
+          offered,
+          (listing.skills || []).join(' '),
+          listing.bio,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .replace(/-/g, ' ');
+        return wanted.some((w) => haystack.includes(w));
+      });
     }
 
     // Available now
@@ -193,11 +216,6 @@ export default function SearchPage() {
     // Verified only
     if (filters.verifiedOnly) {
       filtered = filtered.filter((listing) => listing.verified);
-    }
-
-    // Background check
-    if (filters.hasBackgroundCheck) {
-      filtered = filtered.filter((listing) => listing.backgroundCheckAvailable || listing.willingToBackgroundCheck);
     }
 
     // Drug test willing
@@ -211,14 +229,14 @@ export default function SearchPage() {
     }
 
     // Language filter
-    if (filters.language) {
+    if (filters.language && filters.language !== 'all') {
       filtered = filtered.filter((listing) => 
         listing.languages?.some(lang => lang.toLowerCase().includes(filters.language!.toLowerCase()))
       );
     }
 
     // Years experience filter
-    if (filters.yearsExperience) {
+    if (filters.yearsExperience && filters.yearsExperience !== 'all') {
       filtered = filtered.filter((listing) => {
         const years = listing.experienceYears;
         switch (filters.yearsExperience) {
@@ -274,10 +292,10 @@ export default function SearchPage() {
       verifiedOnly: false,
       profileStatus: 'all',
       title: '',
+      titles: [],
       serviceType: '',
       language: '',
       workAvailability: '',
-      hasBackgroundCheck: false,
       willingDrugTest: false,
       certifications: [],
       comfortWith: [],
@@ -314,10 +332,9 @@ export default function SearchPage() {
   const activeFilterCount = [
     filters.category !== 'all',
     filters.location,
-    filters.title,
+    (filters.titles?.length || 0) > 0,
     filters.availableNow,
     filters.verifiedOnly,
-    filters.hasBackgroundCheck,
     filters.willingDrugTest,
     filters.hasCar,
     filters.language,
@@ -358,10 +375,10 @@ export default function SearchPage() {
           {/* Header */}
           <div className="mb-8 text-center">
             <h1 className="text-5xl font-heading font-bold text-foreground mb-4">
-              Find Professionals
+              What can we help you with?
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Search our network of verified estate professionals and service providers
+              Search services, professionals, or things you need done...
             </p>
           </div>
 
@@ -370,7 +387,7 @@ export default function SearchPage() {
             <div className="relative max-w-2xl mx-auto">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
-                placeholder="Search by name, role, location, or keywords..."
+                placeholder={SEARCH_EXAMPLES[placeholderIndex]}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-12 pr-4 py-6 text-lg bg-background border-border rounded-xl"
@@ -386,6 +403,45 @@ export default function SearchPage() {
                 </Button>
               )}
             </div>
+
+            {/* Recommended Services — derived from natural-language intent */}
+            {searchQuery.trim().length > 2 && (() => {
+              const intent = parseSearchIntent(searchQuery);
+              const recommended = [...intent.matchedServices, ...intent.matchedTitles].slice(0, 6);
+              if (recommended.length === 0) return null;
+              return (
+                <div className="max-w-2xl mx-auto mt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Recommended Services</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {recommended.map((service) => {
+                      const active = filters.titles?.includes(service);
+                      return (
+                        <button
+                          key={service}
+                          type="button"
+                          onClick={() =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              titles: active
+                                ? (prev.titles || []).filter((t) => t !== service)
+                                : [...(prev.titles || []), service],
+                            }))
+                          }
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                            active
+                              ? 'bg-[#A89F91] text-white border-[#A89F91]'
+                              : 'bg-background text-foreground border-border hover:border-[#A89F91]'
+                          }`}
+                        >
+                          <span aria-hidden="true">{getServiceEmoji(service)}</span>
+                          {service}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Filter Toggle & View Mode */}
@@ -439,10 +495,10 @@ export default function SearchPage() {
             </div>
           </div>
 
-          <div className="flex gap-8">
+          <div className="flex flex-col lg:flex-row gap-8">
             {/* Filters Sidebar */}
             {showFilters && (
-              <div className="w-80 flex-shrink-0">
+              <div className="w-full lg:w-80 flex-shrink-0">
                 <Card className="p-6 bg-card sticky top-32">
                   <h3 className="text-lg font-heading font-semibold text-foreground mb-4">
                     Filter Results
@@ -455,7 +511,7 @@ export default function SearchPage() {
                       <AccordionContent>
                         <Select
                           value={filters.category}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, category: value }))}
+                          onValueChange={(value) => setFilters(prev => ({ ...prev, category: value, title: '', titles: [] }))}
                         >
                           <SelectTrigger className="bg-background">
                             <SelectValue placeholder="All Categories" />
@@ -463,54 +519,42 @@ export default function SearchPage() {
                           <SelectContent>
                             <SelectItem value="all">All Categories</SelectItem>
                             <SelectItem value="staff">Professionals</SelectItem>
-                            <SelectItem value="vendor">Vendors</SelectItem>
                             <SelectItem value="business">Service Providers</SelectItem>
                             <SelectItem value="agency">Agencies</SelectItem>
-                            <SelectItem value="estates">Estates</SelectItem>
                           </SelectContent>
                         </Select>
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* Title/Role */}
+                    {/* Services — 167-category catalog, multi-select */}
+                    {filters.category !== 'agency' && (
                     <AccordionItem value="title" className="border-b border-border">
-                      <AccordionTrigger className="text-sm font-medium">Title / Role</AccordionTrigger>
+                      <AccordionTrigger className="text-sm font-medium">Services</AccordionTrigger>
                       <AccordionContent>
-                        <Select
-                          value={filters.title || ''}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, title: value }))}
-                        >
-                          <SelectTrigger className="bg-background">
-                            <SelectValue placeholder="All Titles" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[300px]">
-                            <SelectItem value="all">All Titles</SelectItem>
-                            {professionalTitles.map((title) => (
-                              <SelectItem key={title} value={title}>{title}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <ServiceCategoryPicker
+                          selected={filters.titles || []}
+                          onChange={(values) => setFilters(prev => ({ ...prev, titles: values }))}
+                          placeholder="All services — select one or more"
+                        />
                       </AccordionContent>
                     </AccordionItem>
+                    )}
 
                     {/* Location */}
                     <AccordionItem value="location" className="border-b border-border">
                       <AccordionTrigger className="text-sm font-medium">Location</AccordionTrigger>
                       <AccordionContent>
-                        <Select
-                          value={filters.location || ''}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, location: value }))}
-                        >
-                          <SelectTrigger className="bg-background">
-                            <SelectValue placeholder="All Locations" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[300px]">
-                            <SelectItem value="all">All Locations</SelectItem>
-                            {locationOptions.map((loc) => (
-                              <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <LocationAutocomplete
+                          placeholder="City, state, or ZIP..."
+                          defaultValue={filters.location || ''}
+                          onLocationSelect={(loc) =>
+                            setFilters(prev => ({
+                              ...prev,
+                              location: [loc.city, loc.state].filter(Boolean).join(', ') || loc.formattedAddress,
+                            }))
+                          }
+                          onTextChange={(text) => setFilters(prev => ({ ...prev, location: text }))}
+                        />
                       </AccordionContent>
                     </AccordionItem>
 
@@ -579,18 +623,10 @@ export default function SearchPage() {
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* Background & Verification */}
+                    {/* Requirements */}
                     <AccordionItem value="verification" className="border-b border-border">
-                      <AccordionTrigger className="text-sm font-medium">Verification</AccordionTrigger>
+                      <AccordionTrigger className="text-sm font-medium">Requirements</AccordionTrigger>
                       <AccordionContent className="space-y-3">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="hasBackgroundCheck"
-                            checked={filters.hasBackgroundCheck}
-                            onCheckedChange={(checked) => setFilters(prev => ({ ...prev, hasBackgroundCheck: !!checked }))}
-                          />
-                          <Label htmlFor="hasBackgroundCheck" className="text-sm cursor-pointer">Background Check</Label>
-                        </div>
                         <div className="flex items-center space-x-2">
                           <Checkbox
                             id="willingDrugTest"

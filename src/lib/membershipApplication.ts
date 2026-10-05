@@ -150,20 +150,53 @@ export async function submitMembershipApplication(checkoutData: CheckoutData) {
     application_data: finalApplicationData,
   };
 
-  const { error: profileError } = await supabase
-    .from('profiles')
-    .update(profilePayload)
-    .eq('id', authData.user.id);
-
-  if (profileError) {
-    const { error: insertError } = await supabase.from('profiles').insert({
-      id: authData.user.id,
-      email: checkoutData.email,
-      ...profilePayload,
+  // Write the profile through the dev server with the service role key.
+  // Right after signUp() the client typically has NO session (email
+  // confirmation pending), so a client-side update() silently matches 0 rows
+  // and the insert is blocked by RLS — that is how signup data gets lost.
+  let profileSynced = false;
+  try {
+    const syncRes = await fetch('/api/sync-application-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: authData.user.id,
+        email: checkoutData.email,
+        fullName: profilePayload.full_name,
+        role: profilePayload.role,
+        phone: profilePayload.phone,
+        location: profilePayload.location,
+        profileType: profilePayload.profile_type,
+        tier: profilePayload.tier,
+        applicationData: profilePayload.application_data,
+        subscriptionStatus: profilePayload.subscription_status,
+        subscriptionExpiresAt: profilePayload.subscription_expires_at,
+      }),
     });
+    profileSynced = syncRes.ok;
+    if (!syncRes.ok) {
+      console.error('Profile sync endpoint returned', syncRes.status);
+    }
+  } catch (syncError) {
+    console.error('Profile sync endpoint unreachable:', syncError);
+  }
 
-    if (insertError) {
-      throw new Error(`Failed to create profile: ${insertError.message}`);
+  if (!profileSynced) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update(profilePayload)
+      .eq('id', authData.user.id);
+
+    if (profileError) {
+      const { error: insertError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        email: checkoutData.email,
+        ...profilePayload,
+      });
+
+      if (insertError) {
+        throw new Error(`Failed to create profile: ${insertError.message}`);
+      }
     }
   }
 

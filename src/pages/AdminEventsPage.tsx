@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminSidebar from '../components/AdminSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
@@ -532,23 +531,20 @@ export default function AdminEventsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
-        <AdminSidebar />
-        <main className="flex-1 p-8 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-[#A89F91] mx-auto mb-4" />
-            <p className="text-gray-600">Loading events...</p>
-          </div>
-        </main>
-      </div>
+      <div className="space-y-6">
+
+  <div className="text-center">
+    <Loader2 className="w-12 h-12 animate-spin text-[#A89F91] mx-auto mb-4" />
+    <p className="text-gray-600">Loading events...</p>
+  </div>
+
+</div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 overflow-hidden">
-      <AdminSidebar />
-
-      <main className="flex-1 p-8 overflow-x-hidden overflow-y-auto">
+    <div>
+      <main>
         <div className="max-w-7xl mx-auto w-full">
           {/* Header */}
           <div className="mb-8">

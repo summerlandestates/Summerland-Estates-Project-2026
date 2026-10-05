@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle, BadgeCheck, Shield, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Star, Mail, Share2, Bookmark, UserPlus, CheckCircle, BadgeCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,11 +9,15 @@ import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import UpgradePrompt from '../components/UpgradePrompt';
+import MapLocationLink from '../components/MapLocationLink';
 import ProfileAnalytics, { useProfileViewTracker } from '../components/ProfileAnalytics';
 import ServiceCalendar from '../components/ServiceCalendar';
 import NativeAd from '../components/NativeAd';
+import ReportButton from '../components/ReportButton';
+import BlockUserButton from '../components/BlockUserButton';
 import { fetchListingBySlug, fetchListingById } from '../utils/listings';
 import { getVisibilityRules, formatNameForDisplay, canAccessProfile } from '@/utils/profileVisibility';
+import { getTierLimits } from '@/utils/tierAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Listing, PricingTier, Review } from '../types';
@@ -33,11 +37,17 @@ export default function ProfilePage() {
   const [reviewComment, setReviewComment] = useState('');
   const [bookingType, setBookingType] = useState('video');
   const [bookingMessage, setBookingMessage] = useState('');
+  const [bookingName, setBookingName] = useState('');
+  const [bookingEmail, setBookingEmail] = useState('');
+  const [bookingPhone, setBookingPhone] = useState('');
   const [serviceType, setServiceType] = useState('');
   const [serviceLocation, setServiceLocation] = useState('');
   const [serviceMessage, setServiceMessage] = useState('');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [respondingToReviewId, setRespondingToReviewId] = useState<string | null>(null);
+  const [responseText, setResponseText] = useState('');
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -47,6 +57,7 @@ export default function ProfilePage() {
   const [isPublicView, setIsPublicView] = useState(true);
   const [profileIndex, setProfileIndex] = useState(0);
   const [currentUserId] = useState(localStorage.getItem('userId') || '');
+  const [viewLimitReached, setViewLimitReached] = useState(false);
 
   // Track profile views
   useProfileViewTracker(currentUserId, listing?.id || slug || '');
@@ -62,6 +73,38 @@ export default function ProfilePage() {
       setUserTier(tier);
     }
   }, []);
+
+  // Enforce monthly profile view limits (e.g. "Search & View 3 Profiles/Month")
+  useEffect(() => {
+    if (!user || !listing) return;
+    if (listing.userId && listing.userId === user.id) return;
+
+    const checkViewLimit = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
+      if (!limits.profileViewLimitMonthly) return;
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from('profile_views')
+        .select('id', { count: 'exact', head: true })
+        .eq('viewer_id', user.id)
+        .gte('created_at', startOfMonth.toISOString());
+
+      if ((count || 0) >= limits.profileViewLimitMonthly) {
+        setViewLimitReached(true);
+      }
+    };
+
+    checkViewLimit().catch((err) => console.error('View limit check failed:', err));
+  }, [user, listing]);
 
   useEffect(() => {
     if (!slug) return;
@@ -166,6 +209,8 @@ export default function ProfilePage() {
       }
 
       if (!conversationId) {
+        const allowed = await checkNewConversationLimit();
+        if (!allowed) return;
         const { data: conversation, error: convError } = await supabase
           .from('conversations')
           .insert({})
@@ -293,7 +338,7 @@ export default function ProfilePage() {
   }
 
   // If user cannot access this profile, show upgrade prompt
-  if (!canAccess) {
+  if (!canAccess || viewLimitReached) {
     return (
       <div className="min-h-screen bg-background">
         <NavBar currentPage="" />
@@ -310,7 +355,9 @@ export default function ProfilePage() {
 
             <UpgradePrompt
               feature="Full Profile Access"
-              message="Additional profiles are available with a paid participation level."
+              message={viewLimitReached
+                ? 'You have reached your monthly profile view limit. Upgrade for unlimited profile searches.'
+                : 'Additional profiles are available with a paid participation level.'}
               currentTier={userTier}
             />
           </div>
@@ -336,6 +383,7 @@ export default function ProfilePage() {
     setReviewRating(0);
     setReviewComment('');
     setReviewSubmitting(false);
+    setEditingReviewId(null);
   };
 
   const resetBookingForm = () => {
@@ -344,6 +392,9 @@ export default function ProfilePage() {
     setSelectedTime('');
     setBookingType('video');
     setBookingMessage('');
+    setBookingName('');
+    setBookingEmail('');
+    setBookingPhone('');
     setBookingSubmitting(false);
   };
 
@@ -357,42 +408,266 @@ export default function ProfilePage() {
     setServiceSubmitting(false);
   };
 
-  const handleSubmitReview = () => {
+  const handleSubmitReview = async () => {
     if (!listing || reviewRating === 0) return;
+
+    if (!user) {
+      toast.error('Sign in to leave a review', {
+        description: 'Reviews are tied to your member account.',
+      });
+      navigate('/login');
+      return;
+    }
 
     setReviewSubmitting(true);
 
-    const nextReview: Review = {
-      id: `${listing.id}-${Date.now()}`,
-      reviewerName: 'Community Member',
-      reviewerRole: 'Verified Member',
-      rating: reviewRating,
-      date: new Date().toISOString(),
-      comment: reviewComment,
-      verified: true
-    };
+    try {
+      const { data: reviewerProfile } = await supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', user.id)
+        .maybeSingle();
 
-    const nextReviews = [nextReview, ...reviews];
-    setReviews(nextReviews);
-    persistCollection(`profile_reviews_${listing.id}`, nextReviews);
+      const reviewerName = reviewerProfile?.full_name || user.email?.split('@')[0] || 'Community Member';
+      const reviewerRole = reviewerProfile?.role || 'Member';
 
-    toast.success('Review submitted', {
-      description: 'Your feedback has been added to this profile.',
-    });
+      if (editingReviewId) {
+        const { error } = await supabase
+          .from('reviews')
+          .update({ rating: reviewRating, comment: reviewComment, updated_at: new Date().toISOString() })
+          .eq('id', editingReviewId)
+          .eq('reviewer_id', user.id);
+        if (error) throw error;
 
-    resetReviewForm();
+        setReviews((prev) =>
+          prev.map((r) =>
+            r.id === editingReviewId ? { ...r, rating: reviewRating, comment: reviewComment } : r
+          )
+        );
+        toast.success('Review updated');
+      } else {
+        const { data: inserted, error } = await supabase
+          .from('reviews')
+          .insert({
+            listing_id: listing.id,
+            reviewer_id: user.id,
+            reviewer_name: reviewerName,
+            reviewer_role: reviewerRole,
+            rating: reviewRating,
+            comment: reviewComment,
+            verified: true,
+          })
+          .select('id, created_at')
+          .single();
+        if (error) throw error;
+
+        const nextReview: Review = {
+          id: inserted?.id || `${listing.id}-${Date.now()}`,
+          reviewerId: user.id,
+          reviewerName,
+          reviewerRole,
+          rating: reviewRating,
+          date: inserted?.created_at || new Date().toISOString(),
+          comment: reviewComment,
+          verified: true,
+        };
+        setReviews((prev) => [nextReview, ...prev]);
+        toast.success('Review submitted', {
+          description: 'Your feedback has been added to this profile.',
+        });
+      }
+    } catch (err: any) {
+      console.error('Review submit failed:', err);
+      toast.error('Could not save review', { description: err.message });
+    } finally {
+      setReviewSubmitting(false);
+      resetReviewForm();
+    }
   };
 
-  const handleSubmitInterviewRequest = () => {
-    if (!listing || !selectedDate || !selectedTime) return;
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('reviews')
+      .delete()
+      .eq('id', reviewId)
+      .eq('reviewer_id', user.id);
+    if (error) {
+      toast.error('Could not delete review', { description: error.message });
+      return;
+    }
+    setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+    toast.success('Review deleted');
+  };
+
+  const handleRespondToReview = async (reviewId: string) => {
+    if (!user || !listing?.userId || listing.userId !== user.id) return;
+    const text = responseText.trim();
+    if (!text) return;
+
+    const { error } = await supabase
+      .from('reviews')
+      .update({ response: text, response_at: new Date().toISOString() })
+      .eq('id', reviewId);
+    if (error) {
+      toast.error('Could not save response', { description: error.message });
+      return;
+    }
+    setReviews((prev) =>
+      prev.map((r) => (r.id === reviewId ? { ...r, response: text, responseAt: new Date().toISOString() } : r))
+    );
+    setRespondingToReviewId(null);
+    setResponseText('');
+    toast.success('Response posted');
+  };
+
+  const startEditReview = (review: Review) => {
+    setEditingReviewId(review.id);
+    setReviewRating(review.rating);
+    setReviewComment(review.comment);
+    setShowReviewModal(true);
+  };
+
+  const getMonthlyNewConversationCount = async (): Promise<number> => {
+    if (!user) return 0;
+    const { data: myParticipants } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', user.id);
+    const ids = (myParticipants || []).map(p => p.conversation_id);
+    if (ids.length === 0) return 0;
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const { count } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .in('id', ids)
+      .gte('created_at', startOfMonth.toISOString());
+    return count || 0;
+  };
+
+  const checkNewConversationLimit = async (): Promise<boolean> => {
+    if (!user) return false;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tier')
+      .eq('id', user.id)
+      .maybeSingle();
+    const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
+    if (!limits.newConversationLimitMonthly) return true;
+    const count = await getMonthlyNewConversationCount();
+    if (count >= limits.newConversationLimitMonthly) {
+      toast.error(`You have reached your limit of ${limits.newConversationLimitMonthly} new profiles this month.`, {
+        description: 'Upgrade to message more profiles.',
+      });
+      navigate('/upgrade');
+      return false;
+    }
+    return true;
+  };
+
+  const sendSiteMessage = async (recipientId: string, content: string) => {
+    if (!user) return;
+    const { data: myParticipants } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', user.id);
+
+    const myConversations = (myParticipants || []).map(p => p.conversation_id);
+    let conversationId: string | null = null;
+
+    if (myConversations.length > 0) {
+      const { data: match } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', recipientId)
+        .in('conversation_id', myConversations)
+        .maybeSingle();
+      if (match) conversationId = match.conversation_id;
+    }
+
+    if (!conversationId) {
+      const allowed = await checkNewConversationLimit();
+      if (!allowed) return;
+      const { data: conversation } = await supabase
+        .from('conversations')
+        .insert({})
+        .select('id')
+        .single();
+      if (!conversation) return;
+      conversationId = conversation.id;
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: conversationId, user_id: user.id },
+        { conversation_id: conversationId, user_id: recipientId }
+      ]);
+    }
+
+    await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content
+    });
+  };
+
+  const handleSubmitInterviewRequest = async () => {
+    if (!listing || !bookingName.trim() || !bookingEmail.trim() || !bookingPhone.trim() || !bookingMessage.trim()) return;
 
     setBookingSubmitting(true);
 
+    const messageBody = [
+      `Interview request for ${listing.name}`,
+      ``,
+      `Booking party: ${bookingName.trim()}`,
+      `Email: ${bookingEmail.trim()}`,
+      `Phone: ${bookingPhone.trim()}`,
+      selectedDate && selectedTime ? `Requested time: ${selectedDate} at ${selectedTime}` : '',
+      `Interview type: ${bookingType}`,
+      ``,
+      bookingMessage.trim()
+    ].filter(Boolean).join('\n');
+
+    const recipientId = listing.userId;
+    let delivered = false;
+
+    if (recipientId && user) {
+      try {
+        await sendSiteMessage(recipientId, messageBody);
+        delivered = true;
+      } catch (error) {
+        console.error('Interview message error:', error);
+      }
+    }
+
+    if (recipientId) {
+      try {
+        await fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: recipientId,
+            type: 'message',
+            title: `Interview request from ${bookingName.trim()}`,
+            message: messageBody,
+            link: user ? '/messages' : undefined,
+          }),
+        });
+        delivered = true;
+      } catch (error) {
+        console.error('Interview notification error:', error);
+      }
+    }
+
+    // Keep a local copy for the dashboard requests list
     const existing = JSON.parse(localStorage.getItem('profile_interview_requests') || '[]');
     const nextRequest = {
       id: `${listing.id}-${Date.now()}`,
       profileId: listing.id,
       profileName: listing.name,
+      requesterName: bookingName.trim(),
+      requesterEmail: bookingEmail.trim(),
+      requesterPhone: bookingPhone.trim(),
       requestedDate: selectedDate,
       requestedTime: selectedTime,
       interviewType: bookingType,
@@ -400,11 +675,28 @@ export default function ProfilePage() {
       createdAt: new Date().toISOString(),
       status: 'pending',
     };
-
     persistCollection('profile_interview_requests', [nextRequest, ...existing]);
 
+    // Open Google Calendar so the requester can book a 30-minute Meet slot
+    const professionalEmail = listing.email || listing.businessEmail || '';
+    const eventTitle = encodeURIComponent(`Interview with ${listing.name}`);
+    const eventDetails = encodeURIComponent(
+      `Interview requested via Summerland Estates for ${listing.name}.\n\n` +
+      `Requested by: ${bookingName.trim()} (${bookingEmail.trim()}, ${bookingPhone.trim()})\n\n` +
+      `Profile: ${window.location.href}\n\nAdd a Google Meet video call when creating the event.`
+    );
+    const addParam = professionalEmail ? `&add=${encodeURIComponent(professionalEmail)}` : '';
+    const durationParam = `&dates=`; // dates chosen in calendar
+    window.open(
+      `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&details=${eventDetails}&location=Google Meet${addParam}${durationParam}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+
     toast.success('Interview request sent', {
-      description: `Your request for ${selectedDate} at ${selectedTime} has been saved.`,
+      description: delivered
+        ? `${listing.name} has been notified. Finish booking a 30-minute slot in Google Calendar.`
+        : 'Request saved. Finish booking a 30-minute slot in Google Calendar.',
     });
 
     resetBookingForm();
@@ -476,8 +768,8 @@ export default function ProfilePage() {
           </Button>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Sidebar - Profile Card */}
-            <div className="lg:col-span-1">
+            {/* Sidebar - Profile Card (right column on desktop, like LinkedIn) */}
+            <div className="lg:col-span-1 lg:order-2">
               <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl overflow-hidden">
                 <div className="relative mb-6">
                   <img
@@ -505,14 +797,6 @@ export default function ProfilePage() {
                           <BadgeCheck className="w-6 h-6 text-[#A89F91] fill-[#A89F91]/20" />
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                             Verified
-                          </div>
-                        </div>
-                      )}
-                      {listing.backgroundCheckAvailable && (
-                        <div className="relative group">
-                          <Shield className="w-5 h-5 text-green-600" />
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                            Background Check Available
                           </div>
                         </div>
                       )}
@@ -546,10 +830,11 @@ export default function ProfilePage() {
                   </div>
 
                   {visibilityRules.canViewLocation && (
-                    <div className="flex items-center text-foreground">
-                      <MapPin className="w-5 h-5 mr-2 text-accent" />
-                      <span>{listing.location}</span>
-                    </div>
+                    <MapLocationLink
+                      location={listing.location}
+                      className="text-foreground"
+                      iconClassName="w-5 h-5 mr-2 text-accent"
+                    />
                   )}
 
                   {listing.category !== 'Business' && (
@@ -608,13 +893,7 @@ export default function ProfilePage() {
                           navigate('/pricing');
                           return;
                         }
-                        const professionalEmail = listing.email || listing.businessEmail || '';
-                        const eventTitle = encodeURIComponent(`Interview with ${listing.name}`);
-                        const eventDetails = encodeURIComponent(`Interview requested via Summerland Estates for ${listing.name}.\n\nProfile: ${window.location.href}\n\nPlease use Google Meet for the video call.`);
-                        const addParam = professionalEmail ? `&add=${encodeURIComponent(professionalEmail)}` : '';
-                        const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&details=${eventDetails}&location=Video Call${addParam}`;
-                        window.open(calendarUrl, '_blank', 'noopener,noreferrer');
-                        toast.success('Google Calendar opened', { description: 'Book a 30-minute slot and add a Google Meet link.' });
+                        setShowBookingModal(true);
                       }}
                     >
                       <Calendar className="w-5 h-5 mr-2" />
@@ -673,6 +952,19 @@ export default function ProfilePage() {
                       {isConnected ? 'Connected' : 'Connect'}
                     </Button>
                   </div>
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
+                    <ReportButton
+                      targetType="profile"
+                      targetId={listing.slug || listing.id}
+                      targetLabel={listing.name}
+                      className="border-border text-muted-foreground hover:bg-muted"
+                    />
+                    <BlockUserButton
+                      targetUserId={listing.userId}
+                      targetListingId={listing.id}
+                      targetLabel={listing.name}
+                    />
+                  </div>
                 </div>
               </Card>
 
@@ -682,8 +974,8 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Right Content - Profile Details */}
-            <div className="lg:col-span-2">
+            {/* Main Content - Profile Details (left column on desktop) */}
+            <div className="lg:col-span-2 lg:order-1">
               {!visibilityRules.canViewDetailedInfo ? (
                 <UpgradePrompt
                   feature="Full Profile Details"
@@ -815,7 +1107,10 @@ export default function ProfilePage() {
                         </Badge>
                       </div>
                       <div className="space-y-4">
-                        {reviews.map((review) => (
+                        {reviews.map((review) => {
+                          const isOwnReview = !!user && review.reviewerId === user.id;
+                          const isProfileOwner = !!user && !!listing.userId && listing.userId === user.id;
+                          return (
                           <div key={review.id} className="border-l-2 border-primary pl-4 pb-4 border-b border-border last:border-b-0 last:pb-0">
                             <div className="flex items-start justify-between mb-2">
                               <div>
@@ -841,8 +1136,105 @@ export default function ProfilePage() {
                               </div>
                             </div>
                             <p className="text-foreground text-sm leading-relaxed">{review.comment}</p>
+
+                            {review.response && (
+                              <div className="mt-3 ml-2 rounded-lg bg-[#FAFAF8] border border-border p-3">
+                                <p className="text-xs font-medium text-foreground mb-1">
+                                  Response from {listing.name}
+                                </p>
+                                <p className="text-sm text-muted-foreground">{review.response}</p>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-3 mt-2">
+                              {isOwnReview && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditReview(review)}
+                                    className="text-xs text-[#A89F91] hover:underline"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteReview(review.id)}
+                                    className="text-xs text-red-500 hover:underline"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
+                              {isProfileOwner && !review.response && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRespondingToReviewId(review.id);
+                                    setResponseText('');
+                                  }}
+                                  className="text-xs text-[#A89F91] hover:underline"
+                                >
+                                  Respond
+                                </button>
+                              )}
+                              {isProfileOwner && review.response && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRespondingToReviewId(review.id);
+                                    setResponseText(review.response || '');
+                                  }}
+                                  className="text-xs text-[#A89F91] hover:underline"
+                                >
+                                  Edit Response
+                                </button>
+                              )}
+                              {!isOwnReview && user && (
+                                <ReportButton
+                                  targetType="review"
+                                  targetId={review.id}
+                                  targetLabel={`Review by ${review.reviewerName}`}
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                                />
+                              )}
+                            </div>
+
+                            {respondingToReviewId === review.id && (
+                              <div className="mt-3 ml-2">
+                                <textarea
+                                  value={responseText}
+                                  onChange={(e) => setResponseText(e.target.value)}
+                                  placeholder="Write your response..."
+                                  rows={3}
+                                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-[#A89F91] resize-none"
+                                />
+                                <div className="flex gap-2 mt-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setRespondingToReviewId(null);
+                                      setResponseText('');
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-[#A89F91] hover:bg-[#8A8279] text-white"
+                                    onClick={() => handleRespondToReview(review.id)}
+                                    disabled={!responseText.trim()}
+                                  >
+                                    Post Response
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </Card>
                   )}
@@ -860,7 +1252,7 @@ export default function ProfilePage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md p-6 bg-card">
             <h3 className="text-xl font-heading font-semibold text-foreground mb-4 text-center">
-              Leave a Review
+              {editingReviewId ? 'Edit Your Review' : 'Leave a Review'}
             </h3>
             <p className="text-muted-foreground mb-6">
               How would you rate {listing?.name}?
@@ -908,7 +1300,7 @@ export default function ProfilePage() {
                 onClick={handleSubmitReview}
                 disabled={reviewRating === 0 || reviewSubmitting}
               >
-                {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
+                {reviewSubmitting ? 'Saving...' : editingReviewId ? 'Save Changes' : 'Submit Review'}
               </Button>
             </div>
           </Card>
@@ -920,15 +1312,49 @@ export default function ProfilePage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-lg p-6 bg-card">
             <h3 className="text-xl font-heading font-semibold text-foreground mb-2 text-center">
-              Book Interview
+              Request Interview
             </h3>
             <p className="text-muted-foreground mb-6 text-center text-sm">
-              Schedule an interview with {listing?.name}
+              Send a booking request to {listing?.name}, then reserve a 30-minute slot in Google Calendar
             </p>
-            
+
             <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Your Name *</label>
+                  <input
+                    type="text"
+                    value={bookingName}
+                    onChange={(e) => setBookingName(e.target.value)}
+                    placeholder="Full name"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Email *</label>
+                  <input
+                    type="email"
+                    value={bookingEmail}
+                    onChange={(e) => setBookingEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Select Date</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Phone Number *</label>
+                <input
+                  type="tel"
+                  value={bookingPhone}
+                  onChange={(e) => setBookingPhone(e.target.value)}
+                  placeholder="(555) 555-5555"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Select Date (Optional)</label>
                 <input
                   type="date"
                   value={selectedDate}
@@ -939,7 +1365,7 @@ export default function ProfilePage() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Select Time</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Select Time (Optional)</label>
                 <select
                   value={selectedTime}
                   onChange={(e) => setSelectedTime(e.target.value)}
@@ -1006,11 +1432,11 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Message (Optional)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Message *</label>
                 <textarea
                   value={bookingMessage}
                   onChange={(e) => setBookingMessage(e.target.value)}
-                  placeholder="Add a note about the interview..."
+                  placeholder="Tell them about the role or what you'd like to discuss..."
                   rows={3}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#A89F91] resize-none"
                 />
@@ -1029,7 +1455,7 @@ export default function ProfilePage() {
               <Button
                 className="flex-1 bg-[#A89F91] hover:bg-[#8A8279] text-white"
                 onClick={handleSubmitInterviewRequest}
-                disabled={!selectedDate || !selectedTime || bookingSubmitting}
+                disabled={!bookingName.trim() || !bookingEmail.trim() || !bookingPhone.trim() || !bookingMessage.trim() || bookingSubmitting}
               >
                 {bookingSubmitting ? 'Sending...' : 'Send Request'}
               </Button>

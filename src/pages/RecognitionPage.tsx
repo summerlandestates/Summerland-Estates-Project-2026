@@ -407,6 +407,7 @@ function NominationDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
   const [formData, setFormData] = useState({
     nomineeName: '',
     nomineeTitle: '',
+    nomineeEmail: '',
     company: '',
     category: 'employee_of_month',
     reason: '',
@@ -416,8 +417,8 @@ function NominationDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.nomineeName || !formData.reason) {
-      toast.error('Please fill in all required fields');
+    if (!formData.nomineeName || !formData.nomineeEmail || !formData.reason) {
+      toast.error('Please fill in all required fields, including the nominee\'s email');
       return;
     }
 
@@ -426,6 +427,8 @@ function NominationDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
       const recognitionData = {
         nominee_name: formData.nomineeName,
         nominee_title: formData.nomineeTitle,
+        nominee_email: formData.nomineeEmail,
+        nominee_status: 'pending',
         company: formData.company,
         category: formData.category,
         reason: formData.reason,
@@ -450,6 +453,14 @@ function NominationDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
       // Send notification to admin
       await emailNotifications.notifyAdminRecognition(recognitionData);
 
+      // Ask the nominee to approve the feature in their dashboard
+      await emailNotifications.notifyNomineeApproval({
+        nomineeEmail: formData.nomineeEmail,
+        nomineeName: formData.nomineeName,
+        submitterName: formData.submitterName,
+        category: formData.category,
+      });
+
       setIsSuccess(true);
       toast.success('Nomination submitted successfully!');
     } catch (error) {
@@ -465,6 +476,7 @@ function NominationDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
     setFormData({
       nomineeName: '',
       nomineeTitle: '',
+      nomineeEmail: '',
       company: '',
       category: 'employee_of_month',
       reason: '',
@@ -518,6 +530,21 @@ function NominationDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                 onChange={(e) => setFormData({ ...formData, nomineeTitle: e.target.value })}
                 placeholder="e.g., Estate Manager, Private Chef"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="nomineeEmail">Nominee Email *</Label>
+              <Input
+                id="nomineeEmail"
+                type="email"
+                value={formData.nomineeEmail}
+                onChange={(e) => setFormData({ ...formData, nomineeEmail: e.target.value })}
+                placeholder="Nominee's email — they'll approve this feature before it's published"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                The nominee must sign in and approve this recognition before it can be featured.
+              </p>
             </div>
 
             <div>
