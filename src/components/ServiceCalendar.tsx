@@ -151,10 +151,6 @@ export default function ServiceCalendar({ userId, isOwner }: ServiceCalendarProp
     setTimeSlots(timeSlots.filter((_, i) => i !== index));
   };
 
-  const availableDayNames = new Set(
-    timeSlots.filter((s) => s.available).map((s) => s.day)
-  );
-
   const getAvailableDaysCount = () => timeSlots.filter((s) => s.available).length;
 
   const getTotalHours = () =>

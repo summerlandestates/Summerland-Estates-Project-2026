@@ -65,7 +65,6 @@ export default function ServicesPage() {
         title="In-Home & Personal Services | Summerland Estates"
         description="Browse 30+ categories of in-home and personal services available through Summerland Estates, from housekeeping and childcare to pet care, events, and senior care."
         canonical="/services"
-        ogImage="/images/og-image.jpg"
         schema={{
           '@context': 'https://schema.org',
           '@graph': [
@@ -168,7 +167,7 @@ export default function ServicesPage() {
           </div>
         )}
 
-        {serviceGroups.map((group, groupIndex) => {
+        {serviceGroups.map((group) => {
           const visibleCategories = searchQuery
             ? group.categories.filter((cat) =>
                 filteredCategories.some((fc) => fc.number === cat.number)

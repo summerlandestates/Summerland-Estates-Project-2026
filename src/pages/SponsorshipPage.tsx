@@ -10,7 +10,6 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -18,26 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Handshake,
-  Calendar,
-  Mail,
-  Globe,
-  TrendingUp,
-  Megaphone,
-  Star,
-  ArrowLeft,
-  CheckCircle2,
-  Loader2,
-  Building2,
-  User,
-  DollarSign,
-  MessageSquare,
-  Users,
-  Activity,
-  Heart,
-  Zap
-} from 'lucide-react';
+import { Handshake, Calendar, Mail, Globe, Star, ArrowLeft, CheckCircle2, Loader2, Building2, User, DollarSign, MessageSquare, Users, Activity, Heart } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { emailNotifications } from '@/services/emailNotifications';
 

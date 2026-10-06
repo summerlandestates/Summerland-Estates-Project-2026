@@ -1,5 +1,10 @@
 import { MapPin } from 'lucide-react';
 
+export const isMappableLocation = (loc?: string | null): boolean => {
+  const trimmed = (loc || '').trim();
+  return !!trimmed && !/^(remote|online|virtual|n\/a|tbd)$/i.test(trimmed);
+};
+
 interface MapLocationLinkProps {
   location: string;
   className?: string;
@@ -16,7 +21,7 @@ export default function MapLocationLink({
   iconClassName = 'w-3 h-3 mr-1 flex-shrink-0',
 }: MapLocationLinkProps) {
   const trimmed = (location || '').trim();
-  const unmappable = /^(remote|online|virtual|n\/a|tbd)$/i.test(trimmed);
+  const unmappable = !isMappableLocation(location);
 
   if (!trimmed || unmappable) {
     return (

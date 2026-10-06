@@ -5,7 +5,7 @@ import ArticleManager from '@/components/ArticleManager';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function AdminArticlesPage() {
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

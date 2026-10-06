@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Check, CreditCard, BadgeCheck, Star, Plus } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import type { CheckoutData } from '../types';
 import {
   buildCheckoutDataFromMembership,
@@ -21,7 +20,7 @@ import {
 } from '@/lib/membership';
 import { validateAndRedeemPromoCode } from '@/lib/membershipApplication';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 
 function isSupabaseConnectionIssue(error: unknown) {

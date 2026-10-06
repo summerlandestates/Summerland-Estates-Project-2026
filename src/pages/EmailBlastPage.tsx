@@ -8,27 +8,11 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  Send,
-  Mail,
-  Users,
-  CreditCard,
-  CheckCircle2,
-  ArrowLeft,
-  Loader2,
-  AlertCircle,
-  Eye,
-  Calendar,
-  Target,
-  Sparkles,
-  Lock,
-  FileText,
-  DollarSign
-} from 'lucide-react';
+import { Send, CreditCard, CheckCircle2, ArrowLeft, Loader2, AlertCircle, Calendar, Target, Sparkles, Lock, FileText, DollarSign } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import { emailNotifications } from '@/services/emailNotifications';
 import { loadStripe } from '@stripe/stripe-js';
 import {
@@ -286,6 +270,7 @@ export default function EmailBlastPage() {
         <SEOHead
           title="Email Blast Submitted - Summerland Estates"
           description="Your email blast has been submitted for review."
+          noIndex={true}
         />
         <NavBar currentPage="advertising" />
         
@@ -329,6 +314,7 @@ export default function EmailBlastPage() {
         title="Email Blast - Summerland Estates"
         description="Send a dedicated email blast to our community of estate professionals. Reach 8,500+ members directly in their inbox."
         canonical="/email-blast"
+        noIndex={true}
       />
       <NavBar currentPage="advertising" />
       

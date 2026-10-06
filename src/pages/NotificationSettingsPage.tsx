@@ -49,7 +49,7 @@ export default function NotificationSettingsPage() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [hasPhone, setHasPhone] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [userTier, setUserTier] = useState<string | null>(null);
+  const [, setUserTier] = useState<string | null>(null);
   const [isPaid, setIsPaid] = useState(false);
 
   useEffect(() => {

@@ -23,10 +23,10 @@ import {
 import NotificationBell from './NotificationBell';
 
 interface NavBarProps {
-  currentPage: string;
+  currentPage?: string;
 }
 
-export default function NavBar({ currentPage }: NavBarProps) {
+export default function NavBar({ currentPage = '' }: NavBarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);

@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Loader2, MapPin, Plus, Save, Upload, X } from 'lucide-react';
+import { ArrowLeft, Loader2, MapPin, Plus, Save, X } from 'lucide-react';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import ServiceCategoryPicker from '@/components/ServiceCategoryPicker';
 import { getTierLimits } from '@/utils/tierAccess';

@@ -83,6 +83,7 @@ interface Event {
   organizer_email: string;
   is_featured: boolean;
   status: 'pending' | 'approved' | 'rejected' | 'published' | 'cancelled' | 'completed';
+  notify_radius_miles: number | null;
   admin_notes: string | null;
   submitted_by: string | null;
   reviewed_by: string | null;
@@ -258,6 +259,32 @@ export default function AdminEventsPage() {
         });
       } catch (emailErr) {
         console.error('Failed to send email notification:', emailErr);
+      }
+
+      // Organizer opted into radius-based member notifications — fire them on approval
+      if (
+        (selectedStatus === 'approved' || selectedStatus === 'published') &&
+        reviewingEvent.notify_radius_miles &&
+        reviewingEvent.location &&
+        reviewingEvent.location !== 'Online'
+      ) {
+        try {
+          await fetch('/api/notify-job-matches', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user?.id,
+              eventId: reviewingEvent.id,
+              itemType: 'event',
+              jobTitle: reviewingEvent.title,
+              jobDescription: reviewingEvent.description,
+              location: reviewingEvent.location,
+              radiusMiles: reviewingEvent.notify_radius_miles,
+            }),
+          });
+        } catch (notifyErr) {
+          console.error('Failed to send radius notifications:', notifyErr);
+        }
       }
 
       toast.success(`Event ${selectedStatus === 'published' || selectedStatus === 'approved' ? 'approved' : 'updated'} successfully!`);

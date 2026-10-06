@@ -7,20 +7,45 @@ export const CATEGORY_EMOJIS: Record<string, string> = {
   'Cleaning & Home Care': '🧹',
   'Landscaping & Outdoor': '🌿',
   'Handyman & Repairs': '🔧',
+  'Home Organization & Decluttering': '🗂️',
+  'Moving & Heavy Lifting': '📦',
+  'Childcare & Babysitting': '👶',
+  'Tutoring & Academic Help': '🎓',
+  "Kids' Sports & Athletics": '⚽',
+  "Kids' Arts & Creative Lessons": '🎨',
+  "Kids' Parties & Activities": '🎉',
+  'Family Transportation & Drivers': '🚗',
+  'Baby & New Parent Services': '🍼',
+  'Personal Assistants & Concierge': '🧑‍💼',
+  'Shopping & Personal Errands': '🛍️',
   'Pet Services': '🐾',
   'Health & Wellness': '🧘',
   'Beauty & Personal Care': '💅',
+  'Therapy & Life Coaching': '🧠',
+  'Event & Party Planning': '🎈',
   'Food & Beverage': '🍽️',
   'Entertainment & Specialty': '🎭',
+  'Mobile Classes & Experiences': '📚',
+  'Mobile Auto & Vehicle Services': '🚙',
+  'Senior & Family Care': '👵',
+  'Technology & Smart Home': '💻',
+  'Travel & Vacation Services': '✈️',
+  'Career & Business Services': '💼',
+  'Photography & Creative': '📸',
+  'Estate & Household Management': '🏡',
   'Luxury & Niche Services': '✨',
 };
 
 // Keyword → emoji heuristic for individual services. First match wins.
 const SERVICE_EMOJI_RULES: [RegExp, string][] = [
-  [/baby|newborn|child|kid|nanny|babysit|doula|lactation/, '👶'],
-  [/tutor|homework|test prep|teach|school/, '🎓'],
-  [/drive|chauffeur|ride|transport|pickup|drop.?off/, '🚗'],
-  [/clean|sweep|laundr|iron|maid|junk|declutter|organiz/, '🧹'],
+  [/baby|newborn|child|kid|nanny|babysit|doula|lactation|postpartum|stroller|car.?seat/, '👶'],
+  [/drive|chauffeur|ride|transport|pickup|pick.?up|drop.?off|carpool|dmv/, '🚗'],
+  [/tutor|homework|test prep|teach|school|sat prep|act prep|ap exam|kindergarten|preschool|study skills|homeschool|special education|executive function|time-management/, '🎓'],
+  [/soccer|basketball|baseball|softball|football|volleyball|tennis|pickleball|golf|swim|gymnastic|dance|cheer|martial|hockey|skating|skateboard|surf|ski|snowboard|equestrian|fishing|sport/, '⚽'],
+  [/organiz|declutter|staging|pantry|playroom|inventory|filing/, '�️'],
+  [/clean|sweep|laundr|iron|maid|junk/, '🧹'],
+  [/moving|furniture (mov|rear|pickup|deliv)|heavy lift|packing|unpack|loading|storage mov|donation|cleanout|box deliv/, '📦'],
+  [/coach|counsel|therapist|grief|divorce|behavioral|parenting/, '�'],
   [/window|pressure wash|roof|gutter/, '🪟'],
   [/lawn|mow|landscap|garden|tree|stump|weed|irrigation|plant|fence|patio|pond/, '🌿'],
   [/pool/, '🏊'],
@@ -28,7 +53,7 @@ const SERVICE_EMOJI_RULES: [RegExp, string][] = [
   [/plumb/, '🚿'],
   [/electric/, '💡'],
   [/hvac|air duct|vent/, '🌬️'],
-  [/appliance|handyman|repair|assembl|mount|drywall/, '🔧'],
+  [/appliance|handyman|repair|assembl|mount|drywall|maintenance/, '🔧'],
   [/paint/, '🎨'],
   [/floor|tile|grout/, '🧱'],
   [/locksmith/, '🔑'],
@@ -40,10 +65,16 @@ const SERVICE_EMOJI_RULES: [RegExp, string][] = [
   [/reptile|animal|falcon/, '🦎'],
   [/massage/, '💆'],
   [/trainer|fitness/, '💪'],
-  [/yoga|pilates|meditat/, '🧘'],
+  [/yoga|pilates|meditat|breathwork/, '🧘'],
   [/therap|sauna|cryo|iv therapy/, '🩺'],
   [/nutrition/, '🥗'],
   [/sleep/, '😴'],
+  [/errand|grocery|prescription|package|post office|shopping|shopper|gift/, '🛍️'],
+  [/assistant|concierge|scheduling|calendar|bill organ|lifestyle|arrival|departure/, '🧑‍💼'],
+  [/senior|elder|respite|caregiv|aging/, '👵'],
+  [/resume|linkedin|career|interview|bookkeep|tax|branding|website|social media/, '💼'],
+  [/travel|vacation|hotel|airport|beach|poolside/, '✈️'],
+  [/estate|house sit|sitter|property|vendor coord|household|check.?in|check.?out|home prep/, '🏡'],
   [/hair|barber/, '💇'],
   [/makeup/, '💄'],
   [/nail/, '💅'],
@@ -51,6 +82,7 @@ const SERVICE_EMOJI_RULES: [RegExp, string][] = [
   [/tattoo|piercing|permanent makeup/, '🖋️'],
   [/teeth/, '🦷'],
   [/tan/, '🌞'],
+  [/esthetician|facial|stylist|wardrobe|color analysis|image consult/, '💆'],
   [/chef|cook|meal prep/, '👨‍🍳'],
   [/bartend|mixolog|wine|whiskey|sommelier|cigar/, '🍷'],
   [/coffee|tea/, '☕'],
@@ -62,14 +94,14 @@ const SERVICE_EMOJI_RULES: [RegExp, string][] = [
   [/tarot/, '🔮'],
   [/casino|poker/, '🎰'],
   [/mystery/, '🕵️'],
-  [/party|event|birthday|proposal|picnic|glamp/, '🎉'],
+  [/party|event|birthday|proposal|picnic|glamp|bounce|sleepover|puppet|storytell|slime|lego|nerf/, '🎉'],
   [/dj|karaoke|disco|dancer|music/, '🎶'],
-  [/photograph|drone/, '📸'],
+  [/photograph|videograph|video|drone|recording booth/, '📸'],
   [/movie|film|digitiz|backyard movie/, '🎬'],
   [/christmas|holiday|decorat/, '🎄'],
   [/princess|superhero|character/, '🦸'],
-  [/computer|tech|smart home|automation|podcast|recording|voice/, '💻'],
-  [/auto|car detail|mechanic|tire|oil change|windshield|rv |boat/, '🚙'],
+  [/computer|tech|smart home|automation|podcast|recording|voice|wi-?fi|ipad|printer|streaming|gaming|parental|privacy|device/, '💻'],
+  [/auto|car detail|mechanic|tire|oil change|windshield|rv |boat|vehicle/, '🚙'],
   [/bicycle|bike/, '🚲'],
   [/watch|clock/, '⌚'],
   [/piano/, '🎹'],
@@ -103,6 +135,9 @@ const STOPWORDS = new Set([
   'help', 'with', 'who', 'can', 'could', 'would', 'please', 'is', 'are',
   'this', 'that', 'twice', 'once', 'per', 'week', 'weekend', 'weekday',
   'day', 'daily', 'weekly', 'monthly', 'recurring', 'regularly',
+  'up', 'down', 'out', 'off', 'do', 'go', 'it', 'us', 'am', 'pm', 'be',
+  'also', 'just', 'too', 'very', 'really', 'around', 'near', 'over', 'from',
+  'them', 'him', 'her', 'his', 'their', 'its', 'not', 'no', 'so', 'as',
 ]);
 
 // Query word → related terms to also match against (synonym expansion)
@@ -110,7 +145,12 @@ const SYNONYMS: Record<string, string[]> = {
   drive: ['driver', 'chauffeur', 'transport', 'ride', 'pickup'],
   driver: ['chauffeur', 'transport', 'drive'],
   ride: ['driver', 'chauffeur', 'transport', 'pickup'],
-  pickup: ['driver', 'transport', 'school'],
+  pickup: ['driver', 'transport', 'school', 'pick-up', 'drop-off'],
+  pick: ['pickup', 'pick-up', 'transport', 'driver', 'school'],
+  drop: ['drop-off', 'dropoff', 'pickup', 'transport', 'driver', 'school'],
+  school: ['pickup', 'pick-up', 'drop-off', 'transport', 'education', 'kids', 'after-school'],
+  upstairs: ['furniture', 'moving', 'assembly'],
+  watch: ['babysitter', 'nanny', 'childcare', 'kids'],
   chauffeur: ['driver', 'transport'],
   daughter: ['child', 'kid', 'kids', 'children', 'family'],
   son: ['child', 'kid', 'kids', 'children', 'family'],
@@ -196,6 +236,28 @@ function normalize(text: string): string[] {
     .filter(Boolean);
 }
 
+/** Flatten punctuation so "pick-up" matches the "pickup" token. */
+function normalizeHaystack(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/-/g, '')
+    .replace(/[^a-z0-9\s']/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Prefix-boundary match: token must start at a word boundary, so "up" can't
+ * match inside "makeup", but "clean" still stems into "cleaning"/"cleanup".
+ */
+function termHits(haystack: string, token: string): boolean {
+  const clean = (token || '').replace(/-/g, '');
+  if (!clean) return false;
+  const pattern = clean.includes(' ') ? escapeRe(clean).replace(/\s+/g, '\\s*') : escapeRe(clean);
+  return new RegExp(`\\b${pattern}`, 'i').test(haystack);
+}
+
 export function parseSearchIntent(query: string): SearchIntent {
   const raw = normalize(query);
   const contentTokens = raw.filter((t) => !STOPWORDS.has(t));
@@ -210,10 +272,10 @@ export function parseSearchIntent(query: string): SearchIntent {
   const tokens = [...expanded];
 
   const score = (name: string): number => {
-    const words = name.toLowerCase();
+    const words = normalizeHaystack(name);
     let s = 0;
     for (const t of tokens) {
-      if (words.includes(t)) s += t.length > 3 ? 2 : 1;
+      if (termHits(words, t)) s += t.length > 3 ? 2 : 1;
     }
     // Phrase boost: full query appears inside the service name
     if (contentTokens.length > 1 && words.includes(contentTokens.join(' '))) s += 4;
@@ -241,18 +303,19 @@ function listingHaystack(listing: Listing): string {
   const services = (listing.servicesOffered || [])
     .map((s: any) => (typeof s === 'string' ? s : s?.name || ''))
     .join(' ');
-  return [
-    listing.name,
-    listing.role,
-    listing.bio,
-    listing.location,
-    services,
-    (listing.skills || []).join(' '),
-    (listing.previousJobTitles || []).join(' '),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+  return normalizeHaystack(
+    [
+      listing.name,
+      listing.role,
+      listing.bio,
+      listing.location,
+      services,
+      (listing.skills || []).join(' '),
+      (listing.previousJobTitles || []).join(' '),
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
 }
 
 /**
@@ -260,27 +323,27 @@ function listingHaystack(listing: Listing): string {
  * Exact substring matches score highest; otherwise any content-token hit counts.
  */
 export function intentScore(listing: Listing, query: string, intent?: SearchIntent): number {
-  const q = query.trim().toLowerCase();
+  const q = normalizeHaystack(query.trim());
   if (!q) return 1;
   const hay = listingHaystack(listing);
   if (hay.includes(q)) return 100;
 
-  const parsed = intent || parseSearchIntent(q);
+  const parsed = intent || parseSearchIntent(query);
   if (parsed.tokens.length === 0) return 0;
 
   let score = 0;
   for (const token of parsed.tokens) {
     if (token.length < 3) continue;
-    if (hay.includes(token)) score += 1;
+    if (termHits(hay, token)) score += 1;
   }
 
   // Boost listings whose role matches a recommended service/title
-  const role = listing.role.toLowerCase();
+  const role = normalizeHaystack(listing.role);
   for (const s of parsed.matchedServices) {
-    if (role.includes(s.toLowerCase())) score += 5;
+    if (role.includes(normalizeHaystack(s))) score += 5;
   }
   for (const t of parsed.matchedTitles) {
-    if (role.includes(t.toLowerCase())) score += 5;
+    if (role.includes(normalizeHaystack(t))) score += 5;
   }
 
   return score;

@@ -8,7 +8,6 @@ import MatchedJobs from '@/components/MatchedJobs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,40 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { 
-  Activity, 
-  User, 
-  Edit3, 
-  LogOut,
-  Settings,
-  Search,
-  Bell,
-  Bookmark,
-  Briefcase,
-  MessageSquare,
-  Calendar,
-  Handshake,
-  Send,
-  Award,
-  Crown,
-  Zap,
-  ChevronRight,
-  Clock,
-  CheckCircle2,
-  CheckCircle,
-  BadgeCheck,
-  AlertCircle,
-  ExternalLink,
-  FileText,
-  Eye,
-  Loader2,
-  Plus,
-  DollarSign,
-  Mail,
-  Star,
-  Trash2,
-  MoreVertical
-} from 'lucide-react';
+import { computeProfileCompleteness } from '@/utils/profileCompleteness';
+import { Activity, User, Edit3, LogOut, Settings, Search, Bell, Briefcase, MessageSquare, Calendar, Handshake, Send, Award, Crown, Zap, ChevronRight, Clock, CheckCircle2, CheckCircle, BadgeCheck, AlertCircle, ExternalLink, FileText, Eye, Plus, DollarSign, Mail, Star, Trash2, MoreVertical } from 'lucide-react';
 
 // Types
 interface UserStats {
@@ -703,6 +670,55 @@ export default function UserDashboard() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Profile completeness */}
+              {(() => {
+                const completeness = computeProfileCompleteness(profileData);
+                return (
+                  <Card className="mb-8 border-[#e8dfd3]">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h3 className="font-heading font-semibold text-[#23231f]">
+                            Your profile is {completeness.percent}% complete
+                          </h3>
+                          <p className="text-xs text-[#6b665f]">
+                            Complete profiles appear higher in search results
+                          </p>
+                        </div>
+                        {completeness.percent < 100 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#A89F91] text-[#A89F91]"
+                            onClick={() => navigate('/my-profile/edit')}
+                          >
+                            Complete Profile
+                          </Button>
+                        )}
+                      </div>
+                      <div className="h-2 rounded-full bg-[#f5efe7] overflow-hidden mb-4">
+                        <div
+                          className="h-full bg-[#A89F91] transition-all duration-500"
+                          style={{ width: `${completeness.percent}%` }}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                        {completeness.complete.map((item) => (
+                          <span key={item} className="flex items-center gap-1.5 text-[#6b665f]">
+                            <CheckCircle2 className="w-4 h-4 text-green-600" /> {item}
+                          </span>
+                        ))}
+                        {completeness.missing.map((item) => (
+                          <span key={item} className="flex items-center gap-1.5 text-[#6b665f]/70">
+                            <AlertCircle className="w-4 h-4" /> {item}
+                          </span>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Profile Analytics */}
               <div className="mb-8">

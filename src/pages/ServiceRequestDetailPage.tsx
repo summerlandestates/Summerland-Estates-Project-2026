@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
+import SEOHead from '@/components/SEOHead';
 import MapLocationLink from '../components/MapLocationLink';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -228,8 +229,15 @@ export default function ServiceRequestDetailPage() {
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      {service && (
+        <SEOHead
+          title={`${service.service_needed} - ${service.location} | Service Requests`}
+          description={(service.details || `${service.service_needed} service request in ${service.location} on Summerland Estates`).slice(0, 160)}
+          canonical={`/service-request/${service.id}`}
+        />
+      )}
       <NavBar currentPage="" />
-      
+
       <main className="pt-32 pb-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
           {/* Back Button */}

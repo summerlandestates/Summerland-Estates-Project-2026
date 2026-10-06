@@ -13,18 +13,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Briefcase, 
-  MapPin, 
-  Clock, 
-  DollarSign, 
-  Calendar,
-  Search,
-  Filter,
-  Building2,
-  Users,
-  Loader2
-} from 'lucide-react';
+import { Briefcase, Clock, DollarSign, Calendar, Search, Building2, Users, Loader2 } from 'lucide-react';
 
 interface JobPosting {
   id: string;

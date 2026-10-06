@@ -2,31 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  Calendar, 
-  MapPin, 
-  Clock, 
-  Users, 
-  Video, 
-  Star, 
-  ArrowLeft, 
-  Mail, 
-  Phone, 
-  User,
-  Building2,
-  FileText,
-  Clock2,
-  Pencil,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ExternalLink,
-  Trash2
-} from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Video, Star, ArrowLeft, Mail, Phone, Building2, FileText, Clock2, Pencil, CheckCircle2, XCircle, Loader2, ExternalLink, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,

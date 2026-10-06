@@ -6,7 +6,6 @@ import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -15,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AlertTriangle, Check, User, Mail, Phone, MapPin, Briefcase } from 'lucide-react';
+import { AlertTriangle, Check, User, Mail, MapPin, Briefcase } from 'lucide-react';
 import type { PricingTier, UserType } from '../types';
 
 type ExitStep = 'community-offer' | 'confirm-delete';

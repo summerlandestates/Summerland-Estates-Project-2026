@@ -5,7 +5,8 @@ import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, XCircle, Star, MapPin, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Star, ThumbsUp, ThumbsDown } from 'lucide-react';
+import MapLocationLink from '../components/MapLocationLink';
 import { listings } from '../data/listings';
 import { compareProfiles } from '../utils/profileComparison';
 import type { ComparisonData } from '../types';
@@ -106,10 +107,11 @@ export default function ComparisonPage() {
                   </div>
 
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center text-foreground">
-                      <MapPin className="w-4 h-4 mr-2 text-accent" />
-                      {profile.location}
-                    </div>
+                    <MapLocationLink
+                      location={profile.location}
+                      className="text-foreground"
+                      iconClassName="w-4 h-4 mr-2 text-accent"
+                    />
                     <div className="flex items-center text-foreground">
                       <Star className="w-4 h-4 mr-2 fill-accent text-accent" />
                       {profile.rating}/5.0

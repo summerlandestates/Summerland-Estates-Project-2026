@@ -85,7 +85,7 @@ export default function AdminUsersPage() {
   const [dialogState, setDialogState] = useState<ActionDialogState>({ type: null, profile: null });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

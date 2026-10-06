@@ -36,7 +36,7 @@ function mapArray(raw: any): string[] {
   }
 }
 
-function mapListingFromRow(row: any, index: number = 0): Listing {
+function mapListingFromRow(row: any, _index: number = 0): Listing {
   const skills = (row.skills || []).map((s: any) => s.skill_name).filter(Boolean);
   const workHistory: WorkHistory[] = (row.work_history || []).map((wh: any) => ({
     jobTitle: wh.job_title || '',

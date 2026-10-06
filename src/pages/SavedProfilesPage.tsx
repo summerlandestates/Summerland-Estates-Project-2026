@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Heart, GitCompare, Trash2, Star, MapPin } from 'lucide-react';
+import { Heart, GitCompare, Trash2, Star } from 'lucide-react';
+import MapLocationLink from '../components/MapLocationLink';
 import { listings } from '../data/listings';
 import type { Listing } from '../types';
 
@@ -186,10 +187,11 @@ export default function SavedProfilesPage() {
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center text-foreground">
-                      <MapPin className="w-4 h-4 mr-1 text-accent" />
-                      {profile.location}
-                    </div>
+                    <MapLocationLink
+                      location={profile.location}
+                      className="text-foreground"
+                      iconClassName="w-4 h-4 mr-1 text-accent"
+                    />
                     <div className="flex items-center text-foreground">
                       <Star className="w-4 h-4 mr-1 fill-accent text-accent" />
                       {profile.rating}

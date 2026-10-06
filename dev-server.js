@@ -22,7 +22,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: '2026-01-28.clover',
 });
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
@@ -549,6 +549,19 @@ const getMembershipApplications = async () => {
   };
 };
 
+// Keep in sync with src/data/pricing.ts — prevents client-side amount tampering.
+const PLAN_PRICES = {
+  'professional-pro': 0.99,
+  'business-pro': 6.99,
+  'business-enterprise': 9.99,
+  'agency-basic': 7.99,
+  'agency-hiring': 10.99,
+  'agency-pro': 14.99,
+  'estates-basic': 7.99,
+  'estates-hiring': 10.99,
+  'estates-pro': 14.99,
+};
+
 app.post('/api/create-checkout-session', async (req, res) => {
   try {
     const { priceAmount, email, metadata } = req.body;
@@ -556,6 +569,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
     const parsedAmount = parseFloat(String(priceAmount).replace(/[^0-9.]/g, ''));
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       return res.status(400).json({ error: 'Invalid checkout amount' });
+    }
+
+    const expected = PLAN_PRICES[metadata?.selectedTier];
+    if (expected !== undefined && Math.abs(parsedAmount - expected) > 0.001) {
+      return res.status(400).json({ error: 'Checkout amount does not match the selected plan' });
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -1555,81 +1573,10 @@ const profileViewTemplate = (ownerName, viewerName, time) => `
   </div>
 `;
 
-// ─── Dynamic Sitemap Generator ──────────────────────────────────────────
-// Generates sitemap.xml with all static pages + dynamic articles
-app.get('/api/sitemap.xml', async (req, res) => {
-  try {
-    const baseUrl = 'https://summerlandestates.com';
-    const today = new Date().toISOString().split('T')[0];
+// ─── Sitemap ────────────────────────────────────────────────────────────────
+// Legacy alias — the comprehensive sitemap lives at /sitemap.xml below.
+app.get('/api/sitemap.xml', (req, res) => res.redirect(301, '/sitemap.xml'));
 
-    // Static pages
-    const staticPages = [
-      { url: '/', priority: '1.0', changefreq: 'daily' },
-      { url: '/search', priority: '0.9', changefreq: 'daily' },
-      { url: '/collective', priority: '0.8', changefreq: 'weekly' },
-      { url: '/about', priority: '0.7', changefreq: 'monthly' },
-      { url: '/contact', priority: '0.7', changefreq: 'monthly' },
-      { url: '/faqs', priority: '0.7', changefreq: 'monthly' },
-      { url: '/privacy', priority: '0.6', changefreq: 'monthly' },
-      { url: '/terms', priority: '0.6', changefreq: 'monthly' },
-      { url: '/signup', priority: '0.8', changefreq: 'monthly' },
-      { url: '/login', priority: '0.8', changefreq: 'monthly' },
-      { url: '/advertisements', priority: '0.8', changefreq: 'weekly' },
-      { url: '/open-roles', priority: '0.8', changefreq: 'daily' },
-      { url: '/service-requests', priority: '0.8', changefreq: 'daily' },
-      { url: '/events', priority: '0.7', changefreq: 'weekly' },
-      { url: '/news', priority: '0.7', changefreq: 'weekly' },
-      { url: '/recognition', priority: '0.6', changefreq: 'monthly' },
-      { url: '/add-listing', priority: '0.8', changefreq: 'monthly' },
-    ];
-
-    // Fetch all published articles from Supabase
-    let articles = [];
-    if (supabaseReadClient) {
-      const { data, error } = await supabaseReadClient
-        .from('articles')
-        .select('slug, updated_at, created_at, published_at')
-        .eq('status', 'published');
-      
-      if (!error && data) {
-        articles = data;
-      }
-    }
-
-    // Build sitemap XML
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
-
-    // Add static pages
-    staticPages.forEach(page => {
-      xml += '  <url>\n';
-      xml += `    <loc>${baseUrl}${page.url}</loc>\n`;
-      xml += `    <lastmod>${today}</lastmod>\n`;
-      xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
-      xml += `    <priority>${page.priority}</priority>\n`;
-      xml += '  </url>\n';
-    });
-
-    // Add article pages
-    articles.forEach(article => {
-      const lastmod = (article.updated_at || article.published_at || article.created_at || today).split('T')[0];
-      xml += '  <url>\n';
-      xml += `    <loc>${baseUrl}/articles/${article.slug}</loc>\n`;
-      xml += `    <lastmod>${lastmod}</lastmod>\n`;
-      xml += '    <changefreq>monthly</changefreq>\n';
-      xml += '    <priority>0.6</priority>\n';
-      xml += '  </url>\n';
-    });
-
-    xml += '</urlset>';
-
-    res.setHeader('Content-Type', 'application/xml');
-    res.send(xml);
-  } catch (error) {
-    console.error('Sitemap generation error:', error);
-    res.status(500).json({ error: 'Failed to generate sitemap' });
-  }
-});
 
 // ─── Send Email Endpoint (Generic) ──────────────────────────────────────────
 app.post('/api/send-email', async (req, res) => {
@@ -2153,6 +2100,7 @@ app.post('/api/notify-job-matches', async (req, res) => {
     const {
       jobId,
       serviceId,
+      eventId,
       itemType = 'job',
       jobTitle,
       jobDescription,
@@ -2161,7 +2109,7 @@ app.post('/api/notify-job-matches', async (req, res) => {
       radiusMiles = 50,
     } = req.body;
 
-    const itemId = jobId || serviceId;
+    const itemId = jobId || serviceId || eventId;
 
     if (!itemId || !jobTitle) {
       return res.status(400).json({ error: 'Missing required fields: jobId/serviceId, jobTitle' });
@@ -2213,17 +2161,22 @@ app.post('/api/notify-job-matches', async (req, res) => {
 
       if (matches) {
         const isService = itemType === 'service';
+        const isEvent = itemType === 'event';
         try {
           const result = await deliverNotification({
             userId: p.id,
-            type: isService ? 'new-service-request' : 'new-job',
-            title: isService
-              ? `New service request near you: ${jobTitle}`
-              : `New job matches your resume: ${jobTitle}`,
-            body: isService
-              ? `A new service request (${jobTitle}) in ${location || 'your area'} was posted${jobCoords ? ` within ${radiusMiles} miles of you` : ''}.`
-              : `A new ${jobTitle} position in ${location || 'your area'} looks like a great fit for your profile.`,
-            link: `${APP_URL}/${isService ? 'service-request' : 'job'}/${itemId}`
+            type: isEvent ? 'new-event' : isService ? 'new-service-request' : 'new-job',
+            title: isEvent
+              ? `New event near you: ${jobTitle}`
+              : isService
+                ? `New service request near you: ${jobTitle}`
+                : `New job matches your resume: ${jobTitle}`,
+            body: isEvent
+              ? `A new event (${jobTitle}) in ${location || 'your area'} was just announced${jobCoords ? ` — within ${radiusMiles} miles of you` : ''}.`
+              : isService
+                ? `A new service request (${jobTitle}) in ${location || 'your area'} was posted${jobCoords ? ` within ${radiusMiles} miles of you` : ''}.`
+                : `A new ${jobTitle} position in ${location || 'your area'} looks like a great fit for your profile.`,
+            link: `${APP_URL}/${isEvent ? 'event' : isService ? 'service-request' : 'job'}/${itemId}`
           });
           if (result.sent) sent.push(p.id);
         } catch (notifErr) {
@@ -2250,6 +2203,9 @@ const sitemapStaticRoutes = [
   { path: '/collective', priority: '0.8', changefreq: 'weekly' },
   { path: '/events', priority: '0.7', changefreq: 'weekly' },
   { path: '/news', priority: '0.7', changefreq: 'weekly' },
+  { path: '/services', priority: '0.8', changefreq: 'weekly' },
+  { path: '/how-it-works', priority: '0.7', changefreq: 'monthly' },
+  { path: '/pricing', priority: '0.8', changefreq: 'monthly' },
   { path: '/about', priority: '0.7', changefreq: 'monthly' },
   { path: '/contact', priority: '0.7', changefreq: 'monthly' },
   { path: '/faqs', priority: '0.7', changefreq: 'monthly' },

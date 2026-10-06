@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
+import SEOHead from '@/components/SEOHead';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,20 +16,7 @@ import { getTierLimits } from '@/utils/tierAccess';
 import { sendBackendNotification } from '@/utils/notifications';
 import ReportButton from '@/components/ReportButton';
 import MapLocationLink from '../components/MapLocationLink';
-import { 
-  ArrowLeft,
-  Briefcase, 
-  MapPin, 
-  DollarSign, 
-  Calendar,
-  Mail,
-  Phone,
-  User,
-  Building2,
-  Loader2,
-  Send,
-  CheckCircle
-} from 'lucide-react';
+import { ArrowLeft, Briefcase, DollarSign, Calendar, Mail, Phone, User, Building2, Loader2, Send, CheckCircle } from 'lucide-react';
 
 interface JobPosting {
   id: string;
@@ -258,10 +246,37 @@ export default function JobDetailPage() {
     );
   }
 
+  const jobSchema = job ? {
+    '@context': 'https://schema.org',
+    '@type': 'JobPosting',
+    title: job.job_title,
+    description: job.job_description || `${job.job_title} position in ${job.location}`,
+    datePosted: job.created_at,
+    ...(job.application_deadline ? { validThrough: job.application_deadline } : {}),
+    employmentType: (job.employment_types || []).map((t) => t.toUpperCase().replace(/-/g, '_')),
+    hiringOrganization: {
+      '@type': 'Organization',
+      name: job.contact_name || 'Summerland Estates',
+      sameAs: 'https://summerlandestates.com',
+    },
+    jobLocation: {
+      '@type': 'Place',
+      address: { '@type': 'PostalAddress', addressLocality: job.location },
+    },
+  } : undefined;
+
   return (
     <div className="min-h-screen bg-background page-transition">
+      {job && (
+        <SEOHead
+          title={`${job.job_title} - ${job.location} | Estate Jobs`}
+          description={(job.job_description || `${job.job_title} position in ${job.location} via Summerland Estates`).slice(0, 160)}
+          canonical={`/job/${job.id}`}
+          schema={jobSchema}
+        />
+      )}
       <NavBar currentPage="" />
-      
+
       <main className="pt-32 pb-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
           {/* Back Button */}

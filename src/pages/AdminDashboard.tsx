@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import SEOHead from '@/components/SEOHead';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -234,7 +233,7 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <SEOHead title="Admin Dashboard - Summerland Estates" description="Admin dashboard." canonical="/admin/dashboard" noIndex={true} />
+      {/* noindex + tab title provided by the Private route wrapper in App.tsx */}
 
       {/* Header */}
       <div className="mb-8">

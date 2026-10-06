@@ -181,6 +181,8 @@ export interface Listing {
   accountType?: AccountType;
   estatesRole?: EstatesRole;
   availability: boolean;
+  availabilityNotes?: string;
+  approved?: boolean;
   verified: boolean;
   bio: string;
   skills?: string[];

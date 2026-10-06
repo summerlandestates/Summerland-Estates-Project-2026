@@ -28,28 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { 
-  MessageSquare, 
-  Bell, 
-  ShoppingBag, 
-  Heart, 
-  Tag, 
-  Search, 
-  MapPin, 
-  Power, 
-  ThumbsUp, 
-  AlertTriangle, 
-  Calendar, 
-  PartyPopper, 
-  Mail, 
-  Users, 
-  Lock,
-  Plus,
-  CheckCircle,
-  TrendingUp,
-  Clock,
-  X
-} from 'lucide-react';
+import { MessageSquare, Bell, Heart, Tag, Search, MapPin, Power, ThumbsUp, AlertTriangle, Calendar, Users, Plus, TrendingUp, Clock } from 'lucide-react';
 
 interface ForumTopic {
   id: string;

@@ -30,8 +30,8 @@ export default function PaymentSuccessPage() {
   const [processing, setProcessing] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
+  const [, setRetryCount] = useState(0);
+  const [, setCheckoutData] = useState<CheckoutData | null>(null);
 
   const clearStoredCheckout = () => {
     sessionStorage.removeItem('checkoutData');

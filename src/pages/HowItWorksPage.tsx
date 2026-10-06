@@ -2,33 +2,7 @@
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
-import { 
-  CheckCircle,
-  Users, 
-  Building2, 
-  Briefcase, 
-  Home, 
-  BadgeCheck,
-  Shield,
-  Star,
-  FileText,
-  Flag,
-  UserPlus,
-  Search,
-  MessageSquare,
-  Camera,
-  Award,
-  Network,
-  Calendar,
-  XCircle,
-  ArrowRight,
-  Sparkles,
-  Heart,
-  Lock,
-  Eye,
-  AlertCircle,
-  Handshake
-} from 'lucide-react';
+import { CheckCircle, Users, Building2, Briefcase, Home, BadgeCheck, Shield, Star, FileText, Flag, UserPlus, Search, MessageSquare, Camera, Award, Network, Calendar, XCircle, Sparkles, Heart, Lock, Eye, AlertCircle, Handshake } from 'lucide-react';
 
 const useScrollAnimation = () => {
   const ref = useRef<HTMLDivElement>(null);
@@ -107,7 +81,7 @@ export default function HowItWorksPage() {
         title="How Summerland Estates Works | Connecting Homeowners & Professionals"
         description="Learn how Summerland Estates connects homeowners, professionals, companies, and recruiters across the United States. Understand our platform, hiring process, and safety guidelines."
         canonical="/how-it-works"
-        ogImage="/images/og-image.jpg"
+        ogImage="https://summerlandestates.com/images/how-it-works.png"
         schema={{
           "@context": "https://schema.org",
           "@graph": [

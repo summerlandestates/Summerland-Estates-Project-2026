@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Lock, Loader2, Shield, Trash2, AlertTriangle, Upload, Camera, Mail, CheckCircle2, XCircle, X } from 'lucide-react';
+import { Lock, Loader2, Trash2, AlertTriangle, Upload, Camera, Mail, CheckCircle2, XCircle, X } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -36,6 +36,7 @@ export default function SettingsPage() {
   }, [user]);
 
   const fetchEmailVerificationStatus = async () => {
+    if (!user) return;
     const { data, error } = await supabase
       .from('profiles')
       .select('email_verified')

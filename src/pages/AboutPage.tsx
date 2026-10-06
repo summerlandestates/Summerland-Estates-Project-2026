@@ -3,7 +3,6 @@ import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import { Card } from '@/components/ui/card';
-import { CheckCircle } from 'lucide-react';
 
 export default function AboutPage() {
   useEffect(() => {

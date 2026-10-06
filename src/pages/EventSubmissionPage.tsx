@@ -58,6 +58,7 @@ interface FormData {
   organizer_name: string;
   organizer_email: string;
   image_url: string;
+  notify_radius: string;
 }
 
 export default function EventSubmissionPage() {
@@ -100,6 +101,7 @@ export default function EventSubmissionPage() {
     organizer_name: '',
     organizer_email: '',
     image_url: '',
+    notify_radius: '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -163,6 +165,7 @@ export default function EventSubmissionPage() {
         organizer_name: formData.organizer_name,
         organizer_email: formData.organizer_email,
         image_url: formData.image_url || null,
+        notify_radius_miles: formData.notify_radius ? parseInt(formData.notify_radius) : null,
         status: 'pending',
         submitted_by: user?.id || null,
         created_at: new Date().toISOString(),
@@ -270,6 +273,7 @@ export default function EventSubmissionPage() {
                       organizer_name: '',
                       organizer_email: '',
                       image_url: '',
+                      notify_radius: '',
                     });
                   }}
                 >
@@ -291,6 +295,7 @@ export default function EventSubmissionPage() {
         title="Submit an Event - Summerland Estates"
         description="Submit your estate industry event for approval and reach our network of professionals."
         canonical="/submit-event"
+        noIndex={true}
       />
       <NavBar currentPage="events" />
 
@@ -543,6 +548,29 @@ export default function EventSubmissionPage() {
                           <AlertCircle className="w-3 h-3" /> {formErrors.location}
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {!formData.is_online && (
+                    <div className="space-y-2 mt-4">
+                      <Label htmlFor="notify_radius">Notify Members Nearby (Optional)</Label>
+                      <Select
+                        value={formData.notify_radius}
+                        onValueChange={(value) => handleInputChange('notify_radius', value)}
+                      >
+                        <SelectTrigger id="notify_radius">
+                          <SelectValue placeholder="Don't notify" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">Within 10 miles</SelectItem>
+                          <SelectItem value="25">Within 25 miles</SelectItem>
+                          <SelectItem value="50">Within 50 miles</SelectItem>
+                          <SelectItem value="100">Within 100 miles</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Members within this radius get an email + in-app notification once your event is approved.
+                      </p>
                     </div>
                   )}
                 </div>

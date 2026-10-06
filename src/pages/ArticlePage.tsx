@@ -28,7 +28,6 @@ export default function ArticlePage() {
     if (article) {
       updateViewCount();
       loadRelatedArticles();
-      updateSEO();
     }
   }, [article]);
 
@@ -110,110 +109,6 @@ export default function ArticlePage() {
     }
   };
 
-  const updateSEO = () => {
-    if (!article) return;
-
-    // Update page title
-    document.title = article.metaTitle || article.title;
-    
-    // Update or create meta description
-    let metaDescription = document.querySelector('meta[name="description"]') as HTMLMetaElement;
-    if (!metaDescription) {
-      metaDescription = document.createElement('meta');
-      metaDescription.name = 'description';
-      document.head.appendChild(metaDescription);
-    }
-    metaDescription.content = article.metaDescription || article.excerpt;
-
-    // Update or create canonical URL
-    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
-    if (!canonical) {
-      canonical = document.createElement('link');
-      canonical.rel = 'canonical';
-      document.head.appendChild(canonical);
-    }
-    canonical.href = `https://summerlandestates.com/articles/${article.slug}`;
-
-    // Update or create Open Graph tags
-    const ogTags = [
-      { property: 'og:title', content: article.metaTitle || article.title },
-      { property: 'og:description', content: article.metaDescription || article.excerpt },
-      { property: 'og:image', content: article.featuredImage || '/images/default-article.jpg' },
-      { property: 'og:url', content: `https://summerlandestates.com/articles/${article.slug}` },
-      { property: 'og:type', content: 'article' },
-      { property: 'article:section', content: article.category },
-      { property: 'article:published_time', content: article.publishedAt || article.createdAt },
-      { property: 'article:author', content: article.authorName }
-    ];
-
-    ogTags.forEach(tag => {
-      let meta = document.querySelector(`meta[property="${tag.property}"]`) as HTMLMetaElement;
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('property', tag.property);
-        document.head.appendChild(meta);
-      }
-      meta.content = tag.content;
-    });
-
-    // Update or create Twitter Card tags
-    const twitterTags = [
-      { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:title', content: article.metaTitle || article.title },
-      { name: 'twitter:description', content: article.metaDescription || article.excerpt },
-      { name: 'twitter:image', content: article.featuredImage || '/images/default-article.jpg' }
-    ];
-
-    twitterTags.forEach(tag => {
-      let meta = document.querySelector(`meta[name="${tag.name}"]`) as HTMLMetaElement;
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.name = tag.name;
-        document.head.appendChild(meta);
-      }
-      meta.content = tag.content;
-    });
-
-    // Update or create structured data (JSON-LD)
-    let structuredData = document.querySelector('#structured-data') as HTMLScriptElement;
-    if (!structuredData) {
-      structuredData = document.createElement('script');
-      structuredData.id = 'structured-data';
-      structuredData.type = 'application/ld+json';
-      document.head.appendChild(structuredData);
-    }
-    
-    const schema = {
-      "@context": "https://schema.org",
-      "@type": "Article",
-      "headline": article.metaTitle || article.title,
-      "description": article.metaDescription || article.excerpt,
-      "image": article.featuredImage || "/images/default-article.jpg",
-      "author": {
-        "@type": "Person",
-        "name": article.authorName,
-        "image": article.authorAvatar
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "Summerland Estates",
-        "logo": "/images/logo.png"
-      },
-      "datePublished": article.publishedAt || article.createdAt,
-      "dateModified": article.updatedAt,
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": `https://summerlandestates.com/articles/${article.slug}`
-      },
-      "articleSection": article.category,
-      "keywords": article.tags.join(', '),
-      "wordCount": article.content.replace(/<[^>]*>/g, '').split(/\s+/).length,
-      "timeRequired": `PT${article.readingTime}M`
-    };
-
-    structuredData.textContent = JSON.stringify(schema, null, 2);
-  };
-
   const shareArticle = () => {
     if (navigator.share && article) {
       navigator.share({
@@ -260,8 +155,8 @@ export default function ArticlePage() {
   const articleSchema = article ? {
     '@context': 'https://schema.org',
     '@type': 'Article',
-    headline: article.title,
-    description: article.excerpt,
+    headline: article.metaTitle || article.title,
+    description: article.metaDescription || article.excerpt,
     image: article.featuredImage,
     author: {
       '@type': 'Person',
@@ -271,19 +166,29 @@ export default function ArticlePage() {
       '@type': 'Organization',
       name: 'Summerland Estates',
       url: 'https://summerlandestates.com',
+      logo: 'https://summerlandestates.com/images/logo.png',
     },
     datePublished: article.publishedAt || article.createdAt,
     dateModified: article.updatedAt || article.createdAt,
     url: `https://summerlandestates.com/articles/${article.slug}`,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': `https://summerlandestates.com/articles/${article.slug}`,
+    },
+    articleSection: article.category,
+    keywords: (article.tags || []).join(', '),
+    wordCount: article.content.replace(/<[^>]*>/g, '').split(/\s+/).length,
+    timeRequired: `PT${article.readingTime}M`,
   } : undefined;
 
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
         title={article ? `${article.title} - Summerland Estates` : 'Article - Summerland Estates'}
-        description={article?.excerpt || 'Read the latest insights and articles from Summerland Estates.'}
+        description={article?.metaDescription || article?.excerpt || 'Read the latest insights and articles from Summerland Estates.'}
         canonical={`/articles/${slug}`}
         ogImage={article?.featuredImage}
+        ogType="article"
         schema={articleSchema}
       />
       <NavBar currentPage="news" />

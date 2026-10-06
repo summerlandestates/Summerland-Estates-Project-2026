@@ -40,6 +40,11 @@ const NO_INDEX_PATHS = new Set([
   '/compare',
   '/registration-pending',
   '/email-blast',
+  '/notifications',
+  '/my-articles',
+  '/upgrade',
+  '/submit-event',
+  '/auth/callback',
 ]);
 
 const ROUTE_OVERRIDES = {
@@ -51,6 +56,8 @@ const ROUTE_OVERRIDES = {
   '/collective': { priority: '0.8', changefreq: 'weekly' },
   '/events': { priority: '0.7', changefreq: 'weekly' },
   '/news': { priority: '0.7', changefreq: 'weekly' },
+  '/services': { priority: '0.8', changefreq: 'weekly' },
+  '/pricing': { priority: '0.8', changefreq: 'monthly' },
   '/add-listing': { priority: '0.8', changefreq: 'monthly' },
   '/post-job': { priority: '0.6', changefreq: 'monthly' },
   '/about': { priority: '0.7', changefreq: 'monthly' },
@@ -73,6 +80,9 @@ const FALLBACK_STATIC_ROUTES = [
   { path: '/collective', priority: '0.8', changefreq: 'weekly' },
   { path: '/events', priority: '0.7', changefreq: 'weekly' },
   { path: '/news', priority: '0.7', changefreq: 'weekly' },
+  { path: '/services', priority: '0.8', changefreq: 'weekly' },
+  { path: '/pricing', priority: '0.8', changefreq: 'monthly' },
+  { path: '/how-it-works', priority: '0.7', changefreq: 'monthly' },
   { path: '/about', priority: '0.7', changefreq: 'monthly' },
   { path: '/contact', priority: '0.7', changefreq: 'monthly' },
   { path: '/faqs', priority: '0.7', changefreq: 'monthly' },

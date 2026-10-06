@@ -1,6 +1,6 @@
 ﻿import type { Listing } from '../types';
 
-export const listings: Listing[] = [
+const demoListings: Omit<Listing, 'slug'>[] = [
   {
     id: '1',
     profilePhoto: 'https://c.animaapp.com/mjqmlnqaRP5DSj/img/ai_1.png',
@@ -922,3 +922,5 @@ export const listings: Listing[] = [
     hideDetailedInfo: true
   }
 ];
+
+export const listings: Listing[] = demoListings.map((l) => ({ ...l, slug: l.id }));

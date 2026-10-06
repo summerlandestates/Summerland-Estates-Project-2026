@@ -212,33 +212,6 @@ export default function EventDetailPage() {
     }
   };
 
-  const sendEmailToAdmin = async () => {
-    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@summerlandestates.com';
-    try {
-      await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: adminEmail,
-          subject: `Event Registration Alert: ${event?.title}`,
-          html: `
-            <h2>Event Registration Notification</h2>
-            <p>A new user has registered for an event.</p>
-            <p><strong>Event:</strong> ${event?.title}</p>
-            <p><strong>Organizer:</strong> ${event?.organizer_name} (${event?.organizer_email})</p>
-            <hr />
-            <h3>Attendee Details:</h3>
-            <p><strong>Name:</strong> ${formData.full_name}</p>
-            <p><strong>Email:</strong> ${formData.email}</p>
-            <p><strong>Phone:</strong> ${formData.phone || 'Not provided'}</p>
-          `,
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to send email to admin:', error);
-    }
-  };
-
   const resetForm = () => {
     setFormData({
       full_name: '',
@@ -292,7 +265,24 @@ export default function EventDetailPage() {
         title={`${event.title} - Summerland Estates Events`}
         description={event.description}
         canonical={`/event/${event.id}`}
-        image={event.image_url || undefined}
+        ogImage={event.image_url || undefined}
+        schema={{
+          '@context': 'https://schema.org',
+          '@type': 'Event',
+          name: event.title,
+          description: event.description,
+          startDate: event.time ? `${event.date}T${event.time}` : event.date,
+          ...(event.image_url ? { image: [event.image_url] } : {}),
+          eventStatus: 'https://schema.org/EventScheduled',
+          eventAttendanceMode: event.is_online
+            ? 'https://schema.org/OnlineEventAttendanceMode'
+            : 'https://schema.org/OfflineEventAttendanceMode',
+          location: event.is_online
+            ? { '@type': 'VirtualLocation', url: 'https://summerlandestates.com' }
+            : { '@type': 'Place', name: event.location, address: { '@type': 'PostalAddress', addressLocality: event.location } },
+          organizer: { '@type': 'Organization', name: event.organizer_name || 'Summerland Estates', url: 'https://summerlandestates.com' },
+          url: `https://summerlandestates.com/event/${event.id}`,
+        }}
       />
       <NavBar currentPage="events" />
 

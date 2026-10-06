@@ -5,7 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Briefcase, MapPin, DollarSign, Sparkles } from 'lucide-react';
+import { Briefcase, DollarSign, Sparkles } from 'lucide-react';
+import MapLocationLink from './MapLocationLink';
 import { getTierLimits } from '@/utils/tierAccess';
 import type { PricingTier } from '@/types';
 
@@ -169,7 +170,7 @@ export default function MatchedJobs({ userId, userTier, maxResults = 5 }: Matche
               <div className="flex-1">
                 <h4 className="font-semibold text-[#23231f] mb-1">{job.job_title}</h4>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-[#6b665f] mb-2">
-                  <span className="flex items-center"><MapPin className="w-3.5 h-3.5 mr-1" />{job.location}</span>
+                  <MapLocationLink location={job.location} iconClassName="w-3.5 h-3.5 mr-1" />
                   <span className="flex items-center"><DollarSign className="w-3.5 h-3.5 mr-1" />{job.salary_range}</span>
                   <span className="flex items-center"><Briefcase className="w-3.5 h-3.5 mr-1" />{job.job_category}</span>
                   <span className="text-xs text-[#A89F91]">{formatDate(job.created_at)}</span>

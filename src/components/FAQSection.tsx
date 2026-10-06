@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/accordion';
 import { Card } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HelpCircle } from 'lucide-react';
 
 const containerVariants = {
   hidden: { opacity: 0 },

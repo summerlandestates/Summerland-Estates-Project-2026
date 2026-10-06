@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getPlansByUserType, getPlanById } from '@/data/pricing';
 import { getAddOnsByUserType } from '@/data/addons';
-import { buildCheckoutDataFromMembership, formatTierLabel } from '@/lib/membership';
+import { buildCheckoutDataFromMembership } from '@/lib/membership';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
 import SEOHead from '@/components/SEOHead';
@@ -33,6 +33,8 @@ const profileTypeToUserType: Record<string, UserType> = {
 export default function UpgradePlansPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isPublicPricing = location.pathname === '/pricing';
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -109,9 +111,10 @@ export default function UpgradePlansPage() {
   return (
     <div className="min-h-screen bg-background page-transition">
       <SEOHead
-        title="Upgrade Your Plan - Summerland Estates"
-        description="Choose the plan that fits your membership."
-        noIndex={true}
+        title={isPublicPricing ? 'Membership Plans & Pricing - Summerland Estates' : 'Upgrade Your Plan - Summerland Estates'}
+        description="Choose the plan that fits your membership. Compare tiers for estate professionals, service providers, agencies and households on Summerland Estates."
+        canonical={isPublicPricing ? '/pricing' : undefined}
+        noIndex={!isPublicPricing}
       />
       <NavBar currentPage="" />
 

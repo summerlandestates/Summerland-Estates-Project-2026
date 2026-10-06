@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Save, Globe, FileText } from 'lucide-react';
 import { contentManager, ContentPage } from '@/lib/contentManagement';
-import SEOHead from '@/components/SEOHead';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -131,11 +130,6 @@ export default function AdminContentPageEditor() {
 
   return (
     <div>
-      <SEOHead
-        title={`${isNew ? 'New Page' : 'Edit Page'} - Admin`}
-        description="Edit content page."
-        noIndex={true}
-      />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">

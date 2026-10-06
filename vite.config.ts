@@ -7,8 +7,8 @@ import fs from "fs";
 function sitemapServePlugin() {
   return {
     name: 'sitemap-serve',
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
+    configureServer(server: any) {
+      server.middlewares.use((req: any, res: any, next: any) => {
         const parsedUrl = new URL(req.url || '/', `http://${req.headers.host}`);
         const pathname = parsedUrl.pathname;
 
@@ -45,6 +45,18 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          stripe: ['@stripe/react-stripe-js', '@stripe/stripe-js', 'stripe'],
+          supabase: ['@supabase/supabase-js', '@supabase/auth-ui-react', '@supabase/auth-ui-shared'],
+          ui: ['framer-motion', 'gsap', 'lucide-react', 'sonner', 'react-quill'],
+        },
+      },
     },
   },
   server: {

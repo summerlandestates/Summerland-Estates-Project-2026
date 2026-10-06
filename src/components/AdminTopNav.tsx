@@ -12,8 +12,6 @@ import {
   ChevronDown,
   ExternalLink,
   Shield,
-  CheckCircle2,
-  X,
 } from 'lucide-react';
 
 interface AdminTopNavProps {
@@ -21,55 +19,112 @@ interface AdminTopNavProps {
   pageTitle?: string;
 }
 
-interface Notification {
+interface AdminNotification {
   id: string;
   title: string;
   message: string;
   type: 'info' | 'success' | 'warning';
-  read: boolean;
+  link: string;
   created_at: string;
 }
 
-const initialNotifications: Notification[] = [
-  {
-    id: '1',
-    title: 'New application received',
-    message: 'A new professional membership application is pending review.',
-    type: 'info',
-    read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  },
-  {
-    id: '2',
-    title: 'Promo code redeemed',
-    message: 'A user redeemed promo code PRO-7X9A2B.',
-    type: 'success',
-    read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: '3',
-    title: 'System update',
-    message: 'Dashboard analytics are now live.',
-    type: 'info',
-    read: true,
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
-];
+const reportLabels: Record<string, string> = {
+  profile: 'profile',
+  job: 'job posting',
+  message: 'message',
+  service_request: 'service request',
+  review: 'review',
+  event: 'event',
+  article: 'article',
+  post: 'post',
+};
 
 export default function AdminTopNav({ onMenuToggle, pageTitle = 'Admin' }: AdminTopNavProps) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [readIds, setReadIds] = useState<Set<string>>(
+    () => new Set(JSON.parse(localStorage.getItem('adminReadNotifications') || '[]'))
+  );
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
 
+  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
+
+  // Real admin alerts: open member reports + pending membership applications
   useEffect(() => {
-    setUnreadCount(notifications.filter((n) => !n.read).length);
-  }, [notifications]);
+    if (!user) return;
+
+    const load = async () => {
+      const items: AdminNotification[] = [];
+
+      const { data: reports } = await supabase
+        .from('reports')
+        .select('id, target_type, target_label, reason, created_at')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      for (const r of reports || []) {
+        items.push({
+          id: `report-${r.id}`,
+          title: `Reported ${reportLabels[r.target_type] || 'content'}`,
+          message: `${r.target_label || 'Content'} — ${r.reason}`,
+          type: 'warning',
+          link: '/admin/reports',
+          created_at: r.created_at,
+        });
+      }
+
+      try {
+        const res = await fetch('/api/admin-membership-applications');
+        if (res.ok) {
+          const data = await res.json();
+          const pending = (data.applications || [])
+            .filter((a: any) => a.status === 'pending')
+            .slice(0, 10);
+          for (const a of pending) {
+            items.push({
+              id: `app-${a.id}`,
+              title: 'Membership application pending',
+              message: `${a.full_name || a.email} applied for membership.`,
+              type: 'info',
+              link: '/admin/applications',
+              created_at: a.created_at,
+            });
+          }
+        }
+      } catch {
+        // admin applications API unavailable — skip
+      }
+
+      items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setNotifications(items.slice(0, 15));
+    };
+
+    load();
+    const id = setInterval(load, 120000);
+    return () => clearInterval(id);
+  }, [user]);
+
+  const markRead = (id: string, link: string) => {
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem('adminReadNotifications', JSON.stringify([...next]));
+      return next;
+    });
+    setNotificationsOpen(false);
+    navigate(link);
+  };
+
+  const markAllRead = () => {
+    const all = new Set(notifications.map((n) => n.id));
+    setReadIds(all);
+    localStorage.setItem('adminReadNotifications', JSON.stringify([...all]));
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -88,14 +143,6 @@ export default function AdminTopNav({ onMenuToggle, pageTitle = 'Admin' }: Admin
     await signOut();
     localStorage.removeItem('isAdmin');
     navigate('/admin/login');
-  };
-
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const markRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
   const getInitials = (email: string) => {
@@ -170,13 +217,15 @@ export default function AdminTopNav({ onMenuToggle, pageTitle = 'Admin' }: Admin
                     No notifications yet
                   </div>
                 ) : (
-                  notifications.map((notification) => (
+                  notifications.map((notification) => {
+                    const isRead = readIds.has(notification.id);
+                    return (
                     <button
                       key={notification.id}
                       type="button"
-                      onClick={() => markRead(notification.id)}
+                      onClick={() => markRead(notification.id, notification.link)}
                       className={`w-full text-left px-4 py-3 border-b border-[#F2EDE4] hover:bg-[#FBF9F6] transition-colors ${
-                        notification.read ? 'opacity-70' : ''
+                        isRead ? 'opacity-70' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -201,12 +250,13 @@ export default function AdminTopNav({ onMenuToggle, pageTitle = 'Admin' }: Admin
                             })}
                           </p>
                         </div>
-                        {!notification.read && (
+                        {!isRead && (
                           <span className="w-2 h-2 rounded-full bg-[#A89F91] shrink-0" />
                         )}
                       </div>
                     </button>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

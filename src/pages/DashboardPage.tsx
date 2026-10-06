@@ -7,30 +7,12 @@ import { getPlanById } from '@/data/pricing';
 import { getAddOnsByUserType } from '@/data/addons';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
+import { computeProfileCompleteness, type CompletenessResult } from '@/utils/profileCompleteness';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Briefcase, 
-  FileText, 
-  Bell, 
-  Bookmark, 
-  Users, 
-  Newspaper, 
-  Download, 
-  Settings, 
-  PenSquare,
-  MessageCircle,
-  Eye,
-  TrendingUp,
-  Star,
-  Shield,
-  BadgeCheck,
-  Sparkles,
-  CheckCircle2,
-  Circle
-} from 'lucide-react';
+import { Briefcase, FileText, Bell, Bookmark, Users, Newspaper, Download, Settings, PenSquare, MessageCircle, Eye, TrendingUp, Star, BadgeCheck, Sparkles, CheckCircle2, Circle } from 'lucide-react';
 
 type DashboardUserType = 'professional' | 'business' | 'agency' | 'estates';
 
@@ -211,82 +193,6 @@ const getAddOnIcon = (addOnId: string) => {
   if (addOnId.includes('community')) return MessageCircle;
   return FileText;
 };
-
-// ── Profile completeness ──────────────────────────────────────────────────
-interface CompletenessResult {
-  percent: number;
-  complete: string[];
-  missing: string[];
-}
-
-const hasValue = (v: any): boolean => {
-  if (v === null || v === undefined) return false;
-  if (Array.isArray(v)) return v.length > 0;
-  if (typeof v === 'string') return v.trim().length > 0;
-  return true;
-};
-
-const pick = (data: any, keys: string[]): any => {
-  for (const k of keys) {
-    if (hasValue(data?.[k])) return data[k];
-  }
-  return undefined;
-};
-
-function computeProfileCompleteness(profile: any): CompletenessResult {
-  const data = profile?.application_data || {};
-  const checks: { label: string; present: boolean }[] = [
-    {
-      label: 'Photo',
-      present: hasValue(
-        pick(data, ['profile_photo', 'photo', 'photo_url', 'avatar_url', 'headshot', 'logo', 'image'])
-      ),
-    },
-    {
-      label: 'Bio',
-      present: hasValue(pick(data, ['bio', 'about', 'description', 'agency_bio', 'individual_bio'])),
-    },
-    {
-      label: 'Location',
-      present: hasValue(pick(data, ['location', 'city', 'address', 'formatted_address'])),
-    },
-    {
-      label: 'Services',
-      present: hasValue(
-        pick(data, ['services', 'service_types', 'services_offered', 'title', 'job_title', 'role'])
-      ),
-    },
-    {
-      label: 'Experience',
-      present: hasValue(
-        pick(data, ['experience', 'years_experience', 'work_history', 'previous_jobs'])
-      ),
-    },
-    {
-      label: 'Certifications',
-      present: hasValue(pick(data, ['certifications', 'licenses', 'credentials'])),
-    },
-    {
-      label: 'Availability',
-      present: hasValue(
-        pick(data, ['availability', 'work_availability', 'schedule', 'hours_available'])
-      ),
-    },
-    {
-      label: 'Portfolio',
-      present: hasValue(
-        pick(data, ['portfolio', 'portfolio_link', 'website', 'business_website', 'video_url'])
-      ),
-    },
-  ];
-
-  const done = checks.filter((c) => c.present).length;
-  return {
-    percent: Math.round((done / checks.length) * 100),
-    complete: checks.filter((c) => c.present).map((c) => c.label),
-    missing: checks.filter((c) => !c.present).map((c) => c.label),
-  };
-}
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();

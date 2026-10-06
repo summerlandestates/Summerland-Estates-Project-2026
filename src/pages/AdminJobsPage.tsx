@@ -22,23 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { 
-  Briefcase, 
-  Users,
-  MoreVertical,
-  Eye,
-  EyeOff,
-  Pencil,
-  Trash2,
-  Search,
-  ArrowLeft,
-  Loader2,
-  MapPin,
-  Calendar,
-  DollarSign,
-  CheckCircle,
-  XCircle
-} from 'lucide-react';
+import { Briefcase, Users, MoreVertical, Eye, EyeOff, Pencil, Trash2, Search, Loader2, MapPin, Calendar, DollarSign, CheckCircle, XCircle } from 'lucide-react';
 
 interface JobPosting {
   id: string;

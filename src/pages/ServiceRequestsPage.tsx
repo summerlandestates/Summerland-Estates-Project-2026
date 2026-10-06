@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import NavBar from '../components/NavBar';
+import SEOHead from '../components/SEOHead';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -18,8 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MapPin, Calendar, DollarSign, Send, Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, DollarSign, Send, Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import MapLocationLink from '../components/MapLocationLink';
 import { getTierLimits } from '@/utils/tierAccess';
 import type { PricingTier, ServiceRequest } from '../types';
 
@@ -432,6 +434,11 @@ export default function ServiceRequestsPage() {
 
   return (
     <div className="min-h-screen bg-background page-transition">
+      <SEOHead
+        title="Service Requests - Bid on Estate Services"
+        description="Browse active service requests from households and estates. Submit bids for housekeeping, landscaping, events and more on Summerland Estates."
+        canonical="/service-requests"
+      />
       <NavBar currentPage="jobs" />
       
       <main className="pt-32 pb-16">
@@ -498,10 +505,10 @@ export default function ServiceRequestsPage() {
                         {request.serviceNeeded}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4" />
-                          {request.location}
-                        </div>
+                        <MapLocationLink
+                          location={request.location}
+                          iconClassName="w-4 h-4 mr-1"
+                        />
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           {new Date(request.dateNeeded).toLocaleDateString()}
@@ -587,10 +594,10 @@ export default function ServiceRequestsPage() {
                 {selectedRequest.serviceNeeded}
               </h4>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {selectedRequest.location}
-                </span>
+                <MapLocationLink
+                  location={selectedRequest.location}
+                  iconClassName="w-3 h-3 mr-1"
+                />
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
                   {new Date(selectedRequest.dateNeeded).toLocaleDateString()}

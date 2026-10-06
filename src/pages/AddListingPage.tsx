@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import NavBar from '../components/NavBar';
+import SEOHead from '../components/SEOHead';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -13,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, X, ArrowLeft, ArrowRight, Check, User, Building2, Briefcase, Home, Shield, FileText, Image as ImageIcon, Loader2, Sparkles } from 'lucide-react';
+import { Upload, ArrowLeft, ArrowRight, Check, User, Building2, Briefcase, Home, Shield, FileText, Image as ImageIcon, Loader2, Sparkles } from 'lucide-react';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import { getPlansByUserType } from '../data/pricing';
 import { submitMembershipApplication } from '@/lib/membershipApplication';
@@ -24,7 +25,7 @@ import { parseResumeFile, type ResumeParseResult } from '@/lib/resumeParser';
 import { professionalTitles, languages, workAvailability, certifications, serviceTypes } from '../data/profileOptions';
 import ServiceCategoryPicker from '@/components/ServiceCategoryPicker';
 import { fetchCustomOptions, saveCustomOption } from '@/lib/customOptions';
-import type { OnboardingType, OnboardingStep, UserType, PricingTier, ApplicationFormData, SerializedApplicationData, CheckoutData } from '../types';
+import type { OnboardingStep, UserType, PricingTier, ApplicationFormData, SerializedApplicationData, CheckoutData } from '../types';
 
 type ProfileType = 'professional' | 'service-provider' | 'agency' | 'estates' | null;
 type EstatesSubType = 'estate-manager' | 'chief-of-staff' | 'personal-assistant' | 'executive-assistant' | 'principal' | null;
@@ -200,7 +201,7 @@ async function serializeApplicationForm(
       continue;
     }
 
-    const fileValues = values.filter((value): value is File => value instanceof File && value.name);
+    const fileValues = values.filter((value): value is File => value instanceof File && !!value.name);
 
     if (fileValues.length > 0) {
       serializedData[key] = await Promise.all(
@@ -236,7 +237,7 @@ export default function AddListingPage() {
   const [promoCodeLoading, setPromoCodeLoading] = useState(false);
   const [promoCodeError, setPromoCodeError] = useState('');
   const [showPricing, setShowPricing] = useState(false);
-  const [formData, setFormData] = useState<Partial<ApplicationFormData>>({});
+  const [, setFormData] = useState<Partial<ApplicationFormData>>({});
   const [isCommunityOnly, setIsCommunityOnly] = useState(false);
   const [submittingApplication, setSubmittingApplication] = useState(false);
   const [showStandardsNotice, setShowStandardsNotice] = useState(false);
@@ -1044,6 +1045,11 @@ export default function AddListingPage() {
   if (user && existingProfile && profileType === null) {
     return (
       <div className="min-h-screen bg-background page-transition">
+        <SEOHead
+        title="Join Our Network - Apply for Membership"
+        description="Apply to join Summerland Estates' private network of trusted estate professionals, service providers, and discerning households. Membership is reviewed to preserve network integrity."
+        canonical="/add-listing"
+      />
         <NavBar currentPage="add-listing" />
         
         <main className="pt-28 md:pt-48 pb-16 md:pb-32">
@@ -1123,6 +1129,11 @@ export default function AddListingPage() {
   if (profileType === 'estates' && estatesSubType === null) {
     return (
       <div className="min-h-screen bg-background page-transition">
+        <SEOHead
+        title="Join Our Network - Apply for Membership"
+        description="Apply to join Summerland Estates' private network of trusted estate professionals, service providers, and discerning households. Membership is reviewed to preserve network integrity."
+        canonical="/add-listing"
+      />
         <NavBar currentPage="add-listing" />
         
         <main className="pt-28 md:pt-48 pb-16 md:pb-32">
@@ -1258,6 +1269,11 @@ export default function AddListingPage() {
   if (showStandardsNotice && profileType !== null) {
     return (
       <div className="min-h-screen bg-background page-transition">
+        <SEOHead
+        title="Join Our Network - Apply for Membership"
+        description="Apply to join Summerland Estates' private network of trusted estate professionals, service providers, and discerning households. Membership is reviewed to preserve network integrity."
+        canonical="/add-listing"
+      />
         <NavBar currentPage="add-listing" />
         
         <main className="pt-28 md:pt-48 pb-16 md:pb-32">
@@ -1301,6 +1317,11 @@ export default function AddListingPage() {
   if (profileType === null) {
     return (
       <div className="min-h-screen bg-background page-transition">
+        <SEOHead
+        title="Join Our Network - Apply for Membership"
+        description="Apply to join Summerland Estates' private network of trusted estate professionals, service providers, and discerning households. Membership is reviewed to preserve network integrity."
+        canonical="/add-listing"
+      />
         <NavBar currentPage="add-listing" />
         
         <main className="pt-28 md:pt-48 pb-16 md:pb-32">
@@ -1412,6 +1433,11 @@ export default function AddListingPage() {
 
     return (
       <div className="min-h-screen bg-background">
+        <SEOHead
+        title="Join Our Network - Apply for Membership"
+        description="Apply to join Summerland Estates' private network of trusted estate professionals, service providers, and discerning households. Membership is reviewed to preserve network integrity."
+        canonical="/add-listing"
+      />
         <NavBar currentPage="add-listing" />
         
         <main className="pt-28 md:pt-48 pb-16 md:pb-32">
@@ -1544,6 +1570,11 @@ export default function AddListingPage() {
   if (currentStep <= steps.length && currentStep >= 1 && !showPricing) {
     return (
       <div className="min-h-screen bg-background">
+        <SEOHead
+        title="Join Our Network - Apply for Membership"
+        description="Apply to join Summerland Estates' private network of trusted estate professionals, service providers, and discerning households. Membership is reviewed to preserve network integrity."
+        canonical="/add-listing"
+      />
         <NavBar currentPage="add-listing" />
         
         <main className="pt-28 md:pt-48 pb-16 md:pb-32">
@@ -1624,6 +1655,11 @@ export default function AddListingPage() {
 
     return (
       <div className="min-h-screen bg-background page-transition">
+        <SEOHead
+        title="Join Our Network - Apply for Membership"
+        description="Apply to join Summerland Estates' private network of trusted estate professionals, service providers, and discerning households. Membership is reviewed to preserve network integrity."
+        canonical="/add-listing"
+      />
         <NavBar currentPage="add-listing" />
         
         <main className="pt-32 pb-16">

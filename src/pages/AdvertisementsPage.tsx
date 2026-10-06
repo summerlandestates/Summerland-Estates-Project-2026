@@ -6,29 +6,7 @@ import SEOHead from '../components/SEOHead';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Mail, 
-  Instagram, 
-  Newspaper, 
-  MailOpen, 
-  Handshake, 
-  Megaphone, 
-  Zap, 
-  Calendar, 
-  Globe, 
-  Star,
-  CheckCircle,
-  Send,
-  Target,
-  Users,
-  TrendingUp,
-  Activity,
-  Heart,
-  DollarSign,
-  ChevronRight,
-  MousePointerClick,
-  Eye
-} from 'lucide-react';
+import { Mail, Instagram, Newspaper, Handshake, Megaphone, Zap, Calendar, Globe, Star, CheckCircle, Send, Target, Users, Heart, DollarSign, ChevronRight, Eye } from 'lucide-react';
 
 export default function AdvertisementsPage() {
   const navigate = useNavigate();

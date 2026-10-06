@@ -57,7 +57,7 @@ const MONTH_MAP: Record<string, string> = {
 };
 
 const DATE_RANGE_PATTERN =
-  /\b(?:(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+)?((?:19|20)\d{2})\s*(?:-|–|—|to)\s*(?:(Present|Current)|(?:(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+)?((?:19|20)\d{2}))\b/i;
+  /\b(?:(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+)?((?:19|20)\d{2})\s*(?:-|ï¿½|ï¿½|to)\s*(?:(Present|Current)|(?:(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+)?((?:19|20)\d{2}))\b/i;
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\r/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim();
@@ -240,7 +240,7 @@ function extractSkills(text: string) {
   const source = sectionMatch?.[1] || text;
   const candidateText = source.split(/\n{2,}/)[0];
   const candidates = candidateText
-    .split(/[\n,|•]/)
+    .split(/[\n,|ï¿½]/)
     .map((item) => item.replace(/^[\s:-]+|[\s:-]+$/g, '').trim())
     .filter(Boolean)
     .filter((item) => item.length > 1 && item.length < 50)
@@ -332,7 +332,7 @@ function extractWorkHistory(text: string) {
 
     if (beforeLines.length === 1) {
       title = beforeLines[0];
-      employer = afterLines.find((line) => line.length <= 80 && !/responsible|managed|oversaw|led|supported/i.test(line));
+      employer = afterLines.find((line) => line.length <= 80 && !/responsible|managed|oversaw|led|supported/i.test(line)) || '';
     }
 
     const description = afterLines

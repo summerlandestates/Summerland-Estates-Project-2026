@@ -1,4 +1,4 @@
-import type { PricingTier, UserType } from '../types';
+import type { PricingTier } from '../types';
 
 export interface TierLimits {
   canViewPlacements: boolean;
@@ -437,7 +437,7 @@ export function checkFeatureAccess(
 }
 
 export function getUpgradeMessage(
-  currentTier: PricingTier | undefined,
+  _currentTier: PricingTier | undefined,
   feature: string
 ): string {
   return `This feature is not available in your current participation level. Consider upgrading to access ${feature}.`;

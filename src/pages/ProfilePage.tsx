@@ -55,7 +55,7 @@ export default function ProfilePage() {
   const [isConnected, setIsConnected] = useState(false);
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
   const [isPublicView, setIsPublicView] = useState(true);
-  const [profileIndex, setProfileIndex] = useState(0);
+  const [profileIndex] = useState(0);
   const [currentUserId] = useState(localStorage.getItem('userId') || '');
   const [viewLimitReached, setViewLimitReached] = useState(false);
 
@@ -155,20 +155,6 @@ export default function ProfilePage() {
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleEmailShare = () => {
-    const url = window.location.href;
-    const subject = `Check out ${listing?.name}'s profile`;
-    const body = `I thought you might be interested in this profile:\n\n${listing?.name} - ${listing?.role}\n${url}`;
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-
-  const handleRefer = () => {
-    const url = window.location.href;
-    const subject = `Referral: ${listing?.name} - ${listing?.role}`;
-    const body = `I would like to refer ${listing?.name} for your consideration.\n\nProfile: ${url}\n\nReason for referral: [Please add your comments here]`;
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   const handleSendMessage = async () => {

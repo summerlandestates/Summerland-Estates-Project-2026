@@ -8,7 +8,7 @@ interface PageTransitionProps {
 export default function PageTransition({ children }: PageTransitionProps) {
   const location = useLocation();
   const [displayChildren, setDisplayChildren] = useState(children);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [, setIsTransitioning] = useState(false);
   const [opacity, setOpacity] = useState(1);
 
   useEffect(() => {

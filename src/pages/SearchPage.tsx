@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -24,17 +23,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import DirectoryGrid from '../components/DirectoryGrid';
-import { 
-  Search, 
-  Filter, 
-  Grid, 
-  List, 
-  X, 
-  ChevronLeft, 
-  ChevronRight,
-  Users,
-  Loader2
-} from 'lucide-react';
+import { Search, Filter, Grid, List, X, Users, Loader2 } from 'lucide-react';
 import { fetchListings } from '../utils/listings';
 import { getBlockedIds } from '../components/BlockUserButton';
 import { languages } from '../data/profileOptions';
@@ -61,16 +50,6 @@ const experienceOptions = [
   { value: '10+', label: '10+ years' },
 ];
 
-const workAvailabilityOptions = [
-  'Full Time',
-  'Part Time',
-  'Contract',
-  'Seasonal',
-  'Temporary',
-  'Remote',
-  'Live-In',
-];
-
 const comfortWithOptions = [
   'Children',
   'Pets',
@@ -81,7 +60,6 @@ const comfortWithOptions = [
 ];
 
 export default function SearchPage() {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [allListings, setAllListings] = useState<Listing[]>([]);
   const [filteredListings, setFilteredListings] = useState<Listing[]>([]);

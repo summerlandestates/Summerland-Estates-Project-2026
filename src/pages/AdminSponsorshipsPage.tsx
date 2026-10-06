@@ -20,31 +20,11 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { emailNotifications } from '@/services/emailNotifications';
 import { toast } from 'sonner';
-import {
-  Handshake,
-  Search,
-  Filter,
-  Loader2,
-  Eye,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Calendar,
-  DollarSign,
-  Mail,
-  Phone,
-  Globe,
-  Building2,
-  User,
-  ArrowLeft,
-  MoreHorizontal,
-  MessageSquare
-} from 'lucide-react';
+import { Handshake, Search, Filter, Loader2, Eye, CheckCircle2, DollarSign, Mail, Phone, Globe, Building2, User, ArrowLeft } from 'lucide-react';
 
 interface Sponsorship {
   id: string;

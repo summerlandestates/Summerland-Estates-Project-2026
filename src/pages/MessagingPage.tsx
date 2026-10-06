@@ -11,7 +11,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Send, Users, MapPin, Briefcase, CheckCircle } from 'lucide-react';
 import { listings } from '../data/listings';
-import type { Listing } from '../types';
 
 export default function MessagingPage() {
   const navigate = useNavigate();

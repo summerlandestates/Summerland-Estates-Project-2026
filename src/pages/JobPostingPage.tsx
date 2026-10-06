@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import NavBar from '../components/NavBar';
+import SEOHead from '../components/SEOHead';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DollarSign, Clock, Loader2, Briefcase, Users } from 'lucide-react';
+import { DollarSign, Clock, Briefcase, Users } from 'lucide-react';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getTierLimits } from '@/utils/tierAccess';
 import type { PricingTier } from '../types';
@@ -54,7 +55,7 @@ interface JobFormData {
 
 export default function JobPostingPage() {
   const { user } = useAuth();
-  const [submitting, setSubmitting] = useState(false);
+  const [, setSubmitting] = useState(false);
   const navigate = useNavigate();
   
   // Job form state
@@ -215,35 +216,13 @@ export default function JobPostingPage() {
     }
   };
 
-  const toggleEmploymentType = (type: string) => {
-    setJobForm(prev => ({
-      ...prev,
-      employmentTypes: prev.employmentTypes.includes(type)
-        ? prev.employmentTypes.filter(t => t !== type)
-        : [...prev.employmentTypes, type]
-    }));
-  };
-
-  const toggleDay = (day: string) => {
-    setJobForm(prev => ({
-      ...prev,
-      daysRequired: prev.daysRequired.includes(day)
-        ? prev.daysRequired.filter(d => d !== day)
-        : [...prev.daysRequired, day]
-    }));
-  };
-
-  const toggleBenefit = (benefit: string) => {
-    setJobForm(prev => ({
-      ...prev,
-      benefits: prev.benefits.includes(benefit)
-        ? prev.benefits.filter(b => b !== benefit)
-        : [...prev.benefits, benefit]
-    }));
-  };
-
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead
+        title="Post a Placement - Hire Estate Professionals"
+        description="Post a domestic staffing position and reach vetted estate professionals. House managers, private chefs, nannies, chauffeurs and more on Summerland Estates."
+        canonical="/post-job"
+      />
       <NavBar currentPage="jobs" />
       
       <main className="pt-32 pb-16">

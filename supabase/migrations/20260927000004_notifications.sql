@@ -47,3 +47,11 @@ CREATE POLICY "notifications_delete_own" ON public.notifications
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id
   ON public.notifications(user_id, is_read, created_at DESC);
+
+-- Notification preferences (email/SMS toggles) live on the profile row.
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS notification_preferences jsonb;
+
+-- Events: organizer-chosen radius for "notify members nearby" on approval.
+ALTER TABLE public.events
+  ADD COLUMN IF NOT EXISTS notify_radius_miles integer;

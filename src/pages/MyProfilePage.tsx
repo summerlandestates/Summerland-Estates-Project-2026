@@ -21,13 +21,13 @@ import {
   Link as LinkIcon,
   Loader2,
   Mail,
-  MapPin,
   Phone,
   Save,
   Sparkles,
   Trash2,
   XCircle,
 } from 'lucide-react';
+import MapLocationLink from '@/components/MapLocationLink';
 import {
   Dialog,
   DialogContent,
@@ -123,7 +123,7 @@ export default function MyProfilePage() {
   // Delete profile states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteStep, setDeleteStep] = useState<'confirm' | 'deleting'>('confirm');
-  const [deleting, setDeleting] = useState(false);
+  const [, setDeleting] = useState(false);
   const [personalityDialogOpen, setPersonalityDialogOpen] = useState(false);
   const [personalitySaving, setPersonalitySaving] = useState(false);
   const [personalityResult, setPersonalityResult] = useState<PersonalityAssessmentResult | null>(null);
@@ -658,8 +658,10 @@ export default function MyProfilePage() {
 
                         {displayLocation && (
                           <div className="flex items-start gap-3 rounded-[18px] bg-[#faf6f1] px-4 py-3">
-                            <MapPin className="mt-1 h-4 w-4 text-[#6d7662]" />
-                            <span>{displayLocation}</span>
+                            <MapLocationLink
+                              location={displayLocation}
+                              iconClassName="mt-1 h-4 w-4 text-[#6d7662]"
+                            />
                           </div>
                         )}
 

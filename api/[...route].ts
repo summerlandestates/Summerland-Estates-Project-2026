@@ -1,5 +1,6 @@
 // Catch-all Vercel function for all other dev-server API routes
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+// @ts-expect-error dev-server.js has no type declarations
 import app from '../dev-server.js';
 
 // Vercel parses JSON bodies by default, which would break Stripe webhook
