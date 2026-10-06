@@ -62,9 +62,9 @@ export default function AdminSettingsPage() {
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       toast.error('Validation Error', {
-        description: 'Password must be at least 6 characters',
+        description: 'Password must be at least 8 characters',
       });
       return;
     }
@@ -72,28 +72,19 @@ export default function AdminSettingsPage() {
     setSaving(true);
 
     try {
-      // Get user by email
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', userEmail);
-
-      if (profileError) throw profileError;
-
-      if (!profiles || profiles.length === 0) {
-        throw new Error('User not found');
-      }
-
-      const userId = profiles[0].id;
-
-      // Admin can reset user password using Supabase Admin API
-      // Note: This requires admin privileges in Supabase
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        userId,
-        { password: newPassword }
-      );
-
-      if (updateError) throw updateError;
+      // Password resets must run server-side: auth.admin requires the service
+      // role key, which never ships to the browser.
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin-reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ email: userEmail, newPassword }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Request failed');
 
       toast.success('Password Reset!', {
         description: `Password updated for ${userEmail}`,

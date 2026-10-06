@@ -894,6 +894,71 @@ app.get('/api/admin/stats', async (req, res) => {
   }
 });
 
+// Shared helper: verifies the caller's bearer token belongs to an admin profile.
+async function requireAdmin(req, res) {
+  if (!supabaseAdmin) {
+    res.status(500).json({ error: 'Missing Supabase service role configuration' });
+    return null;
+  }
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!token) {
+    res.status(401).json({ error: 'Authentication required' });
+    return null;
+  }
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) {
+    res.status(401).json({ error: 'Invalid session' });
+    return null;
+  }
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (profile?.role !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return null;
+  }
+  return user;
+}
+
+app.post('/api/admin-reset-password', async (req, res) => {
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: 'Email and newPassword are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const { data: profiles, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .limit(1);
+
+    if (profileError) throw profileError;
+    if (!profiles?.length) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(
+      profiles[0].id,
+      { password: newPassword }
+    );
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin reset password error:', error);
+    res.status(500).json({ error: error.message || 'Failed to reset password' });
+  }
+});
+
 app.post('/api/admin-delete-user', async (req, res) => {
   if (!supabaseAdmin) {
     return res.status(500).json({ error: 'Missing Supabase service role configuration' });

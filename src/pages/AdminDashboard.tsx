@@ -111,7 +111,7 @@ export default function AdminDashboard() {
         countRows('promo_codes', (q) => q.eq('is_active', true)),
         countRows('user_promo_codes'),
         countRows('job_postings', (q) => q.eq('status', 'active')),
-        countRows('events', (q) => q.gte('event_date', new Date().toISOString())),
+        countRows('events', (q) => q.gte('date', new Date().toISOString().split('T')[0])),
         countRows('newsletter_subscribers'),
       ]);
 
