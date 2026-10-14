@@ -290,7 +290,6 @@ export default function AddListingPage() {
   const sectionBodyClassName = 'space-y-4 md:space-y-5 xl:max-h-[calc(100vh-12rem)] xl:overflow-y-auto xl:pr-3';
   const accountFormSteps = [
     { id: 1, title: 'Basic Information', description: 'Profile essentials', icon: User },
-    { id: 2, title: 'Professional Details', description: 'Experience and preferences', icon: Briefcase },
     { id: 3, title: 'Contact & Account', description: 'Verification and final review', icon: Building2 },
   ];
 
