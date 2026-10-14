@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
-import LinkedInAuthButton from '@/components/LinkedInAuthButton';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -18,8 +17,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<'google' | null>(null);
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
-  const { user, loading: authLoading, signIn, signInWithGoogle, signInWithLinkedIn, signOut } = useAuth();
+  const { user, loading: authLoading, signIn, signInWithGoogle, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -144,28 +144,15 @@ export default function LoginPage() {
   };
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
-    
+    setOauthProvider('google');
+
     const { error } = await signInWithGoogle();
 
     if (error) {
       toast.error('Google Sign-In Failed', {
         description: error.message,
       });
-      setLoading(false);
-    }
-  };
-
-  const handleLinkedInSignIn = async () => {
-    setLoading(true);
-
-    const { error } = await signInWithLinkedIn();
-
-    if (error) {
-      toast.error('LinkedIn Sign-In Failed', {
-        description: error.message,
-      });
-      setLoading(false);
+      setOauthProvider(null);
     }
   };
 
@@ -191,8 +178,11 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <GoogleAuthButton onClick={handleGoogleSignIn} disabled={loading} />
-              <LinkedInAuthButton onClick={handleLinkedInSignIn} disabled={loading} />
+              <GoogleAuthButton
+                onClick={handleGoogleSignIn}
+                loading={oauthProvider === 'google'}
+                disabled={loading || oauthProvider !== null}
+              />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -249,7 +239,7 @@ export default function LoginPage() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={loading}
+                  disabled={loading || oauthProvider !== null}
                 >
                   {loading ? (
                     <>

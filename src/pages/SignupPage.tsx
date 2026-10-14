@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, User, Loader2 } from 'lucide-react';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
-import LinkedInAuthButton from '@/components/LinkedInAuthButton';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -19,7 +18,8 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signUp, signInWithGoogle, signInWithLinkedIn } = useAuth();
+  const [oauthProvider, setOauthProvider] = useState<'google' | null>(null);
+  const { signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,28 +59,15 @@ export default function SignupPage() {
   };
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
-    
+    setOauthProvider('google');
+
     const { error } = await signInWithGoogle();
 
     if (error) {
       toast.error('Google Sign-In Failed', {
         description: error.message,
       });
-      setLoading(false);
-    }
-  };
-
-  const handleLinkedInSignIn = async () => {
-    setLoading(true);
-
-    const { error } = await signInWithLinkedIn();
-
-    if (error) {
-      toast.error('LinkedIn Sign-In Failed', {
-        description: error.message,
-      });
-      setLoading(false);
+      setOauthProvider(null);
     }
   };
 
@@ -97,8 +84,11 @@ export default function SignupPage() {
               <CardDescription>Join the Summerland Estates network</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <GoogleAuthButton onClick={handleGoogleSignIn} disabled={loading} />
-              <LinkedInAuthButton onClick={handleLinkedInSignIn} disabled={loading} />
+              <GoogleAuthButton
+                onClick={handleGoogleSignIn}
+                loading={oauthProvider === 'google'}
+                disabled={loading || oauthProvider !== null}
+              />
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -181,7 +171,7 @@ export default function SignupPage() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={loading}
+                  disabled={loading || oauthProvider !== null}
                 >
                   {loading ? (
                     <>

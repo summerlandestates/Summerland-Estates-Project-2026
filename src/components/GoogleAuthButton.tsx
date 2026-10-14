@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 interface GoogleAuthButtonProps {
   onClick: () => void;
   disabled?: boolean;
+  loading?: boolean;
   children?: ReactNode;
 }
 
@@ -33,16 +34,17 @@ function GoogleIcon() {
 export default function GoogleAuthButton({
   onClick,
   disabled = false,
+  loading = false,
   children = 'Continue with Google',
 }: GoogleAuthButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       className="inline-flex w-full items-center justify-center gap-3 rounded-xl border border-[#D7DCE4] bg-white px-4 py-3 text-sm font-medium text-[#1F1F1F] shadow-sm transition-all hover:bg-[#F8FAFC] hover:border-[#C7CED9] disabled:cursor-not-allowed disabled:opacity-70"
     >
-      {disabled ? <Loader2 className="h-5 w-5 animate-spin text-[#5F6368]" /> : <GoogleIcon />}
+      {loading ? <Loader2 className="h-5 w-5 animate-spin text-[#5F6368]" /> : <GoogleIcon />}
       <span>{children}</span>
     </button>
   );

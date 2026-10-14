@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 interface LinkedInAuthButtonProps {
   onClick: () => void;
   disabled?: boolean;
+  loading?: boolean;
   children?: ReactNode;
 }
 
@@ -18,16 +19,17 @@ function LinkedInIcon() {
 export default function LinkedInAuthButton({
   onClick,
   disabled = false,
+  loading = false,
   children = 'Continue with LinkedIn',
 }: LinkedInAuthButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       className="inline-flex w-full items-center justify-center gap-3 rounded-xl border border-[#D7DCE4] bg-white px-4 py-3 text-sm font-medium text-[#1F1F1F] shadow-sm transition-all hover:bg-[#F8FAFC] hover:border-[#C7CED9] disabled:cursor-not-allowed disabled:opacity-70"
     >
-      {disabled ? <Loader2 className="h-5 w-5 animate-spin text-[#0A66C2]" /> : <LinkedInIcon />}
+      {loading ? <Loader2 className="h-5 w-5 animate-spin text-[#0A66C2]" /> : <LinkedInIcon />}
       <span>{children}</span>
     </button>
   );
