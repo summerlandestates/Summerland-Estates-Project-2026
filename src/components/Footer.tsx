@@ -76,31 +76,11 @@ export default function Footer() {
           
           {/* Brand Column */}
           <div className="lg:col-span-1">
-            <Link to="/" className="flex items-center gap-3 mb-5 group">
-              <svg
-                viewBox="0 0 48 48"
-                className="w-12 h-12 text-[#C9BFAE] group-hover:text-[#A89F91] transition-colors duration-300"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <circle cx="24" cy="24" r="14" />
-                <circle cx="24" cy="24" r="5" />
-                <line x1="24" y1="2" x2="24" y2="10" />
-                <line x1="24" y1="38" x2="24" y2="46" />
-                <line x1="2" y1="24" x2="10" y2="24" />
-                <line x1="38" y1="24" x2="46" y2="24" />
-                <line x1="8.5" y1="8.5" x2="14" y2="14" />
-                <line x1="34" y1="34" x2="39.5" y2="39.5" />
-                <line x1="39.5" y1="8.5" x2="34" y2="14" />
-                <line x1="14" y1="34" x2="8.5" y2="39.5" />
-              </svg>
+            <Link to="/" className="flex items-center mb-5 group">
               <img
-                src="/images/logo.png"
+                src="/images/logo-footer.png"
                 alt="Summerland Estates"
-                className="h-8 w-auto brightness-0 invert opacity-90 group-hover:opacity-100 transition-opacity duration-300"
+                className="h-12 w-auto opacity-95 group-hover:opacity-100 transition-opacity duration-300 mix-blend-lighten"
               />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">

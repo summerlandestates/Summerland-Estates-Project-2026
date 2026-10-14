@@ -15,8 +15,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DollarSign, Clock, Briefcase, Users } from 'lucide-react';
 import LocationAutocomplete from '../components/LocationAutocomplete';
-import { getTierLimits } from '@/utils/tierAccess';
-import type { PricingTier } from '../types';
 
 interface JobFormData {
   jobTitle: string;
@@ -112,40 +110,7 @@ export default function JobPostingPage() {
     setSubmitting(true);
 
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('tier')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
-      if (!limits.canPostRoles) {
-        toast.error('Posting placements is not available on your current plan', {
-          description: 'Upgrade to post open roles.',
-        });
-        setSubmitting(false);
-        navigate('/upgrade');
-        return;
-      }
-      if (limits.rolePostLimit) {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        const { count } = await supabase
-          .from('job_postings')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .gte('created_at', startOfMonth.toISOString());
-        if ((count || 0) >= limits.rolePostLimit) {
-          toast.error(`You have reached your limit of ${limits.rolePostLimit} job posting${limits.rolePostLimit === 1 ? '' : 's'} this month.`, {
-            description: 'Upgrade for unlimited job posting.',
-          });
-          setSubmitting(false);
-          navigate('/upgrade');
-          return;
-        }
-      }
-
+      // Job posting is free for all accounts — no plan gate.
       const { data: insertedJob, error } = await supabase.from('job_postings').insert({
         user_id: user.id,
         job_title: jobForm.jobTitle,

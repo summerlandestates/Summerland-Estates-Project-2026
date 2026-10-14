@@ -280,6 +280,17 @@ export default function EditProfilePage() {
 
       if (error) throw error;
 
+      // Refresh the public directory listing with the new data (fire-and-forget).
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        fetch('/api/sync-my-listing', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+        });
+      } catch {
+        // Non-fatal: directory will catch up on next admin sync.
+      }
+
       setProfile((current) =>
         current
           ? {

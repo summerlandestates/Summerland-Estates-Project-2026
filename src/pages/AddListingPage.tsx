@@ -280,8 +280,9 @@ export default function AddListingPage() {
   const [customTitles, setCustomTitles] = useState<string[]>([]);
   const [customServiceTypes, setCustomServiceTypes] = useState<string[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  // Estates skip the "Professional Details" step entirely.
-  const formStepIds = profileType === 'estates' ? [1, 3] : [1, 2, 3];
+  // "Professional Details" was removed for every membership type — it
+  // duplicated step 1. All applicants now take Basic Info → Contact & Account.
+  const formStepIds = [1, 3];
   const totalFormSteps = formStepIds.length;
   const currentFormStepId = formStepIds[formStep - 1] ?? 1;
   const formRef = useRef<HTMLFormElement>(null);
@@ -3201,79 +3202,6 @@ export default function AddListingPage() {
                       </>
                     )}
 
-                  </div>
-                  </Card>
-
-                  {/* Middle Column - Professional Details */}
-                  <Card
-                    className={`${sectionCardClassName} ${currentFormStepId === 2 ? 'block' : 'hidden'}`}
-                    data-form-step="2"
-                  >
-                  <div className={sectionBodyClassName}>
-                    <div className="flex items-center gap-2 pb-3 border-b border-border/30">
-                      <Briefcase className="w-5 h-5 text-[#A89F91]" />
-                      <h3 className="text-lg font-heading font-semibold text-foreground tracking-tight">
-                        Professional Details
-                      </h3>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="experience" className="text-foreground text-sm">Years of Experience</Label>
-                      <Input
-                        id="experience"
-                        name="experience"
-                        type="number"
-                        placeholder="e.g. 5"
-                        min="0"
-                        max="50"
-                        className="bg-background text-foreground border-border"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="available_date" className="text-foreground text-sm">Available From</Label>
-                      <Input
-                        id="available_date"
-                        name="available_date"
-                        type="date"
-                        className="bg-background text-foreground border-border"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-foreground text-sm">Work Preference</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {['Full Time', 'Part Time', 'Contract', 'Remote'].map((pref) => (
-                          <div key={pref} className="flex items-center space-x-1">
-                            <Checkbox id={`pref-${pref.toLowerCase().replace(' ', '')}`} name="work_preference" value={pref} />
-                            <Label htmlFor={`pref-${pref.toLowerCase().replace(' ', '')}`} className="text-xs text-foreground cursor-pointer">{pref}</Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-foreground text-sm">Languages</Label>
-                      <div className="grid grid-cols-2 gap-1 max-h-[120px] overflow-y-auto border border-border rounded-lg p-2 text-xs">
-                        {languages.map((lang) => (
-                          <div key={lang} className="flex items-center space-x-1">
-                            <Checkbox id={`lang-${lang.toLowerCase()}`} name="languages" value={lang} />
-                            <Label htmlFor={`lang-${lang.toLowerCase()}`} className="text-xs text-foreground cursor-pointer">{lang}</Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-foreground text-sm">Skills</Label>
-                      <Textarea
-                        id="skills_summary"
-                        name="skills_summary"
-                        placeholder="Brief summary of your key skills..."
-                        rows={3}
-                        className="bg-background text-foreground border-border text-sm"
-                      />
-                    </div>
                   </div>
                   </Card>
 

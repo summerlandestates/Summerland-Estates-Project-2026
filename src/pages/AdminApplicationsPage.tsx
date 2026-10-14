@@ -66,6 +66,7 @@ export default function AdminApplicationsPage() {
   const [decisionApplication, setDecisionApplication] = useState<MembershipApplication | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -252,19 +253,49 @@ export default function AdminApplicationsPage() {
     }
   };
 
+  // Rebuilds the public directory (`listings`) from approved profiles.
+  // Needed once for accounts approved before listings sync existed.
+  const syncDirectory = async () => {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin-sync-listings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Sync failed');
+      toast.success(`Directory synced — ${result.synced} approved profiles published.`);
+    } catch (error: any) {
+      toast.error('Directory sync failed', { description: error.message });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const pendingCount = applications.filter(a => a.status === 'pending').length;
 
   return (
     <div>
       <main>
         <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-heading font-bold text-foreground mb-2">
-              Membership Applications
-            </h1>
-            <p className="text-muted-foreground">
-              Review and manage membership applications
-            </p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-heading font-bold text-foreground mb-2">
+                Membership Applications
+              </h1>
+              <p className="text-muted-foreground">
+                Review and manage membership applications
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={syncing}
+              onClick={syncDirectory}
+            >
+              {syncing ? 'Syncing…' : 'Sync Directory'}
+            </Button>
           </div>
 
           {/* Stats */}

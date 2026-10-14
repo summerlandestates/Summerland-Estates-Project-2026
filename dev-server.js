@@ -397,6 +397,106 @@ const updateProfileApplicationData = async (userId, applicationData) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Directory sync: `listings` is the read model for the public directory, but
+// approval only writes `profiles`. These helpers upsert a listings row from a
+// profile + its application_data so approved members actually appear in search.
+// ---------------------------------------------------------------------------
+
+const slugifyText = (text) =>
+  (text || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const firstNonEmptyString = (...values) =>
+  values.find((v) => typeof v === 'string' && v.trim().length > 0)?.trim() || null;
+
+const toStringArray = (value) => {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  return [];
+};
+
+const buildListingRow = (userId, profile, userMetadata = {}) => {
+  const ad = {
+    ...(profile?.application_data || {}),
+    ...(userMetadata?.application_data || {}),
+  };
+  const name =
+    firstNonEmptyString(profile?.full_name, ad.name, userMetadata?.full_name) || 'Member';
+  const shortId = userId.replace(/-/g, '').slice(0, 8);
+
+  return {
+    user_id: userId,
+    slug: `${slugifyText(name) || 'member'}-${shortId}`,
+    name,
+    role: firstNonEmptyString(ad.role, ad.professional_title, ad.estates_title, ad.position, profile?.role),
+    location: firstNonEmptyString(ad.location, profile?.location),
+    bio: firstNonEmptyString(ad.bio, ad.individual_bio, ad.agency_bio, ad.description),
+    profile_photo: firstNonEmptyString(profile?.avatar_url, ad.profile_photo, ad.photo_url, ad.avatar_url),
+    category: 'Staff',
+    account_type: firstNonEmptyString(ad.profile_type, userMetadata?.profile_type) || 'professional',
+    experience_years: parseInt(ad.years_experience ?? ad.experience ?? 0, 10) || 0,
+    languages: toStringArray(ad.languages),
+    hourly_rate: firstNonEmptyString(ad.hourly_rate, ad.rate_min, ad.rate),
+    pricing_tier: profile?.tier || ad.selected_tier || null,
+    approved: true,
+    updated_at: new Date().toISOString(),
+  };
+};
+
+// Upserts a listings row for the given profile id. Tolerates schema drift: if
+// PostgREST reports an unknown column, that column is stripped and retried.
+const syncListingForUser = async (userId) => {
+  if (!supabaseAdmin || !userId) return;
+
+  const [{ data: profile }, { data: authData }] = await Promise.all([
+    supabaseAdmin.from('profiles').select('*').eq('id', userId).maybeSingle(),
+    supabaseAdmin.auth.admin.getUserById(userId),
+  ]);
+  if (!profile) return;
+
+  const row = buildListingRow(userId, profile, authData?.user?.user_metadata);
+  const { data: existing } = await supabaseAdmin
+    .from('listings')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  let attempt = { ...row };
+  for (let i = 0; i < 20; i++) {
+    const result = existing?.id
+      ? await supabaseAdmin.from('listings').update(attempt).eq('id', existing.id)
+      : await supabaseAdmin.from('listings').insert(attempt);
+
+    if (!result.error) return;
+
+    const msg = result.error.message || '';
+    const match =
+      /column ['"]([^'"]+)['"]/i.exec(msg) ||
+      /Could not find the '([^']+)' column/i.exec(msg) ||
+      /'([^']+)' column/i.exec(msg);
+    const col = match?.[1]?.split('.').pop();
+    if (!col || !(col in attempt)) {
+      console.error('Listing sync failed:', msg);
+      return;
+    }
+    delete attempt[col];
+  }
+};
+
+const deactivateListingForUser = async (userId) => {
+  if (!supabaseAdmin || !userId) return;
+  const { error } = await supabaseAdmin
+    .from('listings')
+    .update({ approved: false })
+    .eq('user_id', userId);
+  if (error) console.error('Listing deactivation failed:', error.message);
+};
+
 const listAllAuthUsers = async () => {
   const allUsers = [];
   let page = 1;
@@ -840,6 +940,13 @@ app.post('/api/admin-review-application', async (req, res) => {
       reviewed_by: reviewedBy || null,
     });
 
+    // Keep the public directory in sync with the approval decision.
+    if (action === 'approve') {
+      await syncListingForUser(userId);
+    } else {
+      await deactivateListingForUser(userId);
+    }
+
     let emailSent = false;
     let emailError = null;
     try {
@@ -956,6 +1063,50 @@ app.post('/api/admin-reset-password', async (req, res) => {
   } catch (error) {
     console.error('Admin reset password error:', error);
     res.status(500).json({ error: error.message || 'Failed to reset password' });
+  }
+});
+
+// One-time backfill + repair: sync every approved profile into `listings`.
+// Admin-only. Safe to run repeatedly.
+app.post('/api/admin-sync-listings', async (req, res) => {
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+
+  try {
+    const { data: profiles, error } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('status', 'approved');
+    if (error) throw error;
+
+    let synced = 0;
+    for (const p of profiles || []) {
+      await syncListingForUser(p.id);
+      synced++;
+    }
+    res.json({ success: true, synced });
+  } catch (error) {
+    console.error('Admin sync listings error:', error);
+    res.status(500).json({ error: error.message || 'Sync failed' });
+  }
+});
+
+// Lets a logged-in member refresh their own directory listing after edits.
+app.post('/api/sync-my-listing', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Missing Supabase service role configuration' });
+  }
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Authentication required' });
+
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) return res.status(401).json({ error: 'Invalid session' });
+
+  try {
+    await syncListingForUser(user.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Sync failed' });
   }
 });
 
