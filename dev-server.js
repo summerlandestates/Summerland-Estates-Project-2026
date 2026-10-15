@@ -448,25 +448,27 @@ const buildListingRow = (userId, profile, userMetadata = {}) => {
   };
 };
 
+// Columns that PostgREST has already reported as unknown for `listings`.
+// Cached across calls so batch syncs don't re-discover them per row.
+const listingUnknownColumns = new Set();
+
 // Upserts a listings row for the given profile id. Tolerates schema drift: if
 // PostgREST reports an unknown column, that column is stripped and retried.
 const syncListingForUser = async (userId) => {
   if (!supabaseAdmin || !userId) return;
 
-  const [{ data: profile }, { data: authData }] = await Promise.all([
+  const [{ data: profile }, { data: authData }, { data: existing }] = await Promise.all([
     supabaseAdmin.from('profiles').select('*').eq('id', userId).maybeSingle(),
     supabaseAdmin.auth.admin.getUserById(userId),
+    supabaseAdmin.from('listings').select('id').eq('user_id', userId).maybeSingle(),
   ]);
   if (!profile) return;
 
   const row = buildListingRow(userId, profile, authData?.user?.user_metadata);
-  const { data: existing } = await supabaseAdmin
-    .from('listings')
-    .select('id')
-    .eq('user_id', userId)
-    .maybeSingle();
 
   let attempt = { ...row };
+  for (const col of listingUnknownColumns) delete attempt[col];
+
   for (let i = 0; i < 20; i++) {
     const result = existing?.id
       ? await supabaseAdmin.from('listings').update(attempt).eq('id', existing.id)
@@ -485,6 +487,7 @@ const syncListingForUser = async (userId) => {
       return;
     }
     delete attempt[col];
+    listingUnknownColumns.add(col);
   }
 };
 
@@ -1079,12 +1082,8 @@ app.post('/api/admin-sync-listings', async (req, res) => {
       .eq('status', 'approved');
     if (error) throw error;
 
-    let synced = 0;
-    for (const p of profiles || []) {
-      await syncListingForUser(p.id);
-      synced++;
-    }
-    res.json({ success: true, synced });
+    await Promise.all((profiles || []).map((p) => syncListingForUser(p.id)));
+    res.json({ success: true, synced: (profiles || []).length });
   } catch (error) {
     console.error('Admin sync listings error:', error);
     res.status(500).json({ error: error.message || 'Sync failed' });
