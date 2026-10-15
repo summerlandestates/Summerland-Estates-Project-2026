@@ -433,12 +433,17 @@ const buildListingRow = (userId, profile, userMetadata = {}) => {
     user_id: userId,
     slug: `${slugifyText(name) || 'member'}-${shortId}`,
     name,
-    role: firstNonEmptyString(ad.role, ad.professional_title, ad.estates_title, ad.position, profile?.role),
-    location: firstNonEmptyString(ad.location, profile?.location),
-    bio: firstNonEmptyString(ad.bio, ad.individual_bio, ad.agency_bio, ad.description),
+    // role/location/bio are NOT NULL in `listings` — always emit fallbacks.
+    role: firstNonEmptyString(ad.role, ad.professional_title, ad.estates_title, ad.position) || 'Member',
+    location: firstNonEmptyString(ad.location, profile?.location) || 'Not provided',
+    bio: firstNonEmptyString(ad.bio, ad.individual_bio, ad.agency_bio, ad.description) || '',
     profile_photo: firstNonEmptyString(profile?.avatar_url, ad.profile_photo, ad.photo_url, ad.avatar_url),
     category: 'Staff',
-    account_type: firstNonEmptyString(ad.profile_type, userMetadata?.profile_type) || 'professional',
+    // listings.account_type has a CHECK constraint: 'professional' | 'estates'.
+    account_type:
+      firstNonEmptyString(ad.profile_type, userMetadata?.profile_type) === 'estates'
+        ? 'estates'
+        : 'professional',
     experience_years: parseInt(ad.years_experience ?? ad.experience ?? 0, 10) || 0,
     languages: toStringArray(ad.languages),
     hourly_rate: firstNonEmptyString(ad.hourly_rate, ad.rate_min, ad.rate),
@@ -477,6 +482,15 @@ const syncListingForUser = async (userId) => {
     if (!result.error) return;
 
     const msg = result.error.message || '';
+    // NOT NULL violation: stripping the column can't help — supply a default.
+    const nullMatch = /null value in column ['"]([^'"]+)['"]/i.exec(msg);
+    if (nullMatch) {
+      const nullCol = nullMatch[1].split('.').pop();
+      if (nullCol in attempt && attempt[nullCol] === null) {
+        attempt[nullCol] = '';
+        continue;
+      }
+    }
     const match =
       /column ['"]([^'"]+)['"]/i.exec(msg) ||
       /Could not find the '([^']+)' column/i.exec(msg) ||
@@ -1076,14 +1090,13 @@ app.post('/api/admin-sync-listings', async (req, res) => {
   if (!admin) return;
 
   try {
-    const { data: profiles, error } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('status', 'approved');
-    if (error) throw error;
-
-    await Promise.all((profiles || []).map((p) => syncListingForUser(p.id)));
-    res.json({ success: true, synced: (profiles || []).length });
+    // Use the same status derivation as the admin UI (auth user_metadata +
+    // application_data), not just profiles.status — approvals written only to
+    // user_metadata would otherwise be skipped.
+    const result = await getMembershipApplications();
+    const approved = (result.applications || []).filter((a) => a.status === 'approved');
+    await Promise.all(approved.map((a) => syncListingForUser(a.id)));
+    res.json({ success: true, synced: approved.length });
   } catch (error) {
     console.error('Admin sync listings error:', error);
     res.status(500).json({ error: error.message || 'Sync failed' });
