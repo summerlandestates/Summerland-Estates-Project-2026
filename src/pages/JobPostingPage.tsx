@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DollarSign, Clock, Briefcase, Users } from 'lucide-react';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import { serviceGroups } from '../data/serviceCategories';
 
 interface JobFormData {
   jobTitle: string;
@@ -107,6 +108,13 @@ export default function JobPostingPage() {
       return;
     }
 
+    if (!jobForm.jobCategory) {
+      toast.error('Job category required', {
+        description: 'Please select a category for this placement.',
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -115,8 +123,9 @@ export default function JobPostingPage() {
         user_id: user.id,
         job_title: jobForm.jobTitle,
         job_description: jobForm.jobDescription,
-        location: jobForm.location || (jobForm.employmentTypes.includes('remote') ? 'Remote' : null),
-        salary_range: jobForm.salaryRange || null,
+        job_category: jobForm.jobCategory || 'General',
+        location: jobForm.location || (jobForm.employmentTypes.includes('remote') ? 'Remote' : 'Not specified'),
+        salary_range: jobForm.salaryRange || 'Negotiable',
         employment_types: jobForm.employmentTypes,
         days_required: jobForm.daysRequired,
         hours_per_week: jobForm.hoursPerWeek ? parseInt(jobForm.hoursPerWeek) : null,
@@ -231,6 +240,26 @@ export default function JobPostingPage() {
                     onChange={(e) => setJobForm(prev => ({ ...prev, jobTitle: e.target.value }))}
                     className="bg-background text-foreground border-border"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="jobCategory" className="text-foreground">Job Category *</Label>
+                  <Select
+                    value={jobForm.jobCategory}
+                    onValueChange={(value) => setJobForm(prev => ({ ...prev, jobCategory: value }))}
+                  >
+                    <SelectTrigger className="bg-background text-foreground border-border">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {serviceGroups.flatMap((group) =>
+                        group.categories.map((category) => category.title)
+                      ).map((title) => (
+                        <SelectItem key={title} value={title}>{title}</SelectItem>
+                      ))}
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
