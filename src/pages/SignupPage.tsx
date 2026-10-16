@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, User, Loader2 } from 'lucide-react';
-import GoogleAuthButton from '@/components/GoogleAuthButton';
+import GoogleSignIn from '@/components/GoogleSignIn';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -19,7 +19,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthProvider, setOauthProvider] = useState<'google' | null>(null);
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,17 +58,18 @@ export default function SignupPage() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setOauthProvider('google');
+  const handleGoogleSuccess = () => {
+    toast.success('Account Created!', {
+      description: 'Welcome to Summerland Estates',
+    });
+    navigate('/auth/callback', { replace: true });
+  };
 
-    const { error } = await signInWithGoogle();
-
-    if (error) {
-      toast.error('Google Sign-In Failed', {
-        description: error.message,
-      });
-      setOauthProvider(null);
-    }
+  const handleGoogleError = (message: string) => {
+    toast.error('Google Sign-Up Failed', {
+      description: message,
+    });
+    setOauthProvider(null);
   };
 
   return (
@@ -84,9 +85,10 @@ export default function SignupPage() {
               <CardDescription>Join the Summerland Estates network</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <GoogleAuthButton
-                onClick={handleGoogleSignIn}
-                loading={oauthProvider === 'google'}
+              <GoogleSignIn
+                onStart={() => setOauthProvider('google')}
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
                 disabled={loading || oauthProvider !== null}
               />
 

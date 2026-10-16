@@ -10,6 +10,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, metadata?: any) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
+  signInWithGoogleCredential: (credential: string) => Promise<{ error: AuthError | null }>;
   signInWithLinkedIn: () => Promise<{ error: AuthError | null }>;
 }
 
@@ -72,6 +73,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  const signInWithGoogleCredential = async (credential: string) => {
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: credential,
+    });
+    return { error };
+  };
+
   const signInWithLinkedIn = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'linkedin_oidc',
@@ -90,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
     signInWithGoogle,
+    signInWithGoogleCredential,
     signInWithLinkedIn,
   };
 

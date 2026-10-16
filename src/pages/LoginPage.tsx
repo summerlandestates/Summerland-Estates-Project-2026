@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, Loader2 } from 'lucide-react';
-import GoogleAuthButton from '@/components/GoogleAuthButton';
+import GoogleSignIn from '@/components/GoogleSignIn';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [oauthProvider, setOauthProvider] = useState<'google' | null>(null);
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
-  const { user, loading: authLoading, signIn, signInWithGoogle, signOut } = useAuth();
+  const { user, loading: authLoading, signIn, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -143,17 +143,18 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setOauthProvider('google');
+  const handleGoogleSuccess = () => {
+    toast.success('Login Successful!', {
+      description: 'Welcome back to Summerland Estates',
+    });
+    navigate('/auth/callback', { replace: true });
+  };
 
-    const { error } = await signInWithGoogle();
-
-    if (error) {
-      toast.error('Google Sign-In Failed', {
-        description: error.message,
-      });
-      setOauthProvider(null);
-    }
+  const handleGoogleError = (message: string) => {
+    toast.error('Google Sign-In Failed', {
+      description: message,
+    });
+    setOauthProvider(null);
   };
 
   return (
@@ -178,9 +179,10 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <GoogleAuthButton
-                onClick={handleGoogleSignIn}
-                loading={oauthProvider === 'google'}
+              <GoogleSignIn
+                onStart={() => setOauthProvider('google')}
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
                 disabled={loading || oauthProvider !== null}
               />
 

@@ -111,7 +111,7 @@ export default function JobPostingPage() {
 
     try {
       // Job posting is free for all accounts — no plan gate.
-      const { data: insertedJob, error } = await supabase.from('job_postings').insert({
+      const jobPayload: Record<string, unknown> = {
         user_id: user.id,
         job_title: jobForm.jobTitle,
         job_description: jobForm.jobDescription,
@@ -145,9 +145,21 @@ export default function JobPostingPage() {
         travel_required: jobForm.travelRequired,
         relocation_assistance: jobForm.relocationAssistance,
         status: 'active',
-      }).select('id').single();
+      };
 
-      if (error) throw error;
+      // Tolerate schema drift: if the DB reports an unknown column, drop it and retry.
+      let insertedJob: { id: string } | null = null;
+      for (let i = 0; i < 10; i++) {
+        const result = await supabase.from('job_postings').insert(jobPayload).select('id').single();
+        if (!result.error) {
+          insertedJob = result.data;
+          break;
+        }
+        const missingCol = /Could not find the '([^']+)' column/i.exec(result.error.message || '')?.[1];
+        if (!missingCol || !(missingCol in jobPayload)) throw result.error;
+        delete jobPayload[missingCol];
+      }
+      if (!insertedJob) throw new Error('Job insert failed');
 
       // Notify paid users whose profiles match the new job
       try {
@@ -652,20 +664,6 @@ export default function JobPostingPage() {
                       Drug Test Required
                     </Label>
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="personalityFit" className="text-foreground">
-                    Personality Fit
-                  </Label>
-                  <Textarea
-                    id="personalityFit"
-                    placeholder="Describe the ideal personality traits for this role (e.g., detail-oriented, outgoing, calm under pressure, etc.)"
-                    rows={3}
-                    value={jobForm.personalityFit}
-                    onChange={(e) => setJobForm(prev => ({ ...prev, personalityFit: e.target.value }))}
-                    className="bg-background text-foreground border-border"
-                  />
                 </div>
               </div>
 
