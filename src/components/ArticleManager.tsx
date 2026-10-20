@@ -90,6 +90,9 @@ export default function ArticleManager({ userRole, userId, userName, userAvatar,
   const [inlineImagePreview, setInlineImagePreview] = useState<string | null>(null);
   const [inlineImageUploading, setInlineImageUploading] = useState(false);
   const [savedRange, setSavedRange] = useState<Range | null>(null);
+  const [linkDialog, setLinkDialog] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkText, setLinkText] = useState("");
   const [newTag, setNewTag] = useState("");
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -310,6 +313,43 @@ export default function ArticleManager({ userRole, userId, userName, userAvatar,
     setInlineImageDialog(true);
   };
 
+  const restoreSavedRange = () => {
+    contentRef.current?.focus();
+    if (savedRange) {
+      const sel = window.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(savedRange); }
+    }
+  };
+
+  const openLinkDialog = () => {
+    const sel = window.getSelection();
+    const selectedText = sel && sel.rangeCount > 0 ? sel.toString() : "";
+    saveCaretRange();
+    setLinkUrl("");
+    setLinkText(selectedText);
+    setLinkDialog(true);
+  };
+
+  const insertLink = () => {
+    let url = linkUrl.trim();
+    if (!url) { toast.error("Please enter a URL"); return; }
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+
+    const displayText = linkText.trim();
+    if (!displayText) { toast.error("Please enter link text"); return; }
+
+    restoreSavedRange();
+
+    const safeUrl = url.replace(/"/g, "&quot;");
+    const safeText = displayText.replace(/</g, "&lt;");
+    document.execCommand("insertHTML", false, `<a href="${safeUrl}">${safeText}</a>&nbsp;`);
+    if (contentRef.current) setFormData((p) => ({ ...p, content: contentRef.current!.innerHTML }));
+    setLinkDialog(false);
+    setLinkUrl("");
+    setLinkText("");
+    toast.success("Link inserted");
+  };
+
   const insertInlineImage = async () => {
     if (!inlineImageFile) { toast.error("Please select an image"); return; }
     setInlineImageUploading(true);
@@ -463,7 +503,7 @@ export default function ArticleManager({ userRole, userId, userName, userAvatar,
                     <button type="button" title="Align center" onMouseDown={(e) => { e.preventDefault(); execFormat("justifyCenter"); }} className="p-1.5 rounded hover:bg-gray-200 text-gray-700"><AlignCenter className="h-3.5 w-3.5" /></button>
                     <button type="button" title="Align right" onMouseDown={(e) => { e.preventDefault(); execFormat("justifyRight"); }} className="p-1.5 rounded hover:bg-gray-200 text-gray-700"><AlignRight className="h-3.5 w-3.5" /></button>
                     <span className="w-px h-5 bg-gray-300 mx-1" />
-                    <button type="button" title="Insert link" onMouseDown={(e) => { e.preventDefault(); const url = prompt("Enter URL (include https://)"); if (url) execFormat("createLink", url); }} className="p-1.5 rounded hover:bg-gray-200 text-gray-700"><Link className="h-3.5 w-3.5" /></button>
+                    <button type="button" title="Insert link" onMouseDown={(e) => { e.preventDefault(); openLinkDialog(); }} className="p-1.5 rounded hover:bg-gray-200 text-gray-700"><Link className="h-3.5 w-3.5" /></button>
                     <button type="button" title="Insert image with ALT text" onMouseDown={(e) => { e.preventDefault(); openInlineImageDialog(); }} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-50 text-blue-600 border border-blue-200 text-xs font-medium ml-1">
                       <Image className="h-3.5 w-3.5" /> Insert Image
                     </button>
@@ -541,6 +581,49 @@ export default function ArticleManager({ userRole, userId, userName, userAvatar,
                           <Button variant="outline" onClick={() => setInlineImageDialog(false)} disabled={inlineImageUploading}>Cancel</Button>
                           <Button onClick={insertInlineImage} disabled={!inlineImageFile || inlineImageUploading} className="bg-[#A89F91] hover:bg-[#948979] text-white">
                             {inlineImageUploading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : <><Image className="h-4 w-4 mr-2" />Insert Image</>}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Link Insert Dialog ── */}
+                  {linkDialog && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+                        <div className="flex items-center justify-between mb-5">
+                          <h3 className="text-lg font-semibold text-gray-900">Insert Link</h3>
+                          <button onClick={() => setLinkDialog(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700 mb-1 block">URL *</Label>
+                            <Input
+                              value={linkUrl}
+                              onChange={(e) => setLinkUrl(e.target.value)}
+                              placeholder="https://example.com"
+                              autoFocus
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); insertLink(); } }}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">If you leave off https:// we'll add it automatically.</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700 mb-1 block">Link Text *</Label>
+                            <Input
+                              value={linkText}
+                              onChange={(e) => setLinkText(e.target.value)}
+                              placeholder="Text to display for the link"
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); insertLink(); } }}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Prefilled with your selected text — edit it to change the anchor text.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 justify-end mt-6">
+                          <Button variant="outline" onClick={() => setLinkDialog(false)}>Cancel</Button>
+                          <Button onClick={insertLink} disabled={!linkUrl.trim() || !linkText.trim()} className="bg-[#A89F91] hover:bg-[#948979] text-white">
+                            <Link className="h-4 w-4 mr-2" />Insert Link
                           </Button>
                         </div>
                       </div>

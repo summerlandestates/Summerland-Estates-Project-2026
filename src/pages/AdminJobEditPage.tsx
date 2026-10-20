@@ -28,6 +28,7 @@ interface JobForm {
   job_description: string;
   location: string;
   is_remote: boolean;
+  employment_types: string[];
   salary_range: string;
   contact_name: string;
   contact_email: string;
@@ -70,6 +71,7 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
     job_description: '',
     location: '',
     is_remote: false,
+    employment_types: [],
     salary_range: '',
     contact_name: '',
     contact_email: '',
@@ -144,7 +146,10 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
           job_category: data.job_category || '',
           job_description: data.job_description || '',
           location: data.location || '',
-          is_remote: !!data.is_remote,
+          is_remote: Array.isArray(data.employment_types)
+            ? data.employment_types.includes('remote')
+            : data.location === 'Remote',
+          employment_types: Array.isArray(data.employment_types) ? data.employment_types : [],
           salary_range: data.salary_range || '',
           contact_name: data.contact_name || '',
           contact_email: data.contact_email || '',
@@ -194,37 +199,50 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
 
     setSaving(true);
     try {
-      const payload = isJob
-        ? {
-            job_title: jobForm.job_title.trim(),
-            job_category: jobForm.job_category.trim() || 'General',
-            job_description: jobForm.job_description.trim(),
-            location: jobForm.is_remote ? 'Remote' : jobForm.location.trim() || 'Not specified',
-            is_remote: jobForm.is_remote,
-            salary_range: jobForm.salary_range.trim() || 'Negotiable',
-            contact_name: jobForm.contact_name.trim(),
-            contact_email: jobForm.contact_email.trim(),
-            contact_phone: jobForm.contact_phone.trim() || null,
-            application_instructions: jobForm.application_instructions.trim() || null,
-            status: jobForm.status,
-          }
-        : {
-            service_needed: serviceForm.service_needed.trim(),
-            details: serviceForm.details.trim() || null,
-            location: serviceForm.location.trim() || null,
-            date_needed: serviceForm.date_needed || null,
-            budget_min: serviceForm.budget_min ? parseFloat(serviceForm.budget_min) : null,
-            budget_max: serviceForm.budget_max ? parseFloat(serviceForm.budget_max) : null,
-            special_requests: serviceForm.special_requests.trim() || null,
-            status: serviceForm.status,
-          };
+      let payload: Record<string, unknown>;
+      if (isJob) {
+        const types = new Set(jobForm.employment_types);
+        if (jobForm.is_remote) types.add('remote'); else types.delete('remote');
+        payload = {
+          job_title: jobForm.job_title.trim(),
+          job_category: jobForm.job_category.trim() || 'General',
+          job_description: jobForm.job_description.trim(),
+          location: jobForm.is_remote ? 'Remote' : jobForm.location.trim() || 'Not specified',
+          employment_types: [...types],
+          salary_range: jobForm.salary_range.trim() || 'Negotiable',
+          contact_name: jobForm.contact_name.trim(),
+          contact_email: jobForm.contact_email.trim(),
+          contact_phone: jobForm.contact_phone.trim() || null,
+          application_instructions: jobForm.application_instructions.trim() || null,
+          status: jobForm.status,
+        };
+      } else {
+        payload = {
+          service_needed: serviceForm.service_needed.trim(),
+          details: serviceForm.details.trim() || null,
+          location: serviceForm.location.trim() || null,
+          date_needed: serviceForm.date_needed || null,
+          budget_min: serviceForm.budget_min ? parseFloat(serviceForm.budget_min) : null,
+          budget_max: serviceForm.budget_max ? parseFloat(serviceForm.budget_max) : null,
+          special_requests: serviceForm.special_requests.trim() || null,
+          status: serviceForm.status,
+        };
+      }
 
-      const { error } = await supabase
-        .from(table)
-        .update(payload)
-        .eq('id', id);
-
-      if (error) throw error;
+      // Tolerate schema drift: if the DB reports an unknown column, drop it and retry.
+      let updateError: { message?: string } | null = null;
+      for (let i = 0; i < 10; i++) {
+        const { error } = await supabase.from(table).update(payload).eq('id', id);
+        if (!error) {
+          updateError = null;
+          break;
+        }
+        updateError = error;
+        const missingCol = /Could not find the '([^']+)' column/i.exec(error.message || '')?.[1];
+        if (!missingCol || !(missingCol in payload)) break;
+        delete payload[missingCol];
+      }
+      if (updateError) throw updateError;
 
       toast.success(`${label} updated successfully`);
       navigate('/admin/jobs');
