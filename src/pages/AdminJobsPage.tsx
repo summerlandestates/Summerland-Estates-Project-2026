@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Briefcase, Users, MoreVertical, Eye, EyeOff, Pencil, Trash2, Search, Loader2, MapPin, Calendar, DollarSign, CheckCircle, XCircle } from 'lucide-react';
+import { Briefcase, Users, MoreVertical, Eye, EyeOff, Pencil, Trash2, Search, Loader2, MapPin, Calendar, DollarSign, CheckCircle, XCircle, Plus } from 'lucide-react';
 
 interface JobPosting {
   id: string;
@@ -271,22 +271,41 @@ export default function AdminJobsPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="bg-white border border-gray-200 p-1 mb-6">
-            <TabsTrigger 
-              value="jobs" 
-              className="data-[state=active]:bg-[#A89F91] data-[state=active]:text-white"
-            >
-              <Briefcase className="w-4 h-4 mr-2" />
-              Job Postings ({jobs.length})
-            </TabsTrigger>
-            <TabsTrigger 
-              value="services"
-              className="data-[state=active]:bg-[#A89F91] data-[state=active]:text-white"
-            >
-              <Users className="w-4 h-4 mr-2" />
-              Service Requests ({serviceRequests.length})
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <TabsList className="bg-white border border-gray-200 p-1">
+              <TabsTrigger 
+                value="jobs" 
+                className="data-[state=active]:bg-[#A89F91] data-[state=active]:text-white"
+              >
+                <Briefcase className="w-4 h-4 mr-2" />
+                Job Postings ({jobs.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="services"
+                className="data-[state=active]:bg-[#A89F91] data-[state=active]:text-white"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Service Requests ({serviceRequests.length})
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => navigate('/post-job')}
+                className="bg-[#A89F91] hover:bg-[#8A8279] text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Job Posting
+              </Button>
+              <Button
+                onClick={() => navigate('/service-requests?new=1')}
+                variant="outline"
+                className="border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91] hover:text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Service Request
+              </Button>
+            </div>
+          </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-16">

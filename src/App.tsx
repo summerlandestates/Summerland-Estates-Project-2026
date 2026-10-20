@@ -48,6 +48,7 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const OpenRolesPage = lazy(() => import('./pages/OpenRolesPage'));
 const AdminJobsPage = lazy(() => import('./pages/AdminJobsPage'));
+const AdminJobEditPage = lazy(() => import('./pages/AdminJobEditPage'));
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage'));
 const ServiceRequestDetailPage = lazy(() => import('./pages/ServiceRequestDetailPage'));
 const RecognitionPage = lazy(() => import('./pages/RecognitionPage'));
@@ -155,6 +156,8 @@ function AppRoutes() {
           <Route path="/event/:id" element={<EventDetailPage />} />
           <Route element={<AdminLayout />}>
             <Route path="/admin/jobs" element={<Private title="Admin: Manage Jobs"><AdminJobsPage /></Private>} />
+            <Route path="/admin/jobs/edit/:id" element={<Private title="Admin: Edit Job"><AdminJobEditPage type="job" /></Private>} />
+            <Route path="/admin/services/edit/:id" element={<Private title="Admin: Edit Service Request"><AdminJobEditPage type="service" /></Private>} />
             <Route path="/admin/applications" element={<Private title="Admin: Applications"><AdminApplicationsPage /></Private>} />
             <Route path="/admin/applications/:id" element={<Private title="Admin: Application Detail"><AdminApplicationDetailPage /></Private>} />
             <Route path="/admin/newsletter" element={<Private title="Admin: Newsletter"><AdminNewsletterPage /></Private>} />

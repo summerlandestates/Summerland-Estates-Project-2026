@@ -6,8 +6,6 @@ import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import FAQSection from '../components/FAQSection';
 import MapLocationLink from '../components/MapLocationLink';
-import { getTierLimits } from '@/utils/tierAccess';
-import type { PricingTier } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,13 +46,9 @@ export default function OpenRolesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('jobs');
-  const [hasEarlyAccess, setHasEarlyAccess] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const tier = (localStorage.getItem('userTier') || 'professional-basic') as PricingTier;
-    const limits = getTierLimits(tier);
-    setHasEarlyAccess(!!limits.canUseComparisons || tier === 'professional-pro');
     fetchData();
   }, []);
 
@@ -72,27 +66,7 @@ export default function OpenRolesPage() {
         console.error('Jobs fetch error:', jobsError);
       }
 
-      const now = new Date().getTime();
-      const earlyAccessWindowMs = 48 * 60 * 60 * 1000; // 48 hours
-
-      let visibleJobs = jobsData || [];
-      if (!hasEarlyAccess) {
-        // Basic users can only see jobs posted more than 48 hours ago
-        visibleJobs = visibleJobs.filter(job =>
-          now - new Date(job.created_at).getTime() > earlyAccessWindowMs
-        );
-      }
-
-      // Sort: early-access jobs (newest 48h) appear first for pro users
-      visibleJobs.sort((a, b) => {
-        const aIsEarly = now - new Date(a.created_at).getTime() <= earlyAccessWindowMs;
-        const bIsEarly = now - new Date(b.created_at).getTime() <= earlyAccessWindowMs;
-        if (aIsEarly && !bIsEarly) return -1;
-        if (!aIsEarly && bIsEarly) return 1;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-
-      setJobs(visibleJobs);
+      setJobs(jobsData || []);
 
       // Fetch open service requests (status = 'open' matches RLS policy)
       const { data: servicesData, error: servicesError } = await supabase
@@ -258,20 +232,6 @@ export default function OpenRolesPage() {
                                         {type.replace('-', ' ')}
                                       </Badge>
                                     ))}
-                                    {hasEarlyAccess &&
-                                      (() => {
-                                        const now = new Date().getTime();
-                                        const posted = new Date(job.created_at).getTime();
-                                        if (now - posted <= 48 * 60 * 60 * 1000) {
-                                          return (
-                                            <Badge className="bg-amber-100 text-amber-700 border-0">
-                                              Early Access
-                                            </Badge>
-                                          );
-                                        }
-                                        return null;
-                                      })()
-                                    }
                                   </div>
                                 </div>
                               </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -74,7 +74,8 @@ interface ServiceFormData {
 
 export default function ServiceRequestsPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(mockServiceRequests);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [editingRequest, setEditingRequest] = useState<ServiceRequest | null>(null);
@@ -145,6 +146,15 @@ export default function ServiceRequestsPage() {
 
     loadServiceRequests();
   }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (searchParams.get('new') === '1') {
+      handleCreateServiceRequest();
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [authLoading, user]);
 
   const handleBidClick = (request: ServiceRequest) => {
     if (!user) {
@@ -276,12 +286,13 @@ export default function ServiceRequestsPage() {
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('tier')
+        .select('tier, role')
         .eq('id', user.id)
         .maybeSingle();
 
+      const isAdmin = profile?.role === 'admin';
       const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
-      if (!editingRequest && !limits.canPostServiceRequests) {
+      if (!isAdmin && !editingRequest && !limits.canPostServiceRequests) {
         toast.error('Posting service requests is not available on your current plan', {
           description: 'Upgrade to post service requests.',
         });
@@ -289,7 +300,7 @@ export default function ServiceRequestsPage() {
         navigate('/upgrade');
         return;
       }
-      if (!editingRequest && limits.serviceRequestLimit) {
+      if (!isAdmin && !editingRequest && limits.serviceRequestLimit) {
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
