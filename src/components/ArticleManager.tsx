@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, Eye, Search, ArrowLeft, Calendar, User, Clock, X, Loader2, Image, Globe, FileText, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Link, Upload, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { normalizeArticleLinks } from "@/lib/utils";
 import type { Article, ArticleFormData } from "../types/articles";
 import { ARTICLE_CATEGORIES } from "../types/articles";
 import { getTierLimits } from "@/utils/tierAccess";
@@ -416,7 +417,7 @@ export default function ArticleManager({ userRole, userId, userName, userAvatar,
             {viewingArticle.publishedAt && <span className="flex items-center gap-1"><Globe className="h-4 w-4" />Published {new Date(viewingArticle.publishedAt).toLocaleDateString()}</span>}
           </div>
           {viewingArticle.excerpt && <p className="text-gray-600 italic mb-6 text-lg border-l-4 border-[#A89F91] pl-4">{viewingArticle.excerpt}</p>}
-          <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: viewingArticle.content }} />
+          <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: normalizeArticleLinks(viewingArticle.content) }} />
           {viewingArticle.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t">
               {viewingArticle.tags.map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}

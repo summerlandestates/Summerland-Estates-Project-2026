@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
+import { normalizeArticleLinks } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -273,7 +274,7 @@ export default function ArticlePage() {
           {/* Article Content */}
           <div className="prose prose-lg max-w-none mb-8">
             <div 
-              dangerouslySetInnerHTML={{ __html: article.content }}
+              dangerouslySetInnerHTML={{ __html: normalizeArticleLinks(article.content) }}
               className="article-content"
             />
           </div>
