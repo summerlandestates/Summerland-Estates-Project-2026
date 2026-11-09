@@ -22,8 +22,10 @@ import {
 import { Calendar, DollarSign, Send, Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import MapLocationLink from '../components/MapLocationLink';
-import { getTierLimits } from '@/utils/tierAccess';
-import type { PricingTier, ServiceRequest } from '../types';
+import { checkMeteredAccess } from '@/lib/usage';
+import UpgradePromptDialog from '@/components/UpgradePromptDialog';
+import type { MeteredFeature } from '@/lib/plans';
+import type { ServiceRequest } from '../types';
 
 // Mock data - in a real app, this would come from an API
 const mockServiceRequests: ServiceRequest[] = [
@@ -85,6 +87,8 @@ export default function ServiceRequestsPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [bidSubmitting, setBidSubmitting] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<MeteredFeature | null>(null);
+  const [upgradeLimit, setUpgradeLimit] = useState<number | null>(null);
   const [quoteAmount, setQuoteAmount] = useState('');
   const [bidMessage, setBidMessage] = useState('');
   const [serviceForm, setServiceForm] = useState<ServiceFormData>({
@@ -156,12 +160,24 @@ export default function ServiceRequestsPage() {
     }
   }, [authLoading, user]);
 
-  const handleBidClick = (request: ServiceRequest) => {
+  const handleBidClick = async (request: ServiceRequest) => {
     if (!user) {
-      toast.error('Apply or sign in to bid on service requests', {
-        description: 'Membership approval is required before you can submit bids.',
+      toast.error('Sign in to bid on service requests', {
+        description: 'Sign in and we will bring you right back here.',
       });
-      navigate('/add-listing');
+      navigate(`/login?next=${encodeURIComponent('/service-requests')}`);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tier')
+      .eq('id', user.id)
+      .maybeSingle();
+    const check = await checkMeteredAccess(user.id, profile?.tier, 'serviceBids');
+    if (!check.allowed) {
+      setUpgradeFeature('serviceBids');
+      setUpgradeLimit(check.limit);
       return;
     }
 
@@ -276,48 +292,17 @@ export default function ServiceRequestsPage() {
     e.preventDefault();
     
     if (!user) {
-      toast.error('Apply or sign in to create a service request');
-      navigate('/add-listing');
+      toast.error('Sign in to create a service request', {
+        description: 'Sign in and we will bring you right back here.',
+      });
+      navigate(`/login?next=${encodeURIComponent('/service-requests')}`);
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('tier, role')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const isAdmin = profile?.role === 'admin';
-      const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
-      if (!isAdmin && !editingRequest && !limits.canPostServiceRequests) {
-        toast.error('Posting service requests is not available on your current plan', {
-          description: 'Upgrade to post service requests.',
-        });
-        setSubmitting(false);
-        navigate('/upgrade');
-        return;
-      }
-      if (!isAdmin && !editingRequest && limits.serviceRequestLimit) {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        const { count } = await supabase
-          .from('service_requests')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .gte('created_at', startOfMonth.toISOString());
-        if ((count || 0) >= limits.serviceRequestLimit) {
-          toast.error(`You have reached your limit of ${limits.serviceRequestLimit} service request${limits.serviceRequestLimit === 1 ? '' : 's'} this month.`, {
-            description: 'Upgrade for more service requests.',
-          });
-          setSubmitting(false);
-          navigate('/upgrade');
-          return;
-        }
-      }
+      // Posting service requests is free on every plan.
 
       if (editingRequest) {
         const { error } = await supabase
@@ -820,6 +805,13 @@ export default function ServiceRequestsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <UpgradePromptDialog
+        open={upgradeFeature !== null}
+        onOpenChange={(open) => { if (!open) setUpgradeFeature(null); }}
+        feature={upgradeFeature ?? 'serviceBids'}
+        limit={upgradeLimit}
+      />
 
       <Footer />
     </div>

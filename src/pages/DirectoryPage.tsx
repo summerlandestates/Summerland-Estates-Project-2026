@@ -12,6 +12,10 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, BriefcaseBusiness, Search, Sparkles, Loader2 } from 'lucide-react';
 import { fetchListings } from '../utils/listings';
+import { useAuth } from '@/contexts/AuthContext';
+import { checkMeteredAccess, recordAdvancedSearchUse } from '@/lib/usage';
+import UpgradePromptDialog from '@/components/UpgradePromptDialog';
+import { supabase } from '@/lib/supabase';
 import { parseSearchIntent, intentScore } from '../lib/searchIntent';
 import { getBlockedIds } from '../components/BlockUserButton';
 import type { Listing, FilterState, PricingTier } from '../types';
@@ -44,7 +48,10 @@ export default function DirectoryPage() {
   const [allListings, setAllListings] = useState<Listing[]>([]);
   const [filteredListings, setFilteredListings] = useState<Listing[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const { user } = useAuth();
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
+  const [advancedMetered, setAdvancedMetered] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [isPublicView, setIsPublicView] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -75,6 +82,26 @@ export default function DirectoryPage() {
 
     loadListings();
   }, []);
+
+  const handleAdvancedFilterUsed = async () => {
+    if (!user || advancedMetered) return;
+    setAdvancedMetered(true);
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .maybeSingle();
+      const check = await checkMeteredAccess(user.id, profile?.tier, 'advancedSearch');
+      if (!check.allowed) {
+        setUpgradeOpen(true);
+        return;
+      }
+      recordAdvancedSearchUse(user.id);
+    } catch (err) {
+      console.error('Advanced search metering failed:', err);
+    }
+  };
 
   const handleFilterChange = (filters: FilterState) => {
     let filtered = [...allListings];
@@ -281,7 +308,7 @@ export default function DirectoryPage() {
                         onClick={() => navigate('/open-roles')}
                         className="min-h-12 w-full rounded-full bg-[#6d7662] px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-[#5f6756] md:w-auto md:min-w-[250px]"
                       >
-                        View Open Roles & Requests
+                        View Jobs & Service Requests
                       </Button>
                     </div>
                   </div>
@@ -361,7 +388,7 @@ export default function DirectoryPage() {
                       <BriefcaseBusiness className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="font-heading text-lg font-semibold text-[#23231f]">Open Roles</h3>
+                      <h3 className="font-heading text-lg font-semibold text-[#23231f]">Jobs</h3>
                       <p className="text-sm text-[#6b665f]">Explore current placements and service requests.</p>
                     </div>
                   </div>
@@ -386,6 +413,7 @@ export default function DirectoryPage() {
               </div>
 
               <FilterToolbar
+                onAdvancedFilterUsed={handleAdvancedFilterUsed}
                 onFilterChange={handleFilterChange}
                 onResetFilters={handleResetFilters}
                 viewMode={viewMode}
@@ -432,7 +460,7 @@ export default function DirectoryPage() {
                     onClick={() => navigate('/open-roles')}
                     className="rounded-full bg-[#6d7662] px-6 text-white hover:bg-[#5f6756]"
                   >
-                    View Open Roles & Requests
+                    View Jobs & Service Requests
                   </Button>
                 </div>
               </div>
@@ -457,6 +485,13 @@ export default function DirectoryPage() {
           </div>
         </section>
       </main>
+
+      <UpgradePromptDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        feature="advancedSearch"
+        limit={2}
+      />
 
       <Footer />
     </div>

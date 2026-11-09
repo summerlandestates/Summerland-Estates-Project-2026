@@ -29,7 +29,7 @@ export default function AdminSidebar({ collapsed = false, onToggle }: AdminSideb
 
   const menuItems = [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/admin/applications', icon: ClipboardList, label: 'Applications' },
+    { path: '/admin/applications', icon: ClipboardList, label: 'Membership Applications' },
     { path: '/admin/users', icon: Users, label: 'Users' },
     { path: '/admin/reports', icon: Shield, label: 'Reports' },
     { path: '/admin/jobs', icon: Briefcase, label: 'Jobs' },

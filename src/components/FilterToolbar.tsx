@@ -36,6 +36,8 @@ const SEARCH_PLACEHOLDER_EXAMPLES = [
 
 interface FilterToolbarProps {
   onFilterChange: (filters: FilterState) => void;
+  /** Fired when a Basic-plan user touches an advanced filter field. */
+  onAdvancedFilterUsed?: () => void;
   onResetFilters: () => void;
   viewMode: 'grid' | 'list';
   onViewModeChange: (mode: 'grid' | 'list') => void;
@@ -53,6 +55,7 @@ const initialFilters: FilterState = {
 
 export default function FilterToolbar({
   onFilterChange,
+  onAdvancedFilterUsed,
   onResetFilters,
   viewMode,
   onViewModeChange,
@@ -70,9 +73,15 @@ export default function FilterToolbar({
     return () => clearInterval(id);
   }, []);
 
+  const ADVANCED_KEYS = new Set(['language', 'workAvailability', 'yearsExperience', 'cookingLevel', 'personalityType']);
   const handleFilterUpdate = (key: keyof FilterState, value: any) => {
     const newFilters = { ...filters, [key]: value === 'all' ? '' : value };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
     if (key === 'category') newFilters.titles = [];
+    if (ADVANCED_KEYS.has(key as string) && value && value !== 'all') {
+      onAdvancedFilterUsed?.();
+    }
     setFilters(newFilters);
     onFilterChange(newFilters);
   };

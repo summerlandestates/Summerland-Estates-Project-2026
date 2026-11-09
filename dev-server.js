@@ -2114,6 +2114,72 @@ app.post('/api/notify-status-update', async (req, res) => {
   }
 });
 
+// Email the job poster when someone applies for their job. The poster is
+// resolved from the job's contact_email, falling back to the posting account.
+app.post('/api/notify-job-application', async (req, res) => {
+  try {
+    const {
+      jobId,
+      jobTitle,
+      applicantName,
+      applicantEmail,
+      applicantPhone,
+      coverLetter,
+      resumeUrl,
+    } = req.body || {};
+
+    if (!jobId || !applicantName || !applicantEmail) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const { data: job } = await supabaseAdmin
+      .from('job_postings')
+      .select('user_id, contact_email')
+      .eq('id', jobId)
+      .maybeSingle();
+
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    let posterEmail = job.contact_email;
+    if (!posterEmail && job.user_id) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('email')
+        .eq('id', job.user_id)
+        .maybeSingle();
+      posterEmail = profile?.email;
+    }
+
+    if (!posterEmail) {
+      return res.json({ sent: false, reason: 'no-poster-email' });
+    }
+
+    const esc = (s) =>
+      String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    await sendEmail(
+      posterEmail,
+      `New application for ${jobTitle || 'your job'}`,
+      `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#333">
+        <h2 style="color:#8A8279">New Job Application</h2>
+        <p><strong>${esc(applicantName)}</strong> applied for <strong>${esc(jobTitle)}</strong>.</p>
+        <table style="margin:16px 0;border-collapse:collapse">
+          <tr><td style="padding:4px 16px 4px 0;color:#666">Email</td><td><a href="mailto:${esc(applicantEmail)}">${esc(applicantEmail)}</a></td></tr>
+          ${applicantPhone ? `<tr><td style="padding:4px 16px 4px 0;color:#666">Phone</td><td>${esc(applicantPhone)}</td></tr>` : ''}
+          ${resumeUrl ? `<tr><td style="padding:4px 16px 4px 0;color:#666">Resume</td><td><a href="${esc(resumeUrl)}">Download resume</a></td></tr>` : ''}
+        </table>
+        ${coverLetter ? `<div style="background:#f5f2ee;border-radius:8px;padding:12px 16px"><p style="margin:0 0 6px;color:#666;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Cover Message</p><p style="margin:0;white-space:pre-wrap">${esc(coverLetter)}</p></div>` : ''}
+        <p style="margin-top:20px;color:#666;font-size:13px">View all applicants in your account under <strong>My Jobs</strong>.</p>
+      </div>`
+    );
+
+    res.json({ sent: true });
+  } catch (error) {
+    console.error('Job application notify error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send notification' });
+  }
+});
+
 // Sends SMS via Twilio when TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and
 // TWILIO_PHONE_NUMBER are configured. Returns false when not configured.
 const sendSms = async (to, message) => {

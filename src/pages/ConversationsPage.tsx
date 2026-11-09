@@ -12,8 +12,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { Send, MessageSquare, Loader2, ArrowLeft, User } from 'lucide-react';
 import ReportButton from '@/components/ReportButton';
-import { getTierLimits } from '@/utils/tierAccess';
-import type { PricingTier } from '../types';
 
 interface ConversationParticipant {
   conversation_id: string;
@@ -139,32 +137,6 @@ export default function ConversationsPage() {
 
     setSending(true);
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('tier')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
-      if (limits.messageLimitMonthly) {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        const { count } = await supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('sender_id', user.id)
-          .gte('created_at', startOfMonth.toISOString());
-        if ((count || 0) >= limits.messageLimitMonthly) {
-          toast.error(`You have reached your limit of ${limits.messageLimitMonthly} messages this month.`, {
-            description: 'Upgrade for unlimited messaging.',
-          });
-          setSending(false);
-          navigate('/upgrade');
-          return;
-        }
-      }
-
       const { error } = await supabase.from('messages').insert({
         conversation_id: activeConversation,
         sender_id: user.id,

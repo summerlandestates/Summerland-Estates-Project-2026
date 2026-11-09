@@ -1,5 +1,4 @@
 import type { Listing, PricingTier } from '../types';
-import { getTierLimits } from './tierAccess';
 
 export interface VisibilityRules {
   canViewFullName: boolean;
@@ -13,34 +12,20 @@ export interface VisibilityRules {
 }
 
 export function getVisibilityRules(
-  userTier: PricingTier | undefined,
-  isPublicView: boolean = false
+  _userTier: PricingTier | undefined,
+  _isPublicView: boolean = false
 ): VisibilityRules {
-  // Public/not logged in
-  if (isPublicView || !userTier) {
-    return {
-      canViewFullName: false,
-      canViewPhoto: false,
-      canViewLocation: false,
-      canViewBio: false,
-      canViewContactInfo: false,
-      canViewDetailedInfo: false,
-      canSendMessage: false,
-      canViewFullProfile: false
-    };
-  }
-
-  const limits = getTierLimits(userTier);
-
+  // All profiles are fully public — every plan (and logged-out visitors) sees
+  // names, photos, locations, bios and contact information.
   return {
-    canViewFullName: limits.canViewFullProfiles,
-    canViewPhoto: limits.canViewFullProfiles,
-    canViewLocation: limits.canViewFullProfiles,
-    canViewBio: limits.canViewFullProfiles,
-    canViewContactInfo: limits.canViewFullProfiles,
-    canViewDetailedInfo: limits.canViewFullProfiles,
-    canSendMessage: limits.canMessage,
-    canViewFullProfile: limits.canViewFullProfiles
+    canViewFullName: true,
+    canViewPhoto: true,
+    canViewLocation: true,
+    canViewBio: true,
+    canViewContactInfo: true,
+    canViewDetailedInfo: true,
+    canSendMessage: true,
+    canViewFullProfile: true
   };
 }
 
@@ -63,31 +48,19 @@ export function formatNameForDisplay(
 }
 
 export function shouldBlurProfile(
-  profileIndex: number,
-  userTier: PricingTier | undefined,
-  isPublicView: boolean = false
+  _profileIndex: number,
+  _userTier: PricingTier | undefined,
+  _isPublicView: boolean = false
 ): boolean {
-  // Public or free tier: blur after 2 profiles
-  if (isPublicView || !userTier || userTier.includes('free')) {
-    return profileIndex >= 2;
-  }
-
+  // Profiles are never blurred — the directory is fully public.
   return false;
 }
 
 export function canAccessProfile(
-  userTier: PricingTier | undefined,
-  profileIndex: number,
-  isPublicView: boolean = false
+  _userTier: PricingTier | undefined,
+  _profileIndex: number,
+  _isPublicView: boolean = false
 ): boolean {
-  if (isPublicView || !userTier) {
-    return profileIndex < 2;
-  }
-
-  if (userTier.includes('free')) {
-    return profileIndex < 2;
-  }
-
   return true;
 }
 

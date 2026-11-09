@@ -7,3 +7,9 @@ alter table public.job_postings
   add column if not exists personality_fit text;
 
 notify pgrst, 'reload schema';
+
+-- Resume uploads on job applications (shown in the Applicants view).
+alter table public.job_applications
+  add column if not exists resume_url text;
+
+notify pgrst, 'reload schema';

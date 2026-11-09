@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, ArrowLeft, ArrowRight, Check, User, Building2, Briefcase, Home, Shield, FileText, Image as ImageIcon, Loader2, Sparkles } from 'lucide-react';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
-import { getPlansByUserType } from '../data/pricing';
+import { getPlansByUserType, getFreeTierForUserType } from '../data/pricing';
 import { submitMembershipApplication } from '@/lib/membershipApplication';
 import { isComplimentaryTier } from '@/lib/membership';
 import PersonalityAssessmentDialog from '@/components/PersonalityAssessmentDialog';
@@ -232,6 +232,9 @@ export default function AddListingPage() {
   const [estatesSubType, setEstatesSubType] = useState<EstatesSubType>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTier, setSelectedTier] = useState<PricingTier | null>(null);
+  // B3: Company vs Individual — derived from profile type, changeable via the
+  // Business Type radio. Hides individual-only questions for companies.
+  const [entityType, setEntityType] = useState<'individual' | 'company'>('individual');
   const [promoCode, setPromoCode] = useState('');
   const [promoCodeInfo, setPromoCodeInfo] = useState<{ id: string; tier: string; code: string } | null>(null);
   const [promoCodeLoading, setPromoCodeLoading] = useState(false);
@@ -1340,7 +1343,7 @@ export default function AddListingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               <Card 
                 className="p-8 bg-card text-card-foreground cursor-pointer border border-gray-200 hover:border-[#A89F91] transition-all duration-300 h-full flex flex-col"
-                onClick={() => { setProfileType('professional'); setShowStandardsNotice(true); }}
+                onClick={() => { setProfileType('professional'); setEntityType('individual'); setSelectedTier(getFreeTierForUserType('professional')); setShowStandardsNotice(false); setCurrentStep(999); setFormStep(1); }}
               >
                 <div className="text-center flex-1 flex flex-col">
                   <div className="w-20 h-20 bg-[#A89F91]/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -1360,7 +1363,7 @@ export default function AddListingPage() {
 
               <Card 
                 className="p-8 bg-card text-card-foreground cursor-pointer border border-gray-200 hover:border-[#A89F91] transition-all duration-300 h-full flex flex-col"
-                onClick={() => { setProfileType('service-provider'); setShowStandardsNotice(true); }}
+                onClick={() => { setProfileType('service-provider'); setEntityType('company'); setSelectedTier(getFreeTierForUserType('business')); setShowStandardsNotice(false); setCurrentStep(999); setFormStep(1); }}
               >
                 <div className="text-center flex-1 flex flex-col">
                   <div className="w-20 h-20 bg-[#A89F91]/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -1380,7 +1383,7 @@ export default function AddListingPage() {
 
               <Card 
                 className="p-8 bg-card text-card-foreground cursor-pointer border border-gray-200 hover:border-[#A89F91] transition-all duration-300 h-full flex flex-col"
-                onClick={() => { setProfileType('agency'); setShowStandardsNotice(true); }}
+                onClick={() => { setProfileType('agency'); setEntityType('company'); setSelectedTier(getFreeTierForUserType('agency')); setShowStandardsNotice(false); setCurrentStep(999); setFormStep(1); }}
               >
                 <div className="text-center flex-1 flex flex-col">
                   <div className="w-20 h-20 bg-[#A89F91]/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -1400,7 +1403,7 @@ export default function AddListingPage() {
 
               <Card 
                 className="p-8 bg-card text-card-foreground cursor-pointer border border-gray-200 hover:border-[#A89F91] transition-all duration-300 h-full flex flex-col"
-                onClick={() => { setProfileType('estates'); setShowStandardsNotice(true); }}
+                onClick={() => { setProfileType('estates'); setEntityType('individual'); setSelectedTier(getFreeTierForUserType('estates')); setShowStandardsNotice(false); setCurrentStep(999); setFormStep(1); }}
               >
                 <div className="text-center flex-1 flex flex-col">
                   <div className="w-20 h-20 bg-[#A89F91]/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -1669,12 +1672,11 @@ export default function AddListingPage() {
               onClick={() => {
                 if (formStep > 1) {
                   handlePreviousFormStep();
-                } else if (isCommunityOnly) {
+                } else {
+                  // Back to type selection — formData stays in state so
+                  // nothing the applicant entered is thrown away.
                   setProfileType(null);
                   setCurrentStep(1);
-                } else {
-                  setCurrentStep(steps.length);
-                  setShowPricing(true);
                 }
               }}
               className="mb-6 text-foreground"
@@ -1829,7 +1831,8 @@ export default function AddListingPage() {
                           />
                         </div>
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label htmlFor="skills" className="text-foreground text-sm">Skills</Label>
                           <Textarea
                             id="skills"
@@ -1839,6 +1842,7 @@ export default function AddListingPage() {
                             className="bg-background text-foreground border-border"
                           />
                         </div>
+)}
 
                         {renderPersonalityAssessmentSection({
                           fieldId: 'professional_personality',
@@ -1905,7 +1909,8 @@ export default function AddListingPage() {
                               className="bg-background text-foreground border-border"
                             />
                           </div>
-                          <div className="space-y-2">
+                          {entityType === 'individual' && (
+<div className="space-y-2">
                             <Label htmlFor="originally_from" className="text-foreground text-sm">Originally From</Label>
                             <Input
                               id="originally_from"
@@ -1914,6 +1919,7 @@ export default function AddListingPage() {
                               className="bg-background text-foreground border-border"
                             />
                           </div>
+)}
                         </div>
 
                         <div className="space-y-1">
@@ -2532,16 +2538,17 @@ export default function AddListingPage() {
                       <>
                         <div className="space-y-2">
                           <Label className="text-foreground text-sm">Business Type</Label>
-                          <div className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="is_company" name="is_company" />
-                              <Label htmlFor="is_company" className="text-sm text-foreground cursor-pointer">Company</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="is_individual" name="is_individual" />
-                              <Label htmlFor="is_individual" className="text-sm text-foreground cursor-pointer">Individual</Label>
-                            </div>
+                          <div className="flex gap-6 pt-1">
+                            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                              <input type="radio" name="entity_type" value="company" checked={entityType === 'company'} onChange={() => setEntityType('company')} className="accent-[#A89F91]" />
+                              Company / Service Provider
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                              <input type="radio" name="entity_type" value="individual" checked={entityType === 'individual'} onChange={() => setEntityType('individual')} className="accent-[#A89F91]" />
+                              Individual
+                            </label>
                           </div>
+                          <p className="text-xs text-muted-foreground">Choose Company to skip personal questions — only business details are required.</p>
                         </div>
 
                         <div className="space-y-2">
@@ -2698,7 +2705,8 @@ export default function AddListingPage() {
                           {renderFilePreview('sp_portfolio')}
                         </div>
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label className="text-foreground text-sm">Availability</Label>
                           <div className="grid grid-cols-2 gap-2">
                             {workAvailability.map((availability) => (
@@ -2717,8 +2725,10 @@ export default function AddListingPage() {
                             </div>
                           </div>
                         </div>
+)}
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label className="text-foreground text-sm">Comfortable With</Label>
                           <div className="flex gap-4">
                             <div className="flex items-center space-x-2">
@@ -2731,6 +2741,7 @@ export default function AddListingPage() {
                             </div>
                           </div>
                         </div>
+)}
 
                         <div className="space-y-2">
                           <Label className="text-foreground text-sm">Certifications</Label>
@@ -2778,7 +2789,8 @@ export default function AddListingPage() {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label htmlFor="sp_skills" className="text-foreground text-sm">Skills & Expertise</Label>
                           <Textarea
                             id="sp_skills"
@@ -2788,6 +2800,7 @@ export default function AddListingPage() {
                             className="bg-background text-foreground border-border"
                           />
                         </div>
+)}
 
                         {renderPersonalityAssessmentSection({
                           fieldId: 'sp_personality',
@@ -2796,7 +2809,8 @@ export default function AddListingPage() {
                         })}
 
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
+                          {entityType === 'individual' && (
+<div className="space-y-2">
                             <Label htmlFor="sp_hobbies" className="text-foreground text-sm">Hobbies</Label>
                             <Input
                               id="sp_hobbies"
@@ -2805,7 +2819,9 @@ export default function AddListingPage() {
                               className="bg-background text-foreground border-border"
                             />
                           </div>
-                          <div className="space-y-2">
+)}
+                          {entityType === 'individual' && (
+<div className="space-y-2">
                             <Label htmlFor="sp_interests" className="text-foreground text-sm">Interests</Label>
                             <Input
                               id="sp_interests"
@@ -2814,6 +2830,7 @@ export default function AddListingPage() {
                               className="bg-background text-foreground border-border"
                             />
                           </div>
+)}
                         </div>
 
                         <div className="space-y-2">
@@ -2830,7 +2847,8 @@ export default function AddListingPage() {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label htmlFor="sp_letters_rec" className="text-foreground text-sm">Letters of Recommendation</Label>
                           <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-[#A89F91] transition-colors">
                             <Input
@@ -2850,6 +2868,7 @@ export default function AddListingPage() {
                           </div>
                           {renderFilePreview('letters_of_rec')}
                         </div>
+)}
                       </>
                     )}
 
@@ -2908,16 +2927,17 @@ export default function AddListingPage() {
                       <>
                         <div className="space-y-2">
                           <Label className="text-foreground text-sm">Business Type</Label>
-                          <div className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="agency_is_company" name="is_company" />
-                              <Label htmlFor="agency_is_company" className="text-sm text-foreground cursor-pointer">Company</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="agency_is_individual" name="is_individual" />
-                              <Label htmlFor="agency_is_individual" className="text-sm text-foreground cursor-pointer">Individual</Label>
-                            </div>
+                          <div className="flex gap-6 pt-1">
+                            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                              <input type="radio" name="entity_type" value="company" checked={entityType === 'company'} onChange={() => setEntityType('company')} className="accent-[#A89F91]" />
+                              Company / Service Provider
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                              <input type="radio" name="entity_type" value="individual" checked={entityType === 'individual'} onChange={() => setEntityType('individual')} className="accent-[#A89F91]" />
+                              Individual
+                            </label>
                           </div>
+                          <p className="text-xs text-muted-foreground">Choose Company to skip personal questions — only business details are required.</p>
                         </div>
 
                         <div className="grid gap-4 md:grid-cols-2">
@@ -2982,7 +3002,8 @@ export default function AddListingPage() {
                           />
                         </div>
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label className="text-foreground text-sm">Availability</Label>
                           <div className="grid grid-cols-2 gap-2">
                             {workAvailability.map((availability) => (
@@ -2995,8 +3016,10 @@ export default function AddListingPage() {
                             ))}
                           </div>
                         </div>
+)}
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label htmlFor="agency_skills" className="text-foreground text-sm">Skills & Expertise</Label>
                           <Textarea
                             id="agency_skills"
@@ -3006,6 +3029,7 @@ export default function AddListingPage() {
                             className="bg-background text-foreground border-border"
                           />
                         </div>
+)}
 
                         {renderPersonalityAssessmentSection({
                           fieldId: 'agency_personality',
@@ -3014,7 +3038,8 @@ export default function AddListingPage() {
                         })}
 
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
+                          {entityType === 'individual' && (
+<div className="space-y-2">
                             <Label htmlFor="agency_hobbies" className="text-foreground text-sm">Hobbies</Label>
                             <Input
                               id="agency_hobbies"
@@ -3023,7 +3048,9 @@ export default function AddListingPage() {
                               className="bg-background text-foreground border-border"
                             />
                           </div>
-                          <div className="space-y-2">
+)}
+                          {entityType === 'individual' && (
+<div className="space-y-2">
                             <Label htmlFor="agency_interests" className="text-foreground text-sm">Interests</Label>
                             <Input
                               id="agency_interests"
@@ -3032,6 +3059,7 @@ export default function AddListingPage() {
                               className="bg-background text-foreground border-border"
                             />
                           </div>
+)}
                         </div>
 
                         <div className="space-y-2">
@@ -3084,7 +3112,8 @@ export default function AddListingPage() {
                           />
                         </div>
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label htmlFor="agency_letters_rec" className="text-foreground text-sm">Letters of Recommendation</Label>
                           <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-[#A89F91] transition-colors">
                             <Input
@@ -3104,6 +3133,7 @@ export default function AddListingPage() {
                           </div>
                           {renderFilePreview('letters_of_rec')}
                         </div>
+)}
                       </>
                     )}
 
@@ -3177,7 +3207,8 @@ export default function AddListingPage() {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label htmlFor="estates_hobbies" className="text-foreground text-sm">Hobbies</Label>
                           <Textarea
                             id="estates_hobbies"
@@ -3187,8 +3218,10 @@ export default function AddListingPage() {
                             className="bg-background text-foreground border-border"
                           />
                         </div>
+)}
 
-                        <div className="space-y-2">
+                        {entityType === 'individual' && (
+<div className="space-y-2">
                           <Label htmlFor="estates_interests" className="text-foreground text-sm">Interests</Label>
                           <Textarea
                             id="estates_interests"
@@ -3198,6 +3231,7 @@ export default function AddListingPage() {
                             className="bg-background text-foreground border-border"
                           />
                         </div>
+)}
                       </>
                     )}
 

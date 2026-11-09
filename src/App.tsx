@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import PageTransition from './components/PageTransition';
@@ -49,6 +49,8 @@ const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const OpenRolesPage = lazy(() => import('./pages/OpenRolesPage'));
 const AdminJobsPage = lazy(() => import('./pages/AdminJobsPage'));
 const AdminJobEditPage = lazy(() => import('./pages/AdminJobEditPage'));
+const MyJobsPage = lazy(() => import('./pages/MyJobsPage'));
+const JobApplicantsPage = lazy(() => import('./pages/JobApplicantsPage'));
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage'));
 const ServiceRequestDetailPage = lazy(() => import('./pages/ServiceRequestDetailPage'));
 const RecognitionPage = lazy(() => import('./pages/RecognitionPage'));
@@ -111,6 +113,9 @@ function AppRoutes() {
           <Route path="/reset-password" element={<Private title="Reset Password"><ResetPasswordPage /></Private>} />
           <Route path="/my-profile" element={<MyProfilePage />} />
           <Route path="/my-profile/edit" element={<Private title="Edit Profile"><EditProfilePage /></Private>} />
+          <Route path="/my-jobs" element={<Private title="My Jobs"><MyJobsPage /></Private>} />
+          <Route path="/my-jobs/:jobId/applicants" element={<Private title="Job Applicants"><JobApplicantsPage /></Private>} />
+          <Route path="/my-jobs/edit/:id" element={<Private title="Edit Job"><AdminJobEditPage type="job" scope="owner" /></Private>} />
           <Route path="/my-articles" element={<MyArticlesPage />} />
           <Route path="/settings" element={<Private title="Settings"><SettingsPage /></Private>} />
           <Route path="/admin/login" element={<Private title="Admin Sign In"><AdminLoginPage /></Private>} />
@@ -179,6 +184,11 @@ function AppRoutes() {
             <Route path="/admin/email-blasts" element={<Private title="Admin: Email Blasts"><AdminEmailBlastsPage /></Private>} />
             <Route path="/admin/promo-codes" element={<Private title="Admin: Promo Codes"><AdminPromoCodesPage /></Private>} />
           </Route>
+          {/* Legacy/external path aliases — direct loads and refreshes must work */}
+          <Route path="/jobs" element={<Navigate to="/open-roles" replace />} />
+          <Route path="/placements" element={<Navigate to="/open-roles" replace />} />
+          <Route path="/register" element={<Navigate to="/add-listing" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
       </PageTransition>

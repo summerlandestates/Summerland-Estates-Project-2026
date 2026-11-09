@@ -119,7 +119,7 @@ export default function OpenRolesPage() {
   return (
     <div className="min-h-screen bg-background page-transition">
       <SEOHead
-        title="Open Roles - Summerland Estates"
+        title="Jobs - Summerland Estates"
         description="Browse open estate professional positions. Find private chef, housekeeper, estate manager, and other luxury household roles."
         canonical="/open-roles"
       />
@@ -130,7 +130,7 @@ export default function OpenRolesPage() {
           {/* Header */}
           <div className="mb-12 text-center">
             <h1 className="text-5xl font-heading font-bold text-foreground mb-4 tracking-tight">
-              Open Roles & Requests
+              Jobs & Service Requests
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
               Browse available positions and service opportunities within the estate community

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +22,23 @@ export default function LoginPage() {
   const { user, loading: authLoading, signIn, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // ?next=/some/path — where to send the user after sign-in. Persisted to
+  // sessionStorage so it survives OAuth redirects through /auth/callback.
+  const rawNext = searchParams.get('next');
+  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : null;
+
+  useEffect(() => {
+    if (next) sessionStorage.setItem('authRedirect', next);
+  }, [next]);
+
+  const postLoginPath = () => {
+    const stored = sessionStorage.getItem('authRedirect');
+    const target = next || (stored && stored.startsWith('/') && !stored.startsWith('//') ? stored : null);
+    if (target) sessionStorage.removeItem('authRedirect');
+    return target;
+  };
 
   useEffect(() => {
     // Check for pending login from account creation
@@ -53,7 +70,7 @@ export default function LoginPage() {
         .eq('id', user.id)
         .maybeSingle();
 
-      navigate(profile?.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+      navigate(postLoginPath() || (profile?.role === 'admin' ? '/admin/dashboard' : '/dashboard'));
     };
 
     redirectLoggedInUser();
@@ -139,7 +156,7 @@ export default function LoginPage() {
       toast.success('Login Successful!', {
         description: 'Welcome back to Summerland Estates',
       });
-      setTimeout(() => navigate(profile?.role === 'admin' ? '/admin/dashboard' : '/dashboard'), 500);
+      setTimeout(() => navigate(postLoginPath() || (profile?.role === 'admin' ? '/admin/dashboard' : '/dashboard')), 500);
     }
   };
 

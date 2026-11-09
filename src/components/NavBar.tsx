@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, User, ChevronDown, LogOut, Settings, Bookmark } from 'lucide-react';
+import { Menu, X, User, ChevronDown, LogOut, Settings, Bookmark, Briefcase, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -170,7 +170,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                         : 'text-gray-700'
                     }`}
                   >
-                    Apply
+                    Join
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
@@ -183,7 +183,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                       : 'text-gray-700'
                   }`}
                 >
-                  Placements
+                  Jobs
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[400px] gap-2 p-4 bg-background/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100">
@@ -193,7 +193,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                           to="/post-job"
                           className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
                         >
-                          <div className="text-sm font-medium leading-none">Post a Placement</div>
+                          <div className="text-sm font-medium leading-none">Post a Job</div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                             Full-time, part-time, or contract appointments
                           </p>
@@ -219,7 +219,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                           to="/open-roles"
                           className="block select-none space-y-1 rounded-lg p-3 leading-none no-underline outline-none transition-all duration-300 hover:bg-[#A89F91]/10 hover:text-[#A89F91] focus:bg-[#A89F91]/10 focus:text-[#A89F91]"
                         >
-                          <div className="text-sm font-medium leading-none">View Open Roles and Requests</div>
+                          <div className="text-sm font-medium leading-none">View Jobs &amp; Service Requests</div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                             Browse all available positions and service needs
                           </p>
@@ -435,10 +435,17 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     className="text-foreground cursor-pointer hover:bg-[#A89F91]/10 hover:text-[#A89F91] transition-colors"
-                    onClick={() => navigate('/settings')}
+                    onClick={() => navigate('/my-jobs')}
                   >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
+                    <Briefcase className="w-4 h-4 mr-2" />
+                    My Jobs
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="text-foreground cursor-pointer hover:bg-[#A89F91]/10 hover:text-[#A89F91] transition-colors"
+                    onClick={() => navigate('/messaging')}
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Messages
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     className="text-foreground cursor-pointer hover:bg-[#A89F91]/10 hover:text-[#A89F91] transition-colors"
@@ -446,6 +453,13 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                   >
                     <Bookmark className="w-4 h-4 mr-2" />
                     Saved Profiles
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="text-foreground cursor-pointer hover:bg-[#A89F91]/10 hover:text-[#A89F91] transition-colors"
+                    onClick={() => navigate('/settings')}
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
                   </DropdownMenuItem>
                   <div className="h-px bg-border my-1" />
                   <DropdownMenuItem
@@ -509,13 +523,21 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                   <User className="w-4 h-4 mr-2" />
                   My Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
+                <DropdownMenuItem onClick={() => navigate('/my-jobs')} className="cursor-pointer">
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  My Jobs
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/messaging')} className="cursor-pointer">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Messages
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/saved-profiles')} className="cursor-pointer">
                   <Bookmark className="w-4 h-4 mr-2" />
                   Saved Profiles
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
                 </DropdownMenuItem>
                 <div className="border-t border-gray-100 mt-1 pt-1">
                   <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-600 focus:text-red-600">
@@ -575,18 +597,18 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                   : 'text-foreground hover:bg-muted'
               }`}
             >
-              Apply / Membership
+              Join
             </button>
 
             <div className="border-t border-border pt-2 mt-2">
               <div className="px-4 py-2 text-sm font-semibold text-[#A89F91] !bg-transparent">
-                Placements
+                Jobs
               </div>
               <button
                 onClick={() => handleNavigation('/post-job')}
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
               >
-                Post a Placement
+                Post a Job
               </button>
               <button
                 onClick={() => handleNavigation('/service-requests')}
@@ -598,7 +620,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                 onClick={() => handleNavigation('/open-roles')}
                 className="w-full text-left px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
               >
-                View Open Roles & Requests
+                View Jobs &amp; Service Requests
               </button>
             </div>
 

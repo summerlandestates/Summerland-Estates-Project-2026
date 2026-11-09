@@ -247,7 +247,7 @@ export default function ServiceRequestDetailPage() {
             className="mb-6 text-foreground hover:bg-muted"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Open Roles
+            Back to Jobs
           </Button>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">

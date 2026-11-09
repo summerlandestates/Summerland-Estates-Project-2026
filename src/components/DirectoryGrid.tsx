@@ -1,11 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import BlurredProfileCard from './BlurredProfileCard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, Star, BadgeCheck, Users } from 'lucide-react';
 import MapLocationLink from './MapLocationLink';
-import { shouldBlurProfile, canAccessProfile } from '@/utils/profileVisibility';
 import type { Listing, PricingTier } from '../types';
 
 interface DirectoryGridProps {
@@ -26,18 +24,12 @@ export default function DirectoryGrid({
   totalPages,
   onPageChange,
   onCardClick,
-  userTier,
-  isPublicView = false
+  userTier: _userTier,
+  isPublicView: _isPublicView
 }: DirectoryGridProps) {
   const navigate = useNavigate();
 
-  const handleCardClick = (id: string, index: number, e?: React.MouseEvent) => {
-    // Check if user can access this profile
-    if (!canAccessProfile(userTier, index, isPublicView)) {
-      navigate('/pricing');
-      return;
-    }
-
+  const handleCardClick = (id: string, _index: number, e?: React.MouseEvent) => {
     const targetListing = listings.find(l => l.id === id);
     const slug = targetListing?.slug || id;
 
@@ -67,20 +59,14 @@ export default function DirectoryGrid({
             : 'space-y-4'
         }
       >
-        {listings.map((listing, index) => {
-          const isBlurred = shouldBlurProfile(index, userTier, isPublicView);
-          
-          if (isBlurred) {
-            return <BlurredProfileCard key={`blurred-${index}`} viewMode={viewMode} />;
-          }
-
+        {listings.map((listing, _index) => {
           return (
             <Card
               key={listing.id}
               className={`bg-card cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border relative ${
                 listing.priorityListing ? 'border-[#A89F91] border-2' : ''
               }`}
-              onClick={(e) => handleCardClick(listing.id, index, e)}
+              onClick={(e) => handleCardClick(listing.id, _index, e)}
             >
               {viewMode === 'grid' ? (
                 <div className="p-6">

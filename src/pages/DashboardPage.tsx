@@ -831,7 +831,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <Button variant="link" className="w-full mt-4 text-[#A89F91]" onClick={() => navigate('/open-roles')}>
-                      Browse Open Roles
+                      Browse Jobs
                     </Button>
                   </CardContent>
                 </Card>

@@ -16,6 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DollarSign, Clock, Briefcase, Users } from 'lucide-react';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { serviceGroups } from '../data/serviceCategories';
+import { checkMeteredAccess } from '@/lib/usage';
+import UpgradePromptDialog from '@/components/UpgradePromptDialog';
+import type { MeteredFeature } from '@/lib/plans';
 
 interface JobFormData {
   jobTitle: string;
@@ -55,6 +58,8 @@ interface JobFormData {
 export default function JobPostingPage() {
   const { user } = useAuth();
   const [, setSubmitting] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<MeteredFeature | null>(null);
+  const [upgradeLimit, setUpgradeLimit] = useState<number | null>(null);
   const navigate = useNavigate();
   
   // Job form state
@@ -101,21 +106,34 @@ export default function JobPostingPage() {
     e.preventDefault();
     
     if (!user) {
-      toast.error('Apply or sign in to post a placement', {
-        description: 'Posting placements is available after membership approval.',
+      toast.error('Sign in to post a job', {
+        description: 'Sign in and we will bring you right back here.',
       });
-      navigate('/add-listing');
+      navigate(`/login?next=${encodeURIComponent('/post-job')}`);
       return;
     }
 
     if (!jobForm.jobCategory) {
       toast.error('Job category required', {
-        description: 'Please select a category for this placement.',
+        description: 'Please select a category for this job.',
       });
       return;
     }
 
     setSubmitting(true);
+
+    const { data: posterProfile } = await supabase
+      .from('profiles')
+      .select('tier')
+      .eq('id', user.id)
+      .maybeSingle();
+    const meterCheck = await checkMeteredAccess(user.id, posterProfile?.tier, 'jobPosts');
+    if (!meterCheck.allowed) {
+      setUpgradeFeature('jobPosts');
+      setUpgradeLimit(meterCheck.limit);
+      setSubmitting(false);
+      return;
+    }
 
     try {
       // Job posting is free for all accounts — no plan gate.
@@ -205,7 +223,7 @@ export default function JobPostingPage() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Post a Placement - Hire Estate Professionals"
+        title="Post a Job - Hire Estate Professionals"
         description="Post a domestic staffing position and reach vetted estate professionals. House managers, private chefs, nannies, chauffeurs and more on Summerland Estates."
         canonical="/post-job"
       />
@@ -215,7 +233,7 @@ export default function JobPostingPage() {
         <div className="container mx-auto px-8 max-w-4xl">
           <div className="mb-12 text-center">
             <h1 className="text-5xl font-heading font-bold text-foreground mb-4">
-              Post a Placement
+              Post a Job
             </h1>
             <p className="text-lg text-muted-foreground">
               Find the perfect candidate for your estate staffing needs
@@ -905,6 +923,13 @@ export default function JobPostingPage() {
           </div>
         </div>
       </main>
+
+      <UpgradePromptDialog
+        open={upgradeFeature !== null}
+        onOpenChange={(open) => { if (!open) setUpgradeFeature(null); }}
+        feature={upgradeFeature ?? 'jobPosts'}
+        limit={upgradeLimit}
+      />
 
       <Footer />
     </div>

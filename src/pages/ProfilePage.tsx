@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
-import UpgradePrompt from '../components/UpgradePrompt';
+import UpgradePromptDialog from '../components/UpgradePromptDialog';
+import { checkMeteredAccess } from '@/lib/usage';
+import type { MeteredFeature } from '@/lib/plans';
 import MapLocationLink from '../components/MapLocationLink';
 import ProfileAnalytics, { useProfileViewTracker } from '../components/ProfileAnalytics';
 import ServiceCalendar from '../components/ServiceCalendar';
@@ -16,8 +18,7 @@ import NativeAd from '../components/NativeAd';
 import ReportButton from '../components/ReportButton';
 import BlockUserButton from '../components/BlockUserButton';
 import { fetchListingBySlug, fetchListingById } from '../utils/listings';
-import { getVisibilityRules, formatNameForDisplay, canAccessProfile } from '@/utils/profileVisibility';
-import { getTierLimits } from '@/utils/tierAccess';
+import { getVisibilityRules, formatNameForDisplay } from '@/utils/profileVisibility';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Listing, PricingTier, Review } from '../types';
@@ -55,9 +56,10 @@ export default function ProfilePage() {
   const [isConnected, setIsConnected] = useState(false);
   const [userTier, setUserTier] = useState<PricingTier | undefined>(undefined);
   const [isPublicView, setIsPublicView] = useState(true);
-  const [profileIndex] = useState(0);
+  
   const [currentUserId] = useState(localStorage.getItem('userId') || '');
-  const [viewLimitReached, setViewLimitReached] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<MeteredFeature | null>(null);
+  const [upgradeLimit, setUpgradeLimit] = useState<number | null>(null);
 
   // Track profile views
   useProfileViewTracker(currentUserId, listing?.id || slug || '');
@@ -74,37 +76,7 @@ export default function ProfilePage() {
     }
   }, []);
 
-  // Enforce monthly profile view limits (e.g. "Search & View 3 Profiles/Month")
-  useEffect(() => {
-    if (!user || !listing) return;
-    if (listing.userId && listing.userId === user.id) return;
-
-    const checkViewLimit = async () => {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('tier')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
-      if (!limits.profileViewLimitMonthly) return;
-
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-      const { count } = await supabase
-        .from('profile_views')
-        .select('id', { count: 'exact', head: true })
-        .eq('viewer_id', user.id)
-        .gte('created_at', startOfMonth.toISOString());
-
-      if ((count || 0) >= limits.profileViewLimitMonthly) {
-        setViewLimitReached(true);
-      }
-    };
-
-    checkViewLimit().catch((err) => console.error('View limit check failed:', err));
-  }, [user, listing]);
+  // Profiles are fully public — no view limits are enforced.
 
   useEffect(() => {
     if (!slug) return;
@@ -147,7 +119,6 @@ export default function ProfilePage() {
   }, [listing]);
 
   // Check if user can access this profile
-  const canAccess = canAccessProfile(userTier, profileIndex, isPublicView);
   const visibilityRules = getVisibilityRules(userTier, isPublicView);
 
   const handleShare = () => {
@@ -159,8 +130,10 @@ export default function ProfilePage() {
 
   const handleSendMessage = async () => {
     if (!user) {
-      toast.error('Please sign in to send a message');
-      navigate('/login');
+      toast.error('Please sign in to send a message', {
+        description: 'Sign in and we will bring you right back here.',
+      });
+      navigate(`/login?next=${encodeURIComponent(`/profile/${slug}`)}`);
       return;
     }
 
@@ -323,35 +296,6 @@ export default function ProfilePage() {
     );
   }
 
-  // If user cannot access this profile, show upgrade prompt
-  if (!canAccess || viewLimitReached) {
-    return (
-      <div className="min-h-screen bg-background">
-        <NavBar currentPage="" />
-        <main className="pt-32 pb-16">
-          <div className="container mx-auto px-8 max-w-4xl">
-            <Button
-              onClick={() => navigate('/')}
-              variant="ghost"
-              className="mb-8 text-foreground hover:bg-muted"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Back to Directory
-            </Button>
-
-            <UpgradePrompt
-              feature="Full Profile Access"
-              message={viewLimitReached
-                ? 'You have reached your monthly profile view limit. Upgrade for unlimited profile searches.'
-                : 'Additional profiles are available with a paid participation level.'}
-              currentTier={userTier}
-            />
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
 
   const displayName = formatNameForDisplay(listing, visibilityRules.canViewFullName);
   const displayPhoto = visibilityRules.canViewPhoto ? listing.profilePhoto : 'https://via.placeholder.com/400x400/e5e5e5/666666?text=Profile';
@@ -399,9 +343,9 @@ export default function ProfilePage() {
 
     if (!user) {
       toast.error('Sign in to leave a review', {
-        description: 'Reviews are tied to your member account.',
+        description: 'Reviews are tied to your member account — we will bring you right back.',
       });
-      navigate('/login');
+      navigate(`/login?next=${encodeURIComponent(`/profile/${slug}`)}`);
       return;
     }
 
@@ -514,26 +458,6 @@ export default function ProfilePage() {
     setShowReviewModal(true);
   };
 
-  const getMonthlyNewConversationCount = async (): Promise<number> => {
-    if (!user) return 0;
-    const { data: myParticipants } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', user.id);
-    const ids = (myParticipants || []).map(p => p.conversation_id);
-    if (ids.length === 0) return 0;
-
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const { count } = await supabase
-      .from('conversations')
-      .select('id', { count: 'exact', head: true })
-      .in('id', ids)
-      .gte('created_at', startOfMonth.toISOString());
-    return count || 0;
-  };
-
   const checkNewConversationLimit = async (): Promise<boolean> => {
     if (!user) return false;
     const { data: profile } = await supabase
@@ -541,14 +465,10 @@ export default function ProfilePage() {
       .select('tier')
       .eq('id', user.id)
       .maybeSingle();
-    const limits = getTierLimits((profile?.tier || 'professional-basic') as PricingTier);
-    if (!limits.newConversationLimitMonthly) return true;
-    const count = await getMonthlyNewConversationCount();
-    if (count >= limits.newConversationLimitMonthly) {
-      toast.error(`You have reached your limit of ${limits.newConversationLimitMonthly} new profiles this month.`, {
-        description: 'Upgrade to message more profiles.',
-      });
-      navigate('/upgrade');
+    const check = await checkMeteredAccess(user.id, profile?.tier, 'newConversations');
+    if (!check.allowed) {
+      setUpgradeFeature('newConversations');
+      setUpgradeLimit(check.limit);
       return false;
     }
     return true;
@@ -823,7 +743,7 @@ export default function ProfilePage() {
                     />
                   )}
 
-                  {listing.category !== 'Business' && (
+                  {listing.category !== 'Business' && !!listing.experienceYears && (
                     <div className="flex items-center text-foreground">
                       <Calendar className="w-5 h-5 mr-2 text-accent" />
                       <span>{listing.experienceYears} years experience</span>
@@ -849,25 +769,13 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="mt-8 space-y-3">
-                  {/* Professionals can message for free, others need to upgrade */}
-                  {(userTier === 'professional-free' || visibilityRules.canSendMessage) ? (
-                    <Button
-                      onClick={handleSendMessage}
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      <Mail className="w-5 h-5 mr-2" />
-                      Send Message
-                    </Button>
-                  ) : (
-                    <Button 
-                      onClick={() => navigate('/pricing')}
-                      variant="outline"
-                      className="w-full border-border text-foreground hover:bg-muted"
-                    >
-                      <Mail className="w-5 h-5 mr-2" />
-                      Upgrade to Message
-                    </Button>
-                  )}
+                  <Button
+                    onClick={handleSendMessage}
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <Mail className="w-5 h-5 mr-2" />
+                    Send Message
+                  </Button>
                   
                   {/* Request Interview button for Professionals */}
                   {listing.category === 'Staff' && (
@@ -875,8 +783,11 @@ export default function ProfilePage() {
                       variant="outline"
                       className="w-full border-accent text-accent hover:bg-accent/10"
                       onClick={() => {
-                        if (!visibilityRules.canViewFullProfile) {
-                          navigate('/pricing');
+                        if (!user) {
+                          toast.error('Please sign in to request an interview', {
+                            description: 'Sign in and we will bring you right back here.',
+                          });
+                          navigate(`/login?next=${encodeURIComponent(`/profile/${slug}`)}`);
                           return;
                         }
                         setShowBookingModal(true);
@@ -893,11 +804,14 @@ export default function ProfilePage() {
                       variant="outline"
                       className="w-full border-accent text-accent hover:bg-accent/10"
                       onClick={() => {
-                        if (!visibilityRules.canViewFullProfile) {
-                          navigate('/pricing');
-                        } else {
-                          setShowServiceModal(true);
+                        if (!user) {
+                          toast.error('Please sign in to book this service', {
+                            description: 'Sign in and we will bring you right back here.',
+                          });
+                          navigate(`/login?next=${encodeURIComponent(`/profile/${slug}`)}`);
+                          return;
                         }
+                        setShowServiceModal(true);
                       }}
                     >
                       <Calendar className="w-5 h-5 mr-2" />
@@ -962,13 +876,6 @@ export default function ProfilePage() {
 
             {/* Main Content - Profile Details (left column on desktop) */}
             <div className="lg:col-span-2 lg:order-1">
-              {!visibilityRules.canViewDetailedInfo ? (
-                <UpgradePrompt
-                  feature="Full Profile Details"
-                  message="Full profile information is available with a paid participation level."
-                  currentTier={userTier}
-                />
-              ) : (
                 <div className="space-y-6">
                   <Card className="p-6 bg-card text-card-foreground shadow-lg border border-gray-100 rounded-2xl">
                     <h2 className="text-xl font-heading font-bold text-foreground mb-4 pb-3 border-b border-gray-100">
@@ -1225,13 +1132,19 @@ export default function ProfilePage() {
                     </Card>
                   )}
                 </div>
-              )}
             </div>
           </div>
         </div>
       </main>
 
       <Footer />
+
+      <UpgradePromptDialog
+        open={upgradeFeature !== null}
+        onOpenChange={(open) => { if (!open) setUpgradeFeature(null); }}
+        feature={upgradeFeature ?? 'newConversations'}
+        limit={upgradeLimit}
+      />
 
       {/* Review Modal */}
       {showReviewModal && (

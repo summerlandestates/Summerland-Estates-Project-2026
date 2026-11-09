@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { getPlansByUserType, getPlanById } from '@/data/pricing';
+import { PLANS, normalizeTier } from '@/lib/plans';
+import { getPlanById, getFreeTierForUserType } from '@/data/pricing';
 import { getAddOnsByUserType } from '@/data/addons';
 import { buildCheckoutDataFromMembership } from '@/lib/membership';
 import NavBar from '@/components/NavBar';
@@ -69,7 +70,24 @@ export default function UpgradePlansPage() {
 
   const currentTier = profile?.tier || user?.user_metadata?.tier || null;
   const currentPlan = currentTier ? getPlanById(currentTier as PricingTier) : null;
-  const plans = useMemo(() => getPlansByUserType(userType), [userType]);
+  // Canonical plans — same 3 plans for every membership type (B5 spec).
+  const plans = useMemo(
+    () =>
+      PLANS.map((p) => ({
+        id: p.id as unknown as PricingTier,
+        name: p.name,
+        price: p.priceLabel.replace('/month', '').replace('Free', 'Free'),
+        period: p.monthlyPrice > 0 ? '/month' : '',
+        features: p.features,
+        userType,
+      })),
+    [userType]
+  );
+  const canonicalTier: Record<string, PricingTier> = {
+    basic: getFreeTierForUserType(userType),
+    pro: 'business-pro',
+    enterprise: 'business-enterprise',
+  };
   const addOns = useMemo(() => getAddOnsByUserType(userType), [userType]);
 
   const baseCheckoutData = useMemo(
@@ -80,6 +98,7 @@ export default function UpgradePlansPage() {
   const handleSelectPlan = (planId: PricingTier) => {
     const plan = getPlanById(planId);
     if (!plan) return;
+    const checkoutTier = canonicalTier[plan.id as unknown as string] || planId;
 
     const checkoutData = {
       ...(baseCheckoutData || {}),
@@ -90,7 +109,7 @@ export default function UpgradePlansPage() {
       bio: profile?.application_data?.bio || '',
       profileType: profile?.profile_type || '',
       applicationData: profile?.application_data || {},
-      selectedTier: plan.id,
+      selectedTier: checkoutTier,
       planName: plan.name,
       planPrice: plan.price,
       password: '',
@@ -155,7 +174,7 @@ export default function UpgradePlansPage() {
             }`}
           >
             {plans.map((plan) => {
-              const isCurrent = plan.id === currentTier;
+              const isCurrent = normalizeTier(currentTier) === (plan.id as unknown as string);
               const isFreeTier = plan.price === '$0' || plan.price === 'Complimentary';
               return (
                 <Card

@@ -106,8 +106,18 @@ export default function AdminDashboard() {
         newsletterSubscribers,
       ] = await Promise.all([
         countRows('profiles'),
-        countRows('profiles', (q) => q.eq('status', 'pending')),
-        countRows('profiles', (q) => q.eq('status', 'approved')),
+        // Membership-application statuses live in auth user_metadata — count
+        // from the same endpoint the Applications page uses.
+        fetch('/api/admin-membership-applications')
+          .then((r) => (r.ok ? r.json() : { applications: [] }))
+          .then((j) => (Array.isArray(j) ? j : j.applications || []))
+          .then((apps: any[]) => apps.filter((a) => a.status === 'pending').length)
+          .catch(() => 0),
+        fetch('/api/admin-membership-applications')
+          .then((r) => (r.ok ? r.json() : { applications: [] }))
+          .then((j) => (Array.isArray(j) ? j : j.applications || []))
+          .then((apps: any[]) => apps.filter((a) => a.status === 'approved').length)
+          .catch(() => 0),
         countRows('promo_codes', (q) => q.eq('is_active', true)),
         countRows('user_promo_codes'),
         countRows('job_postings', (q) => q.eq('status', 'active')),
@@ -126,13 +136,29 @@ export default function AdminDashboard() {
         newsletterSubscribers,
       });
 
-      const { data: pending } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, tier, status, profile_type, created_at')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      setPendingApps(pending || []);
+      // Pending applications come from the same source as the Membership
+      // Applications page (auth metadata), not profiles.status — the two were
+      // disagreeing because approvals are written to user_metadata.
+      try {
+        const appsRes = await fetch('/api/admin-membership-applications');
+        const appsJson = appsRes.ok ? await appsRes.json() : { applications: [] };
+        const apps = (Array.isArray(appsJson) ? appsJson : appsJson.applications) || [];
+        const pendingList = (Array.isArray(apps) ? apps : [])
+          .filter((a: any) => a.status === 'pending')
+          .slice(0, 5)
+          .map((a: any) => ({
+            id: a.id,
+            email: a.email,
+            full_name: a.name || a.full_name,
+            tier: a.selectedTier || a.tier,
+            status: a.status,
+            profile_type: a.profileType || a.profile_type,
+            created_at: a.submittedDate || a.created_at,
+          }));
+        setPendingApps(pendingList);
+      } catch {
+        setPendingApps([]);
+      }
 
       const { data: members } = await supabase
         .from('profiles')

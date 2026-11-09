@@ -12,8 +12,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { getTierLimits } from '@/utils/tierAccess';
 import { sendBackendNotification } from '@/utils/notifications';
+import { checkMeteredAccess } from '@/lib/usage';
+import UpgradePromptDialog from '@/components/UpgradePromptDialog';
+import type { MeteredFeature } from '@/lib/plans';
 import ReportButton from '@/components/ReportButton';
 import MapLocationLink from '../components/MapLocationLink';
 import { ArrowLeft, Briefcase, DollarSign, Calendar, Mail, Phone, User, Building2, Loader2, Send, CheckCircle } from 'lucide-react';
@@ -71,6 +73,11 @@ export default function JobDetailPage() {
     phone: '',
     coverMessage: ''
   });
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [applicantCount, setApplicantCount] = useState(0);
+  const [upgradeFeature, setUpgradeFeature] = useState<MeteredFeature | null>(null);
+  const [upgradeLimit, setUpgradeLimit] = useState<number | null>(null);
+  const isJobOwner = !!user && !!job && job.user_id === user.id;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -97,24 +104,24 @@ export default function JobDetailPage() {
     setHasApplied(!!data);
   };
 
-  const getMonthlyApplicationCount = async () => {
-    if (!user) return 0;
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const { count } = await supabase
-      .from('job_applications')
-      .select('*', { count: 'exact', head: true })
-      .eq('applicant_id', user.id)
-      .gte('created_at', startOfMonth.toISOString());
-    return count || 0;
+  const uploadResume = async (file: File): Promise<string | null> => {
+    const ext = file.name.split('.').pop() || 'pdf';
+    const path = `resumes/${user!.id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('application-documents')
+      .upload(path, file, { upsert: true });
+    if (error) throw error;
+    const { data } = supabase.storage.from('application-documents').getPublicUrl(path);
+    return data.publicUrl;
   };
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      toast.error('Please sign in to apply');
-      navigate('/login');
+      toast.error('Please sign in to apply', {
+        description: 'Sign in and we will bring you right back here.',
+      });
+      navigate(`/login?next=${encodeURIComponent(`/job/${id}`)}`);
       return;
     }
     if (!job) return;
@@ -129,46 +136,83 @@ export default function JobDetailPage() {
         .from('profiles')
         .select('tier')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
-      const limits = getTierLimits(profile?.tier || 'professional-basic');
-      if (!limits.canApplyToRoles) {
-        toast.error('Applications are not available on your current plan');
+      const check = await checkMeteredAccess(user.id, profile?.tier, 'jobApplications');
+      if (!check.allowed) {
+        setUpgradeFeature('jobApplications');
+        setUpgradeLimit(check.limit);
         return;
       }
-      if (limits.applicationLimit) {
-        const count = await getMonthlyApplicationCount();
-        if (count >= limits.applicationLimit) {
-          toast.error(`You have reached your limit of ${limits.applicationLimit} applications this month. Upgrade to Pro for unlimited applications.`);
-          return;
+
+      let resumeUrl: string | null = null;
+      if (resumeFile) {
+        try {
+          resumeUrl = await uploadResume(resumeFile);
+        } catch (uploadError) {
+          console.error('Resume upload failed:', uploadError);
+          toast.error('Resume upload failed — submitting without it');
         }
       }
 
-      const { error } = await supabase.from('job_applications').insert({
+      const insertPayload: Record<string, unknown> = {
         job_posting_id: job.id,
         applicant_id: user.id,
         applicant_name: applicationForm.name,
         applicant_email: applicationForm.email,
         applicant_phone: applicationForm.phone || null,
         cover_letter: applicationForm.coverMessage || null,
-      });
+        resume_url: resumeUrl,
+      };
 
-      if (error) throw error;
+      // Tolerate schema drift: drop unknown columns and retry.
+      let insertError: { message?: string } | null = null;
+      for (let i = 0; i < 5; i++) {
+        const { error } = await supabase.from('job_applications').insert(insertPayload);
+        if (!error) {
+          insertError = null;
+          break;
+        }
+        insertError = error;
+        const missingCol = /Could not find the '([^']+)' column/i.exec(error.message || '')?.[1];
+        if (!missingCol || !(missingCol in insertPayload)) break;
+        delete insertPayload[missingCol];
+      }
+      if (insertError) throw insertError;
 
-      // Notify job owner
+      // Notify job owner (in-app) and email them a copy
       if (job?.user_id) {
         await sendBackendNotification(
           job.user_id,
           'message',
           `New application for ${job.job_title}`,
           `${applicationForm.name} has applied for ${job.job_title}.`,
-          `/admin/applications`
+          `/my-jobs/${job.id}/applicants`
         );
+      }
+      try {
+        await fetch('/api/notify-job-application', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: job.id,
+            jobTitle: job.job_title,
+            applicantName: applicationForm.name,
+            applicantEmail: applicationForm.email,
+            applicantPhone: applicationForm.phone || null,
+            coverLetter: applicationForm.coverMessage || null,
+            resumeUrl,
+          }),
+        });
+      } catch (notifyError) {
+        console.error('Failed to email job application:', notifyError);
       }
 
       setHasApplied(true);
+      setApplicantCount((c) => c + 1);
       toast.success('Application submitted successfully');
       setApplicationForm({ name: '', email: '', phone: '', coverMessage: '' });
+      setResumeFile(null);
     } catch (error: any) {
       toast.error('Failed to submit application', { description: error.message });
     } finally {
@@ -179,6 +223,12 @@ export default function JobDetailPage() {
   const fetchJob = async () => {
     setLoading(true);
     try {
+      const { count: appCount } = await supabase
+        .from('job_applications')
+        .select('id', { count: 'exact', head: true })
+        .eq('job_posting_id', id);
+      setApplicantCount(appCount || 0);
+
       const { data, error } = await supabase
         .from('job_postings')
         .select('*')
@@ -286,7 +336,7 @@ export default function JobDetailPage() {
             className="mb-6 text-foreground hover:bg-muted"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Open Roles
+            Back to Jobs
           </Button>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -567,6 +617,18 @@ export default function JobDetailPage() {
                           disabled={!user || applying}
                         />
                       </div>
+                      <div>
+                        <Label htmlFor="apply-resume" className="text-sm">Resume (optional)</Label>
+                        <Input
+                          id="apply-resume"
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                          disabled={!user || applying}
+                          className="text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">PDF, DOC or DOCX</p>
+                      </div>
                       <Button 
                         type="submit"
                         className="w-full bg-[#A89F91] hover:bg-[#8A8279] text-white"
@@ -582,6 +644,17 @@ export default function JobDetailPage() {
                     <p className="text-sm text-muted-foreground text-center mt-4">
                       Application deadline: {formatDate(job.application_deadline)}
                     </p>
+                  )}
+
+                  {isJobOwner && (
+                    <Button
+                      variant="outline"
+                      className="w-full mt-4 border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91]/10"
+                      onClick={() => navigate(`/my-jobs/${job.id}/applicants`)}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      View Applicants ({applicantCount})
+                    </Button>
                   )}
                 </Card>
 
@@ -660,6 +733,13 @@ export default function JobDetailPage() {
       </main>
 
       <Footer />
+
+      <UpgradePromptDialog
+        open={upgradeFeature !== null}
+        onOpenChange={(open) => { if (!open) setUpgradeFeature(null); }}
+        feature={upgradeFeature ?? 'jobApplications'}
+        limit={upgradeLimit}
+      />
     </div>
   );
 }

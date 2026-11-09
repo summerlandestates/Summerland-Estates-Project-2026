@@ -390,6 +390,13 @@ export default function AdminJobsPage() {
                                     View
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
+                                    onClick={() => navigate(`/my-jobs/${job.id}/applicants`)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Users className="w-4 h-4 mr-2" />
+                                    Applicants
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
                                     onClick={() => handlePublishToggle(job.id, 'job', job.status)}
                                     className="cursor-pointer"
                                   >

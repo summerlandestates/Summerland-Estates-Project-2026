@@ -20,6 +20,8 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 
 interface AdminJobEditPageProps {
   type: 'job' | 'service';
+  /** 'admin' requires an admin profile; 'owner' also allows the record's poster. */
+  scope?: 'admin' | 'owner';
 }
 
 interface JobForm {
@@ -58,10 +60,13 @@ const SERVICE_STATUSES = [
   { value: 'closed', label: 'Closed' },
 ];
 
-export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
+export default function AdminJobEditPage({ type, scope = 'admin' }: AdminJobEditPageProps) {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
+  const isOwnerScope = scope === 'owner';
+  const backPath = isOwnerScope ? '/my-jobs' : '/admin/jobs';
+  const backLabel = isOwnerScope ? 'Back to My Jobs' : 'Back to Jobs & Services';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -101,7 +106,7 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
 
   const checkAdminAndLoad = async () => {
     if (!user) {
-      navigate('/admin/login');
+      navigate(isOwnerScope ? `/login?next=${encodeURIComponent(`/my-jobs/edit/${id}`)}` : '/admin/login');
       return;
     }
 
@@ -111,16 +116,16 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (profile?.role !== 'admin') {
+    if (profile?.role !== 'admin' && !isOwnerScope) {
       toast.error('Access Denied', { description: 'You do not have admin privileges' });
       navigate('/');
       return;
     }
 
-    await loadRecord();
+    await loadRecord(profile?.role === 'admin');
   };
 
-  const loadRecord = async () => {
+  const loadRecord = async (isAdmin = false) => {
     if (!id) {
       setNotFound(true);
       setLoading(false);
@@ -135,7 +140,7 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
         .maybeSingle();
 
       if (error) throw error;
-      if (!data) {
+      if (!data || (!isAdmin && data.user_id !== user?.id)) {
         setNotFound(true);
         return;
       }
@@ -245,7 +250,7 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
       if (updateError) throw updateError;
 
       toast.success(`${label} updated successfully`);
-      navigate('/admin/jobs');
+      navigate(backPath);
     } catch (error) {
       console.error(`Error updating ${label}:`, error);
       toast.error(`Failed to update ${label.toLowerCase()}`);
@@ -267,8 +272,8 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
       <Card className="p-12 text-center bg-white">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">{label} Not Found</h3>
         <p className="text-gray-500 mb-4">This {label.toLowerCase()} may have been deleted.</p>
-        <Button onClick={() => navigate('/admin/jobs')} className="bg-[#A89F91] hover:bg-[#8A8279] text-white">
-          Back to Jobs &amp; Services
+        <Button onClick={() => navigate(backPath)} className="bg-[#A89F91] hover:bg-[#8A8279] text-white">
+          {backLabel}
         </Button>
       </Card>
     );
@@ -280,11 +285,11 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
     <div>
       <Button
         variant="ghost"
-        onClick={() => navigate('/admin/jobs')}
+        onClick={() => navigate(backPath)}
         className="mb-4 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Jobs &amp; Services
+        {backLabel}
       </Button>
 
       <Card className="p-6 bg-white max-w-3xl">
@@ -525,7 +530,7 @@ export default function AdminJobEditPage({ type }: AdminJobEditPageProps) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/admin/jobs')}
+              onClick={() => navigate(backPath)}
               disabled={saving}
             >
               Cancel

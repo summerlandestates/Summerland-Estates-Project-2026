@@ -40,12 +40,18 @@ export default function AuthCallbackPage() {
         profile?.application_data?.account_status ||
         session.user.user_metadata?.account_status;
 
+      // Return the user to the page they were trying to reach, if any.
+      const stored = sessionStorage.getItem('authRedirect');
+      const returnTo =
+        stored && stored.startsWith('/') && !stored.startsWith('//') ? stored : null;
+      if (returnTo) sessionStorage.removeItem('authRedirect');
+
       if (profile?.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
+        navigate(returnTo || '/admin/dashboard', { replace: true });
       } else if (status === 'pending') {
         navigate('/registration-pending', { replace: true });
       } else {
-        navigate('/dashboard', { replace: true });
+        navigate(returnTo || '/dashboard', { replace: true });
       }
     };
 
