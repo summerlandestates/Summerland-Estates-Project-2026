@@ -518,6 +518,18 @@ export default function UserDashboard() {
             </Button>
             
             <Button
+              variant="ghost"
+              className="w-full justify-start text-[#23231f] hover:bg-[#f5efe7]"
+              onClick={() => navigate('/my-jobs')}
+            >
+              <Briefcase className="w-4 h-4 mr-3" />
+              My Jobs
+              {myJobs.length > 0 && (
+                <Badge className="ml-auto bg-[#A89F91] text-white text-xs">{myJobs.length}</Badge>
+              )}
+            </Button>
+            
+            <Button
               variant={activeSection === 'events' ? 'default' : 'ghost'}
               className={`w-full justify-start ${activeSection === 'events' ? 'bg-[#A89F91] hover:bg-[#8A8279] text-white' : 'text-[#23231f] hover:bg-[#f5efe7]'}`}
               onClick={() => setActiveSection('events')}
