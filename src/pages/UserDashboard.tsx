@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import SEOHead from '@/components/SEOHead';
 import ArticleManager from '@/components/ArticleManager';
@@ -120,6 +120,7 @@ export default function UserDashboard() {
   const [myRecognitions, setMyRecognitions] = useState<MyRecognition[]>([]);
   const [pendingNomineeApprovals, setPendingNomineeApprovals] = useState<any[]>([]);
   const [myPlans, setMyPlans] = useState<MyPlan[]>([]);
+  const [myJobs, setMyJobs] = useState<{ id: string; title: string; status: string; created_at: string; applicants: number }[]>([]);
   const [profileData, setProfileData] = useState<any>(null);
   const [userTier, setUserTier] = useState<string>(localStorage.getItem('userTier') || 'professional-basic');
   
@@ -147,12 +148,45 @@ export default function UserDashboard() {
         loadMyRecognitions(),
         loadPendingNomineeApprovals(),
         loadMyPlans(),
-        loadProfileData()
+        loadProfileData(),
+        loadMyJobs()
       ]);
     } catch (error) {
       console.error('User access check failed:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMyJobs = async () => {
+    if (!user?.id) return;
+    try {
+      const { data: jobsData } = await supabase
+        .from('job_postings')
+        .select('id, job_title, status, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      const list = jobsData || [];
+      const counts: Record<string, number> = {};
+      if (list.length > 0) {
+        const { data: apps } = await supabase
+          .from('job_applications')
+          .select('job_posting_id')
+          .in('job_posting_id', list.map((j: any) => j.id));
+        (apps || []).forEach((a: any) => {
+          counts[a.job_posting_id] = (counts[a.job_posting_id] || 0) + 1;
+        });
+      }
+      setMyJobs(list.map((j: any) => ({
+        id: j.id,
+        title: j.job_title,
+        status: j.status,
+        created_at: j.created_at,
+        applicants: counts[j.id] || 0,
+      })));
+    } catch (error) {
+      console.error('Failed to load my jobs:', error);
     }
   };
 
@@ -736,6 +770,62 @@ export default function UserDashboard() {
                   maxResults={5}
                 />
               </div>
+
+              {/* My Job Postings — jobs posted by this account + applicant counts */}
+              <Card className="mb-8 border-[#e8dfd3] bg-white">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <CardTitle className="flex items-center gap-2 text-[#23231f]">
+                    <Briefcase className="w-5 h-5 text-[#A89F91]" />
+                    My Job Postings
+                  </CardTitle>
+                  <Link to="/my-jobs" className="text-sm text-[#A89F91] hover:underline">
+                    View all
+                  </Link>
+                </CardHeader>
+                <CardContent>
+                  {myJobs.length === 0 ? (
+                    <div className="py-6 text-center">
+                      <p className="text-sm text-[#6b6458] mb-4">You haven't posted any jobs yet.</p>
+                      <Button size="sm" onClick={() => navigate('/post-job')} className="bg-[#A89F91] hover:bg-[#8A8279] text-white">
+                        Post a Job
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-[#f0e9df]">
+                      {myJobs.map((job) => (
+                        <div key={job.id} className="py-3 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-medium text-[#23231f] truncate">{job.title}</p>
+                            <p className="text-xs text-[#6b6458] mt-0.5">
+                              Posted {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {' · '}
+                              <span className={job.status === 'active' ? 'text-green-600' : 'text-[#6b6458]'}>{job.status}</span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(`/my-jobs/${job.id}/applicants`)}
+                              className="border-[#A89F91] text-[#A89F91] hover:bg-[#A89F91]/10"
+                            >
+                              Applicants ({job.applicants})
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => navigate(`/job/${job.id}`)}
+                              className="text-[#6b6458]"
+                            >
+                              View
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Quick Actions - Fixed hover text color */}
               <Card className="mb-8 border-[#e8dfd3] bg-white">
