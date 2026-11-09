@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, User, ChevronDown, LogOut, Settings, Bookmark, Briefcase, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +27,21 @@ interface NavBarProps {
 }
 
 export default function NavBar({ currentPage = '' }: NavBarProps) {
+  const location = useLocation();
+  // Resolve the active page from the actual path so every route highlights,
+  // even when a page forgets to pass currentPage.
+  const path = location.pathname;
+  const pathPage = path === '/' ? 'home'
+    : path.startsWith('/search') || path === '/directory' ? 'search'
+    : ['/open-roles', '/jobs', '/post-job', '/service-requests', '/my-jobs'].some((p) => path === p)
+      || path.startsWith('/job/') || path.startsWith('/service-request/') ? 'jobs'
+    : path === '/add-listing' || path === '/register' ? 'add-listing'
+    : ['/news', '/articles', '/collective'].some((p) => path.startsWith(p)) ? 'news'
+    : ['/contact', '/about', '/faqs', '/privacy', '/terms', '/pricing', '/advertisements', '/how-it-works', '/services']
+      .some((p) => path.startsWith(p)) ? path.slice(1).split('/')[0]
+    : '';
+  const page = currentPage || pathPage;
+  const isPage = (...keys: string[]) => keys.includes(page) || keys.includes(currentPage);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
@@ -135,7 +150,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                   <Link
                     to="/"
                     className={`text-base font-normal transition-all duration-300 cursor-pointer hover:text-[#A89F91] relative pb-1 ${
-                      currentPage === 'home'
+                      isPage('home')
                         ? 'text-[#A89F91] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#A89F91] after:rounded-full'
                         : 'text-gray-700'
                     }`}
@@ -150,7 +165,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                   <Link
                     to="/search"
                     className={`text-base font-normal transition-all duration-300 cursor-pointer hover:text-[#A89F91] relative pb-1 ${
-                      currentPage === 'search'
+                      isPage('search')
                         ? 'text-[#A89F91] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#A89F91] after:rounded-full'
                         : 'text-gray-700'
                     }`}
@@ -165,7 +180,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                   <Link
                     to="/add-listing"
                     className={`text-base font-normal transition-all duration-300 cursor-pointer hover:text-[#A89F91] relative pb-1 ${
-                      currentPage === 'add-listing'
+                      isPage('add-listing')
                         ? 'text-[#A89F91] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#A89F91] after:rounded-full'
                         : 'text-gray-700'
                     }`}
@@ -178,7 +193,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
               <NavigationMenuItem>
                 <NavigationMenuTrigger
                   className={`text-base font-normal transition-all duration-300 cursor-pointer hover:text-[#A89F91] relative pb-1 ${
-                    currentPage === 'jobs'
+                    isPage('jobs')
                       ? 'text-[#A89F91] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#A89F91] after:rounded-full'
                       : 'text-gray-700'
                   }`}
@@ -233,7 +248,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
               <NavigationMenuItem>
                 <NavigationMenuTrigger
                   className={`text-base font-normal transition-colors cursor-pointer hover:text-primary ${
-                    ['collective', 'news'].includes(currentPage)
+                    isPage('collective', 'news')
                       ? 'text-primary font-semibold'
                       : 'text-foreground'
                   }`}
@@ -307,7 +322,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
                   <button
                     type="button"
                     className={`inline-flex items-center gap-1 text-base font-normal transition-colors cursor-pointer hover:text-primary ${
-                      ['contact', 'about', 'faqs', 'privacy', 'terms', 'pricing', 'advertisements', 'how-it-works', 'services'].includes(currentPage)
+                      isPage('contact', 'about', 'faqs', 'privacy', 'terms', 'pricing', 'advertisements', 'how-it-works', 'services')
                         ? 'text-primary font-semibold'
                         : 'text-foreground'
                     }`}
@@ -570,7 +585,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
             <button
               onClick={() => handleNavigation('/')}
               className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                currentPage === 'home'
+                isPage('home')
                   ? 'bg-[#A89F91] text-white font-semibold'
                   : 'text-foreground hover:bg-muted'
               }`}
@@ -581,7 +596,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
             <button
               onClick={() => handleNavigation('/search')}
               className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                currentPage === 'search'
+                isPage('search')
                   ? 'bg-[#A89F91] text-white font-semibold'
                   : 'text-foreground hover:bg-muted'
               }`}
@@ -592,7 +607,7 @@ export default function NavBar({ currentPage = '' }: NavBarProps) {
             <button
               onClick={() => handleNavigation('/add-listing')}
               className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                currentPage === 'add-listing'
+                isPage('add-listing')
                   ? 'bg-[#A89F91] text-white font-semibold'
                   : 'text-foreground hover:bg-muted'
               }`}
